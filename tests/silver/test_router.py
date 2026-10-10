@@ -19,7 +19,7 @@ def env(monkeypatch):
     monkeypatch.setenv("AWS_DEFAULT_REGION", REGION)
     for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"):
         monkeypatch.setenv(k, "test")
-    R._CACHE.update(at=0.0, jobs=[])
+    R._CACHE.update(at=None, jobs=[])
     with mock_aws():
         ddb = boto3.resource("dynamodb", region_name=REGION)
         for name, keys in (("cfg", [("job_name", "HASH")]),
@@ -71,6 +71,28 @@ def test_mot_dataset_nuoi_nhieu_bang_silver(env):
     assert sorted(g for g, _ in msgs) == ["gleif_legal_entity", "gleif_parent_entity"]  # khong co job tat
     body = msgs[0][1]
     assert body["manifest"] == MANIFEST and body["data_date"] == "2026-09-28" and body["run_id"]
+
+
+def test_container_vua_khoi_dong_van_doc_bang_config(env, monkeypatch):
+    """monotonic() dem tu luc MAY khoi dong. Lambda cold start / runner CI moi co the
+    < 60 giay: cache cu (at=0.0) tuong la 'chua het han' va tra danh sach RONG,
+    manifest bi bo qua ma khong bao loi. Loi nay lam CI do ngau nhien (10-10)."""
+    monkeypatch.setattr(R.time, "monotonic", lambda: 5.0)
+    sqs, q = env
+    R.handler(_sqs_event(MANIFEST))
+    assert sorted(g for g, _ in _drain(sqs, q)) == ["gleif_legal_entity", "gleif_parent_entity"]
+
+
+def test_cache_con_han_thi_khong_quet_lai(env, monkeypatch):
+    clock = iter([100.0, 130.0])
+    monkeypatch.setattr(R.time, "monotonic", lambda: next(clock))
+    store = R.JobConfigStore("cfg")
+    calls = []
+    real = store.list_enabled
+    monkeypatch.setattr(store, "list_enabled", lambda: calls.append(1) or real())
+    R.enabled_jobs(store)
+    R.enabled_jobs(store)  # 30 giay sau: van trong 60 giay
+    assert len(calls) == 1
 
 
 def test_manifest_den_hai_lan_chi_chay_mot_lan(env):

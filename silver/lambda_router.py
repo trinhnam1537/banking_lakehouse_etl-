@@ -40,7 +40,11 @@ MANIFEST_RE = re.compile(r"^(?P<prefix>.+?)/_manifests/(?P<dataset>.+)/ingest_da
 # silver.main coi "-" la None.
 NONE = "-"
 
-_CACHE: Dict[str, Any] = {"at": 0.0, "jobs": []}
+# "at" = None nghia la CHUA NAP. Khong khoi tao bang 0.0: time.monotonic() dem
+# tu luc MAY khoi dong, nen tren container moi (Lambda cold start, runner CI)
+# no co the < 60 -> "0 + 60 giay chua het han" -> tra danh sach RONG, router bo
+# qua manifest ma khong bao loi va SQS xoa message nhu da xu ly xong.
+_CACHE: Dict[str, Any] = {"at": None, "jobs": []}
 CACHE_SECONDS = 60
 
 
@@ -59,7 +63,7 @@ def _source_dataset(item: Dict[str, Any]) -> str:
 def enabled_jobs(store: JobConfigStore) -> List[Dict[str, Any]]:
     """Cache ngắn trong container: một đợt 20 manifest không quét bảng 20 lần."""
     now = time.monotonic()
-    if now - _CACHE["at"] > CACHE_SECONDS:
+    if _CACHE["at"] is None or now - _CACHE["at"] > CACHE_SECONDS:
         _CACHE["jobs"] = store.list_enabled()
         _CACHE["at"] = now
     return _CACHE["jobs"]
