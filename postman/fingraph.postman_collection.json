@@ -1,0 +1,3762 @@
+{
+  "info": {
+    "_postman_id": "bdfc7e62-b015-49c0-90bc-6565d831fd06",
+    "name": "FinGraph sources",
+    "description": "Sinh tu dong boi scripts/gen_postman.py — dung sua tay, chay lai script.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "alphavantage",
+      "item": [
+        {
+          "name": "av_balance_sheet [disabled]",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"annualReports\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=IBM&apikey={{alphavantage_apikey}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "alphavantage",
+                "co"
+              ],
+              "path": [
+                "query"
+              ],
+              "query": [
+                {
+                  "key": "function",
+                  "value": "BALANCE_SHEET"
+                },
+                {
+                  "key": "symbol",
+                  "value": "IBM"
+                },
+                {
+                  "key": "apikey",
+                  "value": "{{alphavantage_apikey}}"
+                }
+              ]
+            },
+            "description": "Bang can doi ke toan nam\n\n- entry: `av_balance_sheet` [disabled]\n- records_path: `annualReports`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "av_cash_flow [disabled]",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"annualReports\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.alphavantage.co/query?function=CASH_FLOW&symbol=IBM&apikey={{alphavantage_apikey}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "alphavantage",
+                "co"
+              ],
+              "path": [
+                "query"
+              ],
+              "query": [
+                {
+                  "key": "function",
+                  "value": "CASH_FLOW"
+                },
+                {
+                  "key": "symbol",
+                  "value": "IBM"
+                },
+                {
+                  "key": "apikey",
+                  "value": "{{alphavantage_apikey}}"
+                }
+              ]
+            },
+            "description": "Bao cao luu chuyen tien te nam\n\n- entry: `av_cash_flow` [disabled]\n- records_path: `annualReports`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "av_dividends [disabled]",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.alphavantage.co/query?function=DIVIDENDS&symbol=IBM&apikey={{alphavantage_apikey}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "alphavantage",
+                "co"
+              ],
+              "path": [
+                "query"
+              ],
+              "query": [
+                {
+                  "key": "function",
+                  "value": "DIVIDENDS"
+                },
+                {
+                  "key": "symbol",
+                  "value": "IBM"
+                },
+                {
+                  "key": "apikey",
+                  "value": "{{alphavantage_apikey}}"
+                }
+              ]
+            },
+            "description": "Lich su chi tra co tuc\n\n- entry: `av_dividends` [disabled]\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "av_earnings [disabled]",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"annualEarnings\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.alphavantage.co/query?function=EARNINGS&symbol=IBM&apikey={{alphavantage_apikey}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "alphavantage",
+                "co"
+              ],
+              "path": [
+                "query"
+              ],
+              "query": [
+                {
+                  "key": "function",
+                  "value": "EARNINGS"
+                },
+                {
+                  "key": "symbol",
+                  "value": "IBM"
+                },
+                {
+                  "key": "apikey",
+                  "value": "{{alphavantage_apikey}}"
+                }
+              ]
+            },
+            "description": "Loi nhuan tren co phieu theo nam\n\n- entry: `av_earnings` [disabled]\n- records_path: `annualEarnings`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "av_income_statement [disabled]",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"annualReports\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=IBM&apikey={{alphavantage_apikey}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "alphavantage",
+                "co"
+              ],
+              "path": [
+                "query"
+              ],
+              "query": [
+                {
+                  "key": "function",
+                  "value": "INCOME_STATEMENT"
+                },
+                {
+                  "key": "symbol",
+                  "value": "IBM"
+                },
+                {
+                  "key": "apikey",
+                  "value": "{{alphavantage_apikey}}"
+                }
+              ]
+            },
+            "description": "Bao cao ket qua kinh doanh nam\n\n- entry: `av_income_statement` [disabled]\n- records_path: `annualReports`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "av_news_sentiment [disabled]",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"feed\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=IBM&apikey={{alphavantage_apikey}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "alphavantage",
+                "co"
+              ],
+              "path": [
+                "query"
+              ],
+              "query": [
+                {
+                  "key": "function",
+                  "value": "NEWS_SENTIMENT"
+                },
+                {
+                  "key": "tickers",
+                  "value": "IBM"
+                },
+                {
+                  "key": "apikey",
+                  "value": "{{alphavantage_apikey}}"
+                }
+              ]
+            },
+            "description": "Tin tuc kem diem cam xuc\n\n- entry: `av_news_sentiment` [disabled]\n- records_path: `feed`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "av_overview [disabled]",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.alphavantage.co/query?function=OVERVIEW&symbol=IBM&apikey={{alphavantage_apikey}}",
+              "protocol": "https",
+              "host": [
+                "www",
+                "alphavantage",
+                "co"
+              ],
+              "path": [
+                "query"
+              ],
+              "query": [
+                {
+                  "key": "function",
+                  "value": "OVERVIEW"
+                },
+                {
+                  "key": "symbol",
+                  "value": "IBM"
+                },
+                {
+                  "key": "apikey",
+                  "value": "{{alphavantage_apikey}}"
+                }
+              ]
+            },
+            "description": "Ho so tom tat doanh nghiep\n\n- entry: `av_overview` [disabled]\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        }
+      ]
+    },
+    {
+      "name": "binance",
+      "item": [
+        {
+          "name": "binance_exchange_info",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"symbols\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.binance.com/api/v3/exchangeInfo",
+              "protocol": "https",
+              "host": [
+                "api",
+                "binance",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "exchangeInfo"
+              ],
+              "query": []
+            },
+            "description": "Quy tac giao dich cua tung cap\n\n- entry: `binance_exchange_info`\n- records_path: `symbols`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "binance_ticker_24hr",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.binance.com/api/v3/ticker/24hr",
+              "protocol": "https",
+              "host": [
+                "api",
+                "binance",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "ticker",
+                "24hr"
+              ],
+              "query": []
+            },
+            "description": "Thong ke 24 gio moi cap\n\n- entry: `binance_ticker_24hr`\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "coingecko",
+      "item": [
+        {
+          "name": "coingecko_asset_platforms",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.coingecko.com/api/v3/asset_platforms",
+              "protocol": "https",
+              "host": [
+                "api",
+                "coingecko",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "asset_platforms"
+              ],
+              "query": []
+            },
+            "description": "Nen tang blockchain phat hanh tai san\n\n- entry: `coingecko_asset_platforms`\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "coingecko_categories",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.coingecko.com/api/v3/coins/categories",
+              "protocol": "https",
+              "host": [
+                "api",
+                "coingecko",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "coins",
+                "categories"
+              ],
+              "query": []
+            },
+            "description": "Nhom nganh cua dong tien\n\n- entry: `coingecko_categories`\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "coingecko_coins_list",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.coingecko.com/api/v3/coins/list",
+              "protocol": "https",
+              "host": [
+                "api",
+                "coingecko",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "coins",
+                "list"
+              ],
+              "query": []
+            },
+            "description": "Danh muc toan bo dong tien\n\n- entry: `coingecko_coins_list`\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "coingecko_coins_markets",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&page=1&per_page=250",
+              "protocol": "https",
+              "host": [
+                "api",
+                "coingecko",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "coins",
+                "markets"
+              ],
+              "query": [
+                {
+                  "key": "vs_currency",
+                  "value": "usd"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "250"
+                }
+              ]
+            },
+            "description": "Von hoa va gia cua top dong tien\n\n- entry: `coingecko_coins_markets`\n- records_path: ``\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "coingecko_exchange_rates",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.coingecko.com/api/v3/exchange_rates",
+              "protocol": "https",
+              "host": [
+                "api",
+                "coingecko",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "exchange_rates"
+              ],
+              "query": []
+            },
+            "description": "Ty gia quy doi cua BTC\n\n- entry: `coingecko_exchange_rates`\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "coingecko_exchanges",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.coingecko.com/api/v3/exchanges?page=1&per_page=250",
+              "protocol": "https",
+              "host": [
+                "api",
+                "coingecko",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "exchanges"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "250"
+                }
+              ]
+            },
+            "description": "Danh muc san giao dich\n\n- entry: `coingecko_exchanges`\n- records_path: ``\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        },
+        {
+          "name": "coingecko_global",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.coingecko.com/api/v3/global",
+              "protocol": "https",
+              "host": [
+                "api",
+                "coingecko",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v3",
+                "global"
+              ],
+              "query": []
+            },
+            "description": "So lieu tong cua toan thi truong\n\n- entry: `coingecko_global`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.4"
+          }
+        }
+      ]
+    },
+    {
+      "name": "comtrade",
+      "item": [
+        {
+          "name": "comtrade_vn_exports_2021",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=704&period=2021&cmdCode=TOTAL&flowCode=X",
+              "protocol": "https",
+              "host": [
+                "comtradeapi",
+                "un",
+                "org"
+              ],
+              "path": [
+                "public",
+                "v1",
+                "preview",
+                "C",
+                "A",
+                "HS"
+              ],
+              "query": [
+                {
+                  "key": "reporterCode",
+                  "value": "704"
+                },
+                {
+                  "key": "period",
+                  "value": "2021"
+                },
+                {
+                  "key": "cmdCode",
+                  "value": "TOTAL"
+                },
+                {
+                  "key": "flowCode",
+                  "value": "X"
+                }
+              ]
+            },
+            "description": "Xuat khau cua Viet Nam nam 2021 theo HS\n\n- entry: `comtrade_vn_exports_2021`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.5"
+          }
+        },
+        {
+          "name": "comtrade_vn_exports_2022",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=704&period=2022&cmdCode=TOTAL&flowCode=X",
+              "protocol": "https",
+              "host": [
+                "comtradeapi",
+                "un",
+                "org"
+              ],
+              "path": [
+                "public",
+                "v1",
+                "preview",
+                "C",
+                "A",
+                "HS"
+              ],
+              "query": [
+                {
+                  "key": "reporterCode",
+                  "value": "704"
+                },
+                {
+                  "key": "period",
+                  "value": "2022"
+                },
+                {
+                  "key": "cmdCode",
+                  "value": "TOTAL"
+                },
+                {
+                  "key": "flowCode",
+                  "value": "X"
+                }
+              ]
+            },
+            "description": "Xuat khau cua Viet Nam nam 2022 theo HS\n\n- entry: `comtrade_vn_exports_2022`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.5"
+          }
+        },
+        {
+          "name": "comtrade_vn_exports_2023",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=704&period=2023&cmdCode=TOTAL&flowCode=X",
+              "protocol": "https",
+              "host": [
+                "comtradeapi",
+                "un",
+                "org"
+              ],
+              "path": [
+                "public",
+                "v1",
+                "preview",
+                "C",
+                "A",
+                "HS"
+              ],
+              "query": [
+                {
+                  "key": "reporterCode",
+                  "value": "704"
+                },
+                {
+                  "key": "period",
+                  "value": "2023"
+                },
+                {
+                  "key": "cmdCode",
+                  "value": "TOTAL"
+                },
+                {
+                  "key": "flowCode",
+                  "value": "X"
+                }
+              ]
+            },
+            "description": "Xuat khau cua Viet Nam nam 2023 theo HS\n\n- entry: `comtrade_vn_exports_2023`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.5"
+          }
+        },
+        {
+          "name": "comtrade_vn_imports_2021",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=704&period=2021&cmdCode=TOTAL&flowCode=M",
+              "protocol": "https",
+              "host": [
+                "comtradeapi",
+                "un",
+                "org"
+              ],
+              "path": [
+                "public",
+                "v1",
+                "preview",
+                "C",
+                "A",
+                "HS"
+              ],
+              "query": [
+                {
+                  "key": "reporterCode",
+                  "value": "704"
+                },
+                {
+                  "key": "period",
+                  "value": "2021"
+                },
+                {
+                  "key": "cmdCode",
+                  "value": "TOTAL"
+                },
+                {
+                  "key": "flowCode",
+                  "value": "M"
+                }
+              ]
+            },
+            "description": "Nhap khau cua Viet Nam nam 2021 theo HS\n\n- entry: `comtrade_vn_imports_2021`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.5"
+          }
+        },
+        {
+          "name": "comtrade_vn_imports_2022",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=704&period=2022&cmdCode=TOTAL&flowCode=M",
+              "protocol": "https",
+              "host": [
+                "comtradeapi",
+                "un",
+                "org"
+              ],
+              "path": [
+                "public",
+                "v1",
+                "preview",
+                "C",
+                "A",
+                "HS"
+              ],
+              "query": [
+                {
+                  "key": "reporterCode",
+                  "value": "704"
+                },
+                {
+                  "key": "period",
+                  "value": "2022"
+                },
+                {
+                  "key": "cmdCode",
+                  "value": "TOTAL"
+                },
+                {
+                  "key": "flowCode",
+                  "value": "M"
+                }
+              ]
+            },
+            "description": "Nhap khau cua Viet Nam nam 2022 theo HS\n\n- entry: `comtrade_vn_imports_2022`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.5"
+          }
+        },
+        {
+          "name": "comtrade_vn_imports_2023",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=704&period=2023&cmdCode=TOTAL&flowCode=M",
+              "protocol": "https",
+              "host": [
+                "comtradeapi",
+                "un",
+                "org"
+              ],
+              "path": [
+                "public",
+                "v1",
+                "preview",
+                "C",
+                "A",
+                "HS"
+              ],
+              "query": [
+                {
+                  "key": "reporterCode",
+                  "value": "704"
+                },
+                {
+                  "key": "period",
+                  "value": "2023"
+                },
+                {
+                  "key": "cmdCode",
+                  "value": "TOTAL"
+                },
+                {
+                  "key": "flowCode",
+                  "value": "M"
+                }
+              ]
+            },
+            "description": "Nhap khau cua Viet Nam nam 2023 theo HS\n\n- entry: `comtrade_vn_imports_2023`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 0.5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "fdic",
+      "item": [
+        {
+          "name": "fdic_failures",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://banks.data.fdic.gov/api/failures?format=json&offset=0&limit=1000",
+              "protocol": "https",
+              "host": [
+                "banks",
+                "data",
+                "fdic",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "failures"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Ngan hang do vo\n\n- entry: `fdic_failures`\n- records_path: `data`\n- pagination: `offset` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "fdic_financials",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://banks.data.fdic.gov/api/financials?format=json&offset=0&limit=1000",
+              "protocol": "https",
+              "host": [
+                "banks",
+                "data",
+                "fdic",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "financials"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Bao cao tai chinh dinh ky\n\n- entry: `fdic_financials`\n- records_path: `data`\n- pagination: `offset` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "fdic_history",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://banks.data.fdic.gov/api/history?format=json&offset=0&limit=1000",
+              "protocol": "https",
+              "host": [
+                "banks",
+                "data",
+                "fdic",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Lich su sap nhap va doi ten\n\n- entry: `fdic_history`\n- records_path: `data`\n- pagination: `offset` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "fdic_institutions",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://banks.data.fdic.gov/api/institutions?format=json&offset=0&limit=1000",
+              "protocol": "https",
+              "host": [
+                "banks",
+                "data",
+                "fdic",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "institutions"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Danh sach to chuc tin dung\n\n- entry: `fdic_institutions`\n- records_path: `data`\n- pagination: `offset` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "fdic_locations",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://banks.data.fdic.gov/api/locations?format=json&offset=0&limit=1000",
+              "protocol": "https",
+              "host": [
+                "banks",
+                "data",
+                "fdic",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "locations"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Chi nhanh va dia diem giao dich\n\n- entry: `fdic_locations`\n- records_path: `data`\n- pagination: `offset` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "fdic_summary",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://banks.data.fdic.gov/api/summary?format=json&offset=0&limit=1000",
+              "protocol": "https",
+              "host": [
+                "banks",
+                "data",
+                "fdic",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Tong hop theo nam\n\n- entry: `fdic_summary`\n- records_path: `data`\n- pagination: `offset` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "gleif",
+      "item": [
+        {
+          "name": "gleif_countries",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.gleif.org/api/v1/countries?page[number]=1&page[size]=200",
+              "protocol": "https",
+              "host": [
+                "api",
+                "gleif",
+                "org"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "countries"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "200"
+                }
+              ]
+            },
+            "description": "Ma quoc gia ISO 3166\n\n- entry: `gleif_countries`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 3"
+          }
+        },
+        {
+          "name": "gleif_entity_legal_forms",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.gleif.org/api/v1/entity-legal-forms?page[number]=1&page[size]=200",
+              "protocol": "https",
+              "host": [
+                "api",
+                "gleif",
+                "org"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "entity-legal-forms"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "200"
+                }
+              ]
+            },
+            "description": "Danh muc hinh thuc phap ly (ELF)\n\n- entry: `gleif_entity_legal_forms`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 3"
+          }
+        },
+        {
+          "name": "gleif_lei",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.gleif.org/api/v1/lei-records?filter[entity.legalAddress.country]=VN&include=direct-parent,ultimate-parent&page[number]=1&page[size]=200",
+              "protocol": "https",
+              "host": [
+                "api",
+                "gleif",
+                "org"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lei-records"
+              ],
+              "query": [
+                {
+                  "key": "filter[entity.legalAddress.country]",
+                  "value": "VN"
+                },
+                {
+                  "key": "include",
+                  "value": "direct-parent,ultimate-parent"
+                },
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "200"
+                }
+              ]
+            },
+            "description": "Ban ghi LEI cua phap nhan, loc theo quoc gia\n\n- entry: `gleif_lei`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 3"
+          }
+        },
+        {
+          "name": "gleif_lei_issuers",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.gleif.org/api/v1/lei-issuers?page[number]=1&page[size]=200",
+              "protocol": "https",
+              "host": [
+                "api",
+                "gleif",
+                "org"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lei-issuers"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "200"
+                }
+              ]
+            },
+            "description": "To chuc duoc phep cap ma LEI\n\n- entry: `gleif_lei_issuers`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 3"
+          }
+        },
+        {
+          "name": "gleif_regions",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.gleif.org/api/v1/regions?page[number]=1&page[size]=200",
+              "protocol": "https",
+              "host": [
+                "api",
+                "gleif",
+                "org"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "regions"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "200"
+                }
+              ]
+            },
+            "description": "Ma vung ISO 3166-2\n\n- entry: `gleif_regions`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 3"
+          }
+        },
+        {
+          "name": "gleif_registration_authorities",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.gleif.org/api/v1/registration-authorities?page[number]=1&page[size]=200",
+              "protocol": "https",
+              "host": [
+                "api",
+                "gleif",
+                "org"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "registration-authorities"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "200"
+                }
+              ]
+            },
+            "description": "Co quan dang ky kinh doanh tung nuoc\n\n- entry: `gleif_registration_authorities`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 3"
+          }
+        }
+      ]
+    },
+    {
+      "name": "okx",
+      "item": [
+        {
+          "name": "okx_instruments_spot",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.okx.com/api/v5/public/instruments?instType=SPOT",
+              "protocol": "https",
+              "host": [
+                "www",
+                "okx",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "public",
+                "instruments"
+              ],
+              "query": [
+                {
+                  "key": "instType",
+                  "value": "SPOT"
+                }
+              ]
+            },
+            "description": "Danh muc cong cu giao ngay\n\n- entry: `okx_instruments_spot`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "okx_instruments_swap",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.okx.com/api/v5/public/instruments?instType=SWAP",
+              "protocol": "https",
+              "host": [
+                "www",
+                "okx",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "public",
+                "instruments"
+              ],
+              "query": [
+                {
+                  "key": "instType",
+                  "value": "SWAP"
+                }
+              ]
+            },
+            "description": "Danh muc hop dong vinh cuu\n\n- entry: `okx_instruments_swap`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "okx_open_interest",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.okx.com/api/v5/public/open-interest?instType=SWAP",
+              "protocol": "https",
+              "host": [
+                "www",
+                "okx",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "public",
+                "open-interest"
+              ],
+              "query": [
+                {
+                  "key": "instType",
+                  "value": "SWAP"
+                }
+              ]
+            },
+            "description": "Vi the mo toan bo hop dong\n\n- entry: `okx_open_interest`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "okx_tickers_spot",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.okx.com/api/v5/market/tickers?instType=SPOT",
+              "protocol": "https",
+              "host": [
+                "www",
+                "okx",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "market",
+                "tickers"
+              ],
+              "query": [
+                {
+                  "key": "instType",
+                  "value": "SPOT"
+                }
+              ]
+            },
+            "description": "Gia giao ngay toan san\n\n- entry: `okx_tickers_spot`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "okx_tickers_swap",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://www.okx.com/api/v5/market/tickers?instType=SWAP",
+              "protocol": "https",
+              "host": [
+                "www",
+                "okx",
+                "com"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "market",
+                "tickers"
+              ],
+              "query": [
+                {
+                  "key": "instType",
+                  "value": "SWAP"
+                }
+              ]
+            },
+            "description": "Gia hop dong vinh cuu\n\n- entry: `okx_tickers_swap`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "sec",
+      "item": [
+        {
+          "name": "sec_company_tickers_exchange",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "HUST FinGraph Research trinhnama31609@gmail.com"
+              }
+            ],
+            "url": {
+              "raw": "https://www.sec.gov/files/company_tickers_exchange.json",
+              "protocol": "https",
+              "host": [
+                "www",
+                "sec",
+                "gov"
+              ],
+              "path": [
+                "files",
+                "company_tickers_exchange.json"
+              ],
+              "query": []
+            },
+            "description": "CIK - ma chung khoan - san niem yet\n\n- entry: `sec_company_tickers_exchange`\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 8"
+          }
+        },
+        {
+          "name": "sec_companyfacts_aapl",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "HUST FinGraph Research trinhnama31609@gmail.com"
+              }
+            ],
+            "url": {
+              "raw": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+              "protocol": "https",
+              "host": [
+                "data",
+                "sec",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "xbrl",
+                "companyfacts",
+                "CIK0000320193.json"
+              ],
+              "query": []
+            },
+            "description": "Toan bo chi tieu XBRL cua mot CIK\n\n- entry: `sec_companyfacts_aapl`\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 8"
+          }
+        },
+        {
+          "name": "sec_frames_assets",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "HUST FinGraph Research trinhnama31609@gmail.com"
+              }
+            ],
+            "url": {
+              "raw": "https://data.sec.gov/api/xbrl/frames/us-gaap/Assets/USD/CY2023Q1I.json",
+              "protocol": "https",
+              "host": [
+                "data",
+                "sec",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "xbrl",
+                "frames",
+                "us-gaap",
+                "Assets",
+                "USD",
+                "CY2023Q1I.json"
+              ],
+              "query": []
+            },
+            "description": "Chi tieu Assets ky CY2023Q1I, moi doanh nghiep mot dong\n\n- entry: `sec_frames_assets`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 8"
+          }
+        },
+        {
+          "name": "sec_frames_netincome",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "HUST FinGraph Research trinhnama31609@gmail.com"
+              }
+            ],
+            "url": {
+              "raw": "https://data.sec.gov/api/xbrl/frames/us-gaap/NetIncomeLoss/USD/CY2023.json",
+              "protocol": "https",
+              "host": [
+                "data",
+                "sec",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "xbrl",
+                "frames",
+                "us-gaap",
+                "NetIncomeLoss",
+                "USD",
+                "CY2023.json"
+              ],
+              "query": []
+            },
+            "description": "Chi tieu NetIncomeLoss ky CY2023, moi doanh nghiep mot dong\n\n- entry: `sec_frames_netincome`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 8"
+          }
+        },
+        {
+          "name": "sec_frames_revenues",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "HUST FinGraph Research trinhnama31609@gmail.com"
+              }
+            ],
+            "url": {
+              "raw": "https://data.sec.gov/api/xbrl/frames/us-gaap/Revenues/USD/CY2023Q1.json",
+              "protocol": "https",
+              "host": [
+                "data",
+                "sec",
+                "gov"
+              ],
+              "path": [
+                "api",
+                "xbrl",
+                "frames",
+                "us-gaap",
+                "Revenues",
+                "USD",
+                "CY2023Q1.json"
+              ],
+              "query": []
+            },
+            "description": "Chi tieu Revenues ky CY2023Q1, moi doanh nghiep mot dong\n\n- entry: `sec_frames_revenues`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 8"
+          }
+        },
+        {
+          "name": "sec_submissions",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "User-Agent",
+                "value": "HUST FinGraph Research trinhnama31609@gmail.com"
+              }
+            ],
+            "url": {
+              "raw": "https://data.sec.gov/submissions/CIK0000320193.json",
+              "protocol": "https",
+              "host": [
+                "data",
+                "sec",
+                "gov"
+              ],
+              "path": [
+                "submissions",
+                "CIK0000320193.json"
+              ],
+              "query": []
+            },
+            "description": "Ho so nop SEC theo CIK\n\n- entry: `sec_submissions`\n- records_path: ``\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 8"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ssi",
+      "item": [
+        {
+          "name": "ssi_exchange_hnx",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "https://iboard.ssi.com.vn/"
+              },
+              {
+                "key": "Origin",
+                "value": "https://iboard.ssi.com.vn"
+              }
+            ],
+            "url": {
+              "raw": "https://iboard-query.ssi.com.vn/stock/exchange/hnx",
+              "protocol": "https",
+              "host": [
+                "iboard-query",
+                "ssi",
+                "com",
+                "vn"
+              ],
+              "path": [
+                "stock",
+                "exchange",
+                "hnx"
+              ],
+              "query": []
+            },
+            "description": "Toan bo ma niem yet san HNX\n\n- entry: `ssi_exchange_hnx`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 2"
+          }
+        },
+        {
+          "name": "ssi_exchange_hose",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "https://iboard.ssi.com.vn/"
+              },
+              {
+                "key": "Origin",
+                "value": "https://iboard.ssi.com.vn"
+              }
+            ],
+            "url": {
+              "raw": "https://iboard-query.ssi.com.vn/stock/exchange/hose",
+              "protocol": "https",
+              "host": [
+                "iboard-query",
+                "ssi",
+                "com",
+                "vn"
+              ],
+              "path": [
+                "stock",
+                "exchange",
+                "hose"
+              ],
+              "query": []
+            },
+            "description": "Toan bo ma niem yet san HOSE\n\n- entry: `ssi_exchange_hose`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 2"
+          }
+        },
+        {
+          "name": "ssi_exchange_upcom",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "https://iboard.ssi.com.vn/"
+              },
+              {
+                "key": "Origin",
+                "value": "https://iboard.ssi.com.vn"
+              }
+            ],
+            "url": {
+              "raw": "https://iboard-query.ssi.com.vn/stock/exchange/upcom",
+              "protocol": "https",
+              "host": [
+                "iboard-query",
+                "ssi",
+                "com",
+                "vn"
+              ],
+              "path": [
+                "stock",
+                "exchange",
+                "upcom"
+              ],
+              "query": []
+            },
+            "description": "Toan bo ma tren UPCOM\n\n- entry: `ssi_exchange_upcom`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 2"
+          }
+        },
+        {
+          "name": "ssi_group_hnx30",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "https://iboard.ssi.com.vn/"
+              },
+              {
+                "key": "Origin",
+                "value": "https://iboard.ssi.com.vn"
+              }
+            ],
+            "url": {
+              "raw": "https://iboard-query.ssi.com.vn/stock/group/HNX30",
+              "protocol": "https",
+              "host": [
+                "iboard-query",
+                "ssi",
+                "com",
+                "vn"
+              ],
+              "path": [
+                "stock",
+                "group",
+                "HNX30"
+              ],
+              "query": []
+            },
+            "description": "Ro HNX30\n\n- entry: `ssi_group_hnx30`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 2"
+          }
+        },
+        {
+          "name": "ssi_group_vn100",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "https://iboard.ssi.com.vn/"
+              },
+              {
+                "key": "Origin",
+                "value": "https://iboard.ssi.com.vn"
+              }
+            ],
+            "url": {
+              "raw": "https://iboard-query.ssi.com.vn/stock/group/VN100",
+              "protocol": "https",
+              "host": [
+                "iboard-query",
+                "ssi",
+                "com",
+                "vn"
+              ],
+              "path": [
+                "stock",
+                "group",
+                "VN100"
+              ],
+              "query": []
+            },
+            "description": "Ro VN100\n\n- entry: `ssi_group_vn100`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 2"
+          }
+        },
+        {
+          "name": "ssi_group_vn30",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "https://iboard.ssi.com.vn/"
+              },
+              {
+                "key": "Origin",
+                "value": "https://iboard.ssi.com.vn"
+              }
+            ],
+            "url": {
+              "raw": "https://iboard-query.ssi.com.vn/stock/group/VN30",
+              "protocol": "https",
+              "host": [
+                "iboard-query",
+                "ssi",
+                "com",
+                "vn"
+              ],
+              "path": [
+                "stock",
+                "group",
+                "VN30"
+              ],
+              "query": []
+            },
+            "description": "Ro VN30\n\n- entry: `ssi_group_vn30`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 2"
+          }
+        },
+        {
+          "name": "ssi_group_vnmid",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "https://iboard.ssi.com.vn/"
+              },
+              {
+                "key": "Origin",
+                "value": "https://iboard.ssi.com.vn"
+              }
+            ],
+            "url": {
+              "raw": "https://iboard-query.ssi.com.vn/stock/group/VNMID",
+              "protocol": "https",
+              "host": [
+                "iboard-query",
+                "ssi",
+                "com",
+                "vn"
+              ],
+              "path": [
+                "stock",
+                "group",
+                "VNMID"
+              ],
+              "query": []
+            },
+            "description": "Ro VNMID\n\n- entry: `ssi_group_vnmid`\n- records_path: `data`\n- pagination: `none` (chi trang dau)\n- rate_limit_per_sec: 2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "treasury",
+      "item": [
+        {
+          "name": "treasury_auctions",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query?page[number]=1&page[size]=1000",
+              "protocol": "https",
+              "host": [
+                "api",
+                "fiscaldata",
+                "treasury",
+                "gov"
+              ],
+              "path": [
+                "services",
+                "api",
+                "fiscal_service",
+                "v1",
+                "accounting",
+                "od",
+                "auctions_query"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Ket qua dau thau trai phieu\n\n- entry: `treasury_auctions`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "treasury_avg_interest_rates",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/avg_interest_rates?page[number]=1&page[size]=1000",
+              "protocol": "https",
+              "host": [
+                "api",
+                "fiscaldata",
+                "treasury",
+                "gov"
+              ],
+              "path": [
+                "services",
+                "api",
+                "fiscal_service",
+                "v2",
+                "accounting",
+                "od",
+                "avg_interest_rates"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Lai suat binh quan no cong\n\n- entry: `treasury_avg_interest_rates`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "treasury_debt_to_penny",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/debt_to_penny?page[number]=1&page[size]=1000",
+              "protocol": "https",
+              "host": [
+                "api",
+                "fiscaldata",
+                "treasury",
+                "gov"
+              ],
+              "path": [
+                "services",
+                "api",
+                "fiscal_service",
+                "v2",
+                "accounting",
+                "od",
+                "debt_to_penny"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Du no cong theo ngay\n\n- entry: `treasury_debt_to_penny`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        },
+        {
+          "name": "treasury_rates_of_exchange",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('records_path', \"data\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body && (body.Note || body.Information || body[\"Error Message\"])) {",
+                  "    console.warn(body.Note || body.Information || body[\"Error Message\"]);",
+                  "}",
+                  "const path = pm.variables.get(\"records_path\") || \"\";",
+                  "let node = body;",
+                  "for (const p of path.split(\".\").filter(Boolean)) node = node && node[p];",
+                  "pm.test(\"co ban ghi tai '\" + path + \"'\", () => {",
+                  "    pm.expect(node, \"records_path khong ton tai\").to.not.be.undefined;",
+                  "    const n = Array.isArray(node) ? node.length : 1;",
+                  "    console.log(pm.info.requestName + \": \" + n + \" ban ghi\");",
+                  "    pm.expect(n).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/rates_of_exchange?page[number]=1&page[size]=1000",
+              "protocol": "https",
+              "host": [
+                "api",
+                "fiscaldata",
+                "treasury",
+                "gov"
+              ],
+              "path": [
+                "services",
+                "api",
+                "fiscal_service",
+                "v1",
+                "accounting",
+                "od",
+                "rates_of_exchange"
+              ],
+              "query": [
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Ty gia quy doi chinh thuc\n\n- entry: `treasury_rates_of_exchange`\n- records_path: `data`\n- pagination: `page` (chi trang dau)\n- rate_limit_per_sec: 5"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "alphavantage_apikey",
+      "value": ""
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+# SEC EDGAR — bang tra CIK kem SAN niem yet
+#
+# Khong can khoa, nhung BAT BUOC header User-Agent mo ta danh tinh.
+#
+# Khac `sec_company_tickers` o cho co them cot `exchange` — can de noi sang
+# MIC va OpenFIGI o tang ontology.
+#
+# CDC5: bang tra cuu nho.
+#
+# LUU Y HINH DANG: tra ve {fields: [...], data: [[...]]} tuc mang-cua-mang.
+# Framework ghi thanh 1 ban ghi; bronze phai ghep `fields` voi tung dong
+# cua `data` thi moi thanh bang.
+
+name: sec_company_tickers_exchange
+source_type: api
+description: CIK - ma chung khoan - san niem yet
+owner: namth
+enabled: true
+
+api:
+  base_url: https://www.sec.gov
+  path: files/company_tickers_exchange.json
+  records_path: ""
+  pagination: none
+  rate_limit_per_sec: 8
+  headers:
+    User-Agent: "HUST FinGraph Research trinhnama31609@gmail.com"
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: sec/company_tickers_exchange
+
+schedule:
+  enabled: false
+  expression: "cron(0 19 * * ? *)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 15

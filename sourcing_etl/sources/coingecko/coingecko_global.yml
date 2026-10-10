@@ -1,0 +1,37 @@
+# CoinGecko — so lieu tong cua toan thi truong
+#
+# Khac Binance va OKX: hai cho kia la SAN (gia tren chinh san do), CoinGecko
+# la TONG HOP (gia binh quan nhieu san, kem von hoa va xep hang). Can ca hai
+# neu muon noi mot tai san voi chinh no tren tung noi giao dich.
+#
+# CDC5: anh chup theo lich.
+#
+# RATE LIMIT: ban mien phi khoang 30 lan goi moi phut. De 0.4 req/s cho chac
+# — vuot la 429 va bi chan tam thoi.
+
+name: coingecko_global
+source_type: api
+description: So lieu tong cua toan thi truong
+owner: namth
+enabled: true
+
+api:
+  base_url: https://api.coingecko.com/api/v3
+  path: global
+  records_path: data
+  pagination: none
+  rate_limit_per_sec: 0.4
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: coingecko/global
+
+schedule:
+  enabled: false
+  expression: "rate(6 hours)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 20

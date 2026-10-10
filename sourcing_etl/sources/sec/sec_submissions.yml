@@ -1,0 +1,36 @@
+# SEC EDGAR — hồ sơ nộp của doanh nghiệp niêm yết Mỹ.
+#
+# LƯU Ý: SEC bắt buộc header User-Agent mô tả danh tính, dạng
+# "Ten ung dung email@example.com". Thiếu là HTTP 403 với thông báo không nói
+# rõ lý do. Framework đã đặt mặc định, nhưng khai lại ở đây cho tường minh.
+#
+# CDC5: mỗi CIK là một tài liệu JSON hoàn chỉnh, không có khái niệm
+# "phần thêm" để kéo incremental.
+
+name: sec_submissions
+source_type: api
+description: Ho so nop SEC theo CIK
+owner: namth
+enabled: true
+
+api:
+  base_url: https://data.sec.gov
+  path: submissions/CIK0000320193.json
+  records_path: ""
+  pagination: none
+  rate_limit_per_sec: 8      # SEC khuyen cao toi da 10 req/s
+  headers:
+    User-Agent: "HUST FinGraph Research trinhnama31609@gmail.com"
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: sec/submissions
+
+schedule:
+  enabled: false             # bat o tuan 8 khi lam ontology
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 15

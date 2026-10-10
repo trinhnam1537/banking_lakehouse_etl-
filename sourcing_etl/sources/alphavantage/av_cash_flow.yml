@@ -1,0 +1,50 @@
+# Alpha Vantage — bao cao luu chuyen tien te nam
+#
+# enabled: false — CHUA co khoa. Bat len sau khi tao secret:
+#
+#   aws secretsmanager create-secret --name fingraph/alphavantage \
+#       --secret-string '{"apikey":"<KHOA>"}' --profile fingraph
+#
+# QUAN TRONG: ban mien phi chi 25 lan goi MOI NGAY — khong du cho bay entry
+# nay chay hang ngay. Nhung Alpha Vantage cap ban KHONG GIOI HAN cho du an
+# giao duc va ma nguon mo (xem alphavantage.co/support). Do an tot nghiep
+# thuoc dien nay — xin truoc khi bat lich.
+#
+# Endpoint premium (khong co o ban mien phi) da duoc loai khoi nhom nay:
+# TIME_SERIES_INTRADAY, TIME_SERIES_DAILY_ADJUSTED, FX_INTRADAY,
+# CRYPTO_INTRADAY, MACD, VWAP, REALTIME_*, INDEX_DATA, HISTORICAL_OPTIONS.
+#
+# CDC5: moi lan goi tra ve toan bo lich su cua ma do, khong co phan them.
+
+name: av_cash_flow
+source_type: api
+description: Bao cao luu chuyen tien te nam
+owner: namth
+enabled: false
+
+api:
+  base_url: https://www.alphavantage.co
+  path: query
+  records_path: annualReports
+  pagination: none
+  rate_limit_per_sec: 0.4
+  query:
+    function: "CASH_FLOW"
+    symbol: "IBM"
+  secret_name: fingraph/alphavantage
+  secret_inject:
+    apikey: query.apikey
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: alphavantage/cash_flow
+
+schedule:
+  enabled: false
+  expression: "cron(0 23 * * ? *)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 15

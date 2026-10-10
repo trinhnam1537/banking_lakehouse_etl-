@@ -1,0 +1,34 @@
+# Binance REST — quy tac giao dich cua tung cap
+#
+# Khac `kafka_trades`: job kia hut lenh khop THEO DONG tu Redpanda, job nay
+# chup ANH TINH cua thi truong theo lich. Hai gia tri khac nhau, khong thay
+# the nhau.
+#
+# CDC5: anh chup tai mot thoi diem, khong co moc de keo tiep.
+
+name: binance_exchange_info
+source_type: api
+description: Quy tac giao dich cua tung cap
+owner: namth
+enabled: true
+
+api:
+  base_url: https://api.binance.com/api/v3
+  path: exchangeInfo
+  records_path: symbols
+  pagination: none
+  rate_limit_per_sec: 5
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: binance/exchange_info
+
+schedule:
+  enabled: false
+  expression: "rate(1 hour)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 15

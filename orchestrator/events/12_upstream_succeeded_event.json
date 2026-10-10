@@ -1,0 +1,13 @@
+{
+  "version": "0",
+  "source": "fingraph.jobs",
+  "detail-type": "Job Run Succeeded",
+  "detail": {
+    "job_id": "src.binance_ticker_24hr",
+    "job_type": "src",
+    "job_name": "binance_ticker_24hr",
+    "run_id": "<run_id>",
+    "manifest": "landing/_manifests/binance/ticker_24hr/ingest_date=2026-09-28/<run_id>.json",
+    "chain": true
+  }
+}

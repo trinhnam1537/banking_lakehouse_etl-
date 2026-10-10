@@ -1,0 +1,42 @@
+# UN Comtrade — nhap khau cua Viet Nam nam 2022
+#
+# Ban `preview` cong khai, khong can khoa. Day la du lieu thuong mai song
+# phuong: Viet Nam (ma bao cao 704) voi tung doi tac.
+#
+# Moi nam mot entry rieng vi ban preview khong cho loc nhieu ky trong mot lan
+# goi. Them nam moi la them mot file, khong sua code.
+#
+# CDC5: so lieu mot nam da chot thi co dinh.
+#
+# RATE LIMIT rat chat. De 0.5 req/s va dung chay nhieu job Comtrade cung luc.
+
+name: comtrade_vn_imports_2022
+source_type: api
+description: Nhap khau cua Viet Nam nam 2022 theo HS
+owner: namth
+enabled: true
+
+api:
+  base_url: https://comtradeapi.un.org/public/v1/preview/C/A/HS
+  records_path: data
+  pagination: none
+  rate_limit_per_sec: 0.5
+  query:
+    reporterCode: "704"
+    period: "2022"
+    cmdCode: "TOTAL"
+    flowCode: "M"
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: comtrade/vn_imports_2022
+
+schedule:
+  enabled: false
+  expression: "cron(0 23 1 * ? *)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 20

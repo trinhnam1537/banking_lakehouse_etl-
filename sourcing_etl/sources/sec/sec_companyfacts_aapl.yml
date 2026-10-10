@@ -1,0 +1,40 @@
+# SEC EDGAR — toan bo so lieu XBRL cua mot doanh nghiep
+#
+# Giau hon han `sec_submissions`: submissions chi liet ke ho so da nop, con
+# companyfacts co GIA TRI tung chi tieu tai chinh theo tung ky.
+#
+# Doi CIK trong `path` la doi doanh nghiep. Muon nhieu doanh nghiep thi
+# them file, moi file mot CIK — hoac doi sang nhom `sec_frames_*` ben duoi,
+# von tra ve moi doanh nghiep trong mot lan goi.
+#
+# CDC5: moi CIK la mot tai lieu JSON hoan chinh, khong co phan them de keo
+# incremental.
+
+name: sec_companyfacts_aapl
+source_type: api
+description: Toan bo chi tieu XBRL cua mot CIK
+owner: namth
+enabled: true
+
+api:
+  base_url: https://data.sec.gov
+  path: api/xbrl/companyfacts/CIK0000320193.json
+  records_path: ""
+  pagination: none
+  rate_limit_per_sec: 8
+  headers:
+    User-Agent: "HUST FinGraph Research trinhnama31609@gmail.com"
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: sec/companyfacts
+
+schedule:
+  enabled: false
+  expression: "cron(30 19 * * ? *)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 20

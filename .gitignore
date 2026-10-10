@@ -1,0 +1,35 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# ---- Biến môi trường ----
+# .env chứa tên bucket, bảng, có thể cả API key. Sinh từ repo hạ tầng:
+#     ..\lakehouse_ontology_project\scripts\gen-env.ps1 -Out .env
+.env
+.env.*
+!.env.example
+
+# ---- Spark / test ----
+# JVM crash dump khi chạy test Spark trên Windows
+hs_err_pid*.log
+spark-warehouse/
+metastore_db/
+derby.log
+
+# ---- Dữ liệu ----
+data/
+*.csv
+*.parquet
+
+# ---- Hệ điều hành / IDE ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,49 @@
+name: Tests
+
+# Test framework (sourcing, silver, orchestrator) + kiểm tra mọi entry YAML.
+#
+# Không cần AWS: DynamoDB/S3/SQS/Secrets Manager đều giả lập bằng moto, nên
+# job này KHÔNG xin OIDC và không có quyền gì trên tài khoản thật.
+#
+# Repo này chỉ chứa code ETL, nên mọi thay đổi đều chạy test — không lọc
+# theo đường dẫn. Deploy KHÔNG nằm ở đây: repo hạ tầng
+# (lakehouse_ontology_project) ghim một commit của repo này trong `etl.ref`
+# rồi mới plan/apply. Test xanh ở đây là điều kiện để bump `etl.ref`.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: pytest (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cung mot package chay o hai noi, hai phien ban:
+        #   3.9  — Glue Python Shell
+        #   3.12 — Lambda (orchestrator trigger, dispatcher, silver router)
+        # May dev dung 3.11 nen cu phap chi co tu 3.10 (match, X | Y) se lot
+        # qua test tren may ma chet tren Glue. Test ca hai dau de chan.
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            sourcing/requirements.txt
+
+      - name: Cai thu vien
+        run: pip install -r requirements-dev.txt
+
+      - name: pytest
+        run: python -m pytest -q

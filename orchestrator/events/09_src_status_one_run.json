@@ -1,0 +1,5 @@
+{
+  "job_id": "src.binance_ticker_24hr",
+  "action": "status",
+  "run_id": "<run_id>"
+}

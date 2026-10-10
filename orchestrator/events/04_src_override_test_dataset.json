@@ -1,0 +1,8 @@
+{
+  "job_id": "src.fdic_institutions",
+  "overrides": {
+    "api.max_pages": 1,
+    "target.dataset": "_test/fdic_institutions"
+  },
+  "wait_seconds": 600
+}

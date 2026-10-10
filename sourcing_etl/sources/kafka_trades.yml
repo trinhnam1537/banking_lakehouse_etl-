@@ -1,0 +1,45 @@
+# Lệnh khớp từ Redpanda xuống tầng raw.
+#
+# Đây là phương án A1 của bảng 2.2 — micro-batch thay cho Glue Streaming.
+# Độ trễ 2-7 phút, chi phí gần bằng không. Glue Streaming (A2) cho độ trễ
+# 1-2 phút nhưng tốn ~20 USD/NGÀY vì tính tối thiểu 2 DPU chạy liên tục.
+#
+# Mốc CDC1 ở đây là offset từng partition, không phải cột dữ liệu.
+# Topic 12 partition -> 12 dòng checkpoint độc lập trong DynamoDB.
+
+name: kafka_trades
+source_type: kafka
+description: Lenh khop Binance qua Redpanda
+owner: namth
+# Tat 10-02 cung luc voi kafka_enabled = false (envs/dev): khong co broker
+# thi job chi co the FAILED. Bat lai cung luc voi Kafka.
+enabled: false
+
+kafka:
+  # IP riêng của EC2 đổi mỗi lần máy được dựng lại -> lấy từ biến môi trường,
+  # Terraform truyền vào lúc tạo job. Chạy tay thì `.env` có sẵn giá trị này.
+  bootstrap_servers: "${KAFKA_BOOTSTRAP}"
+  topic: fingraph.trades
+  group_id: fingraph-sourcing-trades
+  auto_offset_reset: earliest
+  max_records_per_run: 500000
+  poll_timeout_seconds: 10
+
+cdc:
+  mode: cdc1                 # Kafka dung offset -> khong khai watermark_column
+
+target:
+  dataset: kafka/trades
+  max_records_per_file: 50000
+
+schedule:
+  # Tat 09-27: dispatcher kich 5 phut/lan va job chet vi ModuleNotFoundError.
+  # Bat lai khi Glue chay duoc VA EC2 Kafka dang chay.
+  enabled: false
+  expression: "rate(5 minutes)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 15
+  additional_python_modules:
+    - confluent-kafka==2.5.3

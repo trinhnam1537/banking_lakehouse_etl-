@@ -1,0 +1,45 @@
+# SEC XBRL frames — chi tieu Revenues cua moi doanh nghiep trong mot ky.
+#
+# Minh hoa cot ENVELOPE (from: response): ban ghi chi co cik/val/start/end;
+# chi tieu nao (tag), don vi (uom), ky (ccp) nam o goc response. Truoc khi
+# raw giu nguyen response (09-27), ba cot nay bi vut mat.
+#
+# Nhieu entry (revenues, net income, assets) co the cung ghi vao MOT bang
+# sec_financial_frame — moi entry append voi ds_source rieng nen khong de nhau.
+
+name: sec_frame_revenues
+description: Doanh thu moi doanh nghiep SEC theo ky (XBRL frames)
+owner: namth
+enabled: true
+
+source:
+  dataset: sec/frames_revenues
+  records_path: data
+
+target:
+  database: track_a_silver
+  table: sec_financial_frame
+  partition_by: [ds_partition_date]
+
+columns:
+  - {name: cik, type: bigint, nullable: false}
+  - {name: entity_name, path: entityName}
+  - {name: location, path: loc}
+  - {name: accession_no, path: accn}
+  - {name: period_start, path: start, type: date}
+  - {name: period_end, path: end, type: date}
+  - {name: value, path: val, type: "decimal(38,2)"}
+  - {name: taxonomy, from: response, path: taxonomy}
+  - {name: concept, from: response, path: tag}
+  - {name: unit, from: response, path: uom}
+  - {name: frame_period, from: response, path: ccp}
+
+technical:
+  keys: [cik, concept, unit, frame_period]
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [cik, concept]

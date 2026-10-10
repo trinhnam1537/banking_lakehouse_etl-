@@ -1,0 +1,9 @@
+﻿# Framework sourcing — chay tren may va trong Glue Python Shell
+PyYAML>=6.0
+boto3>=1.34
+
+# Chi can cho tung loai nguon; Glue nap qua runtime.additional_python_modules
+# trong entry YAML, khong cai san trong job.
+# confluent-kafka==2.5.3     # nguon kafka
+# psycopg2-binary==2.9.9     # nguon jdbc postgresql
+# PyMySQL==1.1.1             # nguon jdbc mysql
