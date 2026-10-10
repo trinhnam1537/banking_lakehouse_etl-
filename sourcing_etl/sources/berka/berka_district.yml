@@ -1,0 +1,42 @@
+# Berka (PKDD'99): du lieu THAT da an danh cua mot ngan hang Sec, 1993-1998.
+# Nguon: MariaDB cong khai cua CTU, relational.fel.cvut.cz:3306, database `financial`
+# (BAN GOC, khong phai Financial_std). Phan tich nguon: docs/sources/berka.md.
+#
+# Nhan khau hoc theo quan/huyen (bang tham chieu). Cot dat ten A2..A16 (theo berka.htm):
+#   A2 ten quan | A3 vung | A4 dan so | A5..A8 so xa theo quy mo | A9 so thanh pho
+#   A10 ty le dan thanh thi (%) | A11 luong trung binh | A12, A13 ty le that nghiep '95, '96
+#   A14 doanh nhan / 1000 dan | A15, A16 so vu pham toi '95, '96
+# A12, A15 co NULL. A10/A12/A13 la decimal — ghi raw dang CHUOI, khong float.
+# 77 dong, khoa chinh district_id. Nguon TINH (khong co updated_at) va nho ->
+# CDC5: moi lan chay keo lai toan bo, ghi de partition hom nay.
+
+name: berka_district
+source_type: jdbc
+description: Berka district tu MariaDB CTU (financial.district)
+owner: namth
+enabled: true
+
+jdbc:
+  # {host, port, username, password, dbname}. Tai khoan guest CONG KHAI cua CTU,
+  # van de trong Secrets Manager de entry khong bao gio chua thong tin ket noi.
+  secret_name: fingraph/berka_ctu
+  driver: mysql
+  schema: financial
+  table: district
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: berka/district
+
+schedule:
+  # Nguon khong doi tu 1999: chay tay (Lambda trigger) la du, khong can lich.
+  enabled: false
+  expression: "cron(0 20 ? * SUN *)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 15
+  additional_python_modules:
+    - PyMySQL==1.1.1

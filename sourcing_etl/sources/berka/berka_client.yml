@@ -1,0 +1,40 @@
+# Berka (PKDD'99): du lieu THAT da an danh cua mot ngan hang Sec, 1993-1998.
+# Nguon: MariaDB cong khai cua CTU, relational.fel.cvut.cz:3306, database `financial`
+# (BAN GOC, khong phai Financial_std). Phan tich nguon: docs/sources/berka.md.
+#
+# Khach hang. Ban CTU da giai ma birth_number goc thanh gender (M/F) + birth_date.
+# birth_date 1911..1987. FK: district_id -> berka_district.
+# PII (gioi tinh, ngay sinh): silver phai che cot khi bat Lake Formation.
+# 5.369 dong, khoa chinh client_id. Nguon TINH (khong co updated_at) va nho ->
+# CDC5: moi lan chay keo lai toan bo, ghi de partition hom nay.
+
+name: berka_client
+source_type: jdbc
+description: Berka client tu MariaDB CTU (financial.client)
+owner: namth
+enabled: true
+
+jdbc:
+  # {host, port, username, password, dbname}. Tai khoan guest CONG KHAI cua CTU,
+  # van de trong Secrets Manager de entry khong bao gio chua thong tin ket noi.
+  secret_name: fingraph/berka_ctu
+  driver: mysql
+  schema: financial
+  table: client
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: berka/client
+
+schedule:
+  # Nguon khong doi tu 1999: chay tay (Lambda trigger) la du, khong can lich.
+  enabled: false
+  expression: "cron(0 20 ? * SUN *)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 15
+  additional_python_modules:
+    - PyMySQL==1.1.1

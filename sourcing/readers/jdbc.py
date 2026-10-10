@@ -70,12 +70,13 @@ class JdbcReader(Reader):
         định danh) — bù lại chúng đến từ file YAML trong repo, đã qua review,
         không phải từ dữ liệu người dùng.
         """
-        table = f'"{self.j.schema}"."{self.j.table}"'
+        q = self._quote
+        table = f"{q(self.j.schema)}.{q(self.j.table)}"
         where: List[str] = []
         params: List[Any] = []
 
         if since is not None and self.cfg.cdc.watermark_column:
-            where.append(f'"{self.cfg.cdc.watermark_column}" > %s')
+            where.append(f"{q(self.cfg.cdc.watermark_column)} > %s")
             params.append(since)
         if self.j.extra_where:
             where.append(f"({self.j.extra_where})")
@@ -86,8 +87,20 @@ class JdbcReader(Reader):
         if self.cfg.cdc.watermark_column and not self.is_full_snapshot:
             # Sắp xếp theo mốc: nếu job chết giữa chừng, phần đã ghi luôn là
             # một tiền tố liên tục của dữ liệu, nên checkpoint vẫn nhất quán.
-            sql += f' ORDER BY "{self.cfg.cdc.watermark_column}" ASC'
+            sql += f" ORDER BY {q(self.cfg.cdc.watermark_column)} ASC"
         return sql, params
+
+    def _quote(self, name: str) -> str:
+        """Bọc định danh theo driver.
+
+        Postgres dùng `"x"`; MySQL/MariaDB dùng backtick — với nó `"x"` là CHUỖI,
+        nên `SELECT * FROM "financial"."order"` là lỗi cú pháp, và bảng `order`
+        (từ khoá SQL) không bọc thì cũng lỗi. Ký tự bọc bên trong tên được nhân
+        đôi theo đúng quy tắc của từng hệ.
+        """
+        if self.j.driver == "mysql":
+            return "`" + name.replace("`", "``") + "`"
+        return '"' + name.replace('"', '""') + '"'
 
     def read(self, checkpoint: Optional[Checkpoint]) -> Iterator[Batch]:
         since = self.effective_since(checkpoint)
@@ -103,7 +116,15 @@ class JdbcReader(Reader):
                               cursor_factory=psycopg2.extras.RealDictCursor)
             cur.itersize = FETCH_SIZE
         else:
-            cur = conn.cursor()
+            # Cursor mặc định của PyMySQL tải TOÀN BỘ kết quả vào RAM trước
+            # khi trả dòng đầu tiên — bảng trans của Berka (1,06 triệu dòng)
+            # vượt 1 GB của Python Shell. SSDictCursor đọc dần từ socket.
+            # Cái giá: không được dừng lâu giữa hai lần đọc (server cắt sau
+            # net_write_timeout, mặc định 60 giây) — mỗi lô chỉ ghi một file
+            # S3 nên còn xa giới hạn đó.
+            import pymysql.cursors  # noqa: PLC0415
+
+            cur = conn.cursor(pymysql.cursors.SSDictCursor)
 
         cur.execute(sql, params)
         wm_col = self.cfg.cdc.watermark_column
@@ -146,7 +167,9 @@ def _jsonable(rec: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(v, (_dt.datetime, _dt.date, _dt.time)):
             out[k] = v.isoformat()
         elif isinstance(v, decimal.Decimal):
-            out[k] = float(v)
+            # Chuỗi, KHÔNG float: float làm sai số tiền ngay ở tầng raw và
+            # không lấy lại được. Silver ép về decimal(p,s) theo entry của nó.
+            out[k] = str(v)
         elif isinstance(v, _uuid.UUID):
             out[k] = str(v)
         elif isinstance(v, (bytes, bytearray, memoryview)):

@@ -1,0 +1,98 @@
+name: CI
+
+# PR        -> test (Python 3.9 Glue + 3.12 Lambda). Không đụng AWS.
+# push main -> test -> deploy dev: bắn repository_dispatch sang repo hạ tầng
+#              (lakehouse_ontology_project) kèm SHA. Repo hạ tầng checkout
+#              đúng SHA này, terraform plan + apply dev (workflow etl-deploy.yml),
+#              rồi ghi SHA vào etl.ref.
+#
+# Repo này KHÔNG có credential AWS và KHÔNG chạy Terraform. Toàn bộ quyền
+# deploy nằm ở repo hạ tầng; ở đây chỉ có một token đủ để GỬI sự kiện.
+#
+# Secret cần có: INFRA_DISPATCH_TOKEN — fine-grained PAT, chỉ repo
+# lakehouse_ontology_project, quyền "Contents: Read and write" (GitHub đòi
+# đúng quyền này cho repository_dispatch). Thiếu secret thì job deploy báo
+# lỗi rõ ràng, phần test vẫn xanh.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Bắn deploy dev cho commit này (chạy lại khi lần trước lỗi)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# PR: lần push mới huỷ lần cũ. main: xếp hàng, không huỷ (mỗi commit một deploy)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pytest:
+    name: pytest (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cung mot package chay o hai noi, hai phien ban:
+        #   3.9  — Glue Python Shell
+        #   3.12 — Lambda (orchestrator trigger, dispatcher, silver router)
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            sourcing/requirements.txt
+
+      - name: Cai thu vien
+        run: pip install -r requirements-dev.txt
+
+      - name: pytest
+        run: python -m pytest -q
+
+  deploy-dev:
+    name: Deploy dev (qua repo ha tang)
+    needs: pytest
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kiem tra token
+        env:
+          TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Thieu secret INFRA_DISPATCH_TOKEN (fine-grained PAT, repo lakehouse_ontology_project, Contents: Read and write)."
+            exit 1
+          fi
+
+      - name: Gui repository_dispatch
+        env:
+          TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+        run: |
+          body=$(jq -n --arg sha "$GITHUB_SHA" --arg actor "$GITHUB_ACTOR" \
+                       --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{event_type: "etl-released", client_payload: {sha: $sha, actor: $actor, run: $run}}')
+          code=$(curl -sS -o resp.txt -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/trinhnam1537/lakehouse_ontology_project/dispatches \
+            -d "$body")
+          if [ "$code" != "204" ]; then
+            echo "::error::Dispatch that bai (HTTP $code): $(cat resp.txt)"
+            exit 1
+          fi
+          echo "::notice::Da gui deploy dev cho $GITHUB_SHA. Theo doi: repo ha tang > Actions > ETL Deploy (dev)"
+          echo "**Deploy dev:** da gui \`$GITHUB_SHA\` sang repo ha tang (workflow *ETL Deploy (dev)*)." >> "$GITHUB_STEP_SUMMARY"

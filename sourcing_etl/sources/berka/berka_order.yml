@@ -1,0 +1,41 @@
+# Berka (PKDD'99): du lieu THAT da an danh cua mot ngan hang Sec, 1993-1998.
+# Nguon: MariaDB cong khai cua CTU, relational.fel.cvut.cz:3306, database `financial`
+# (BAN GOC, khong phai Financial_std). Phan tich nguon: docs/sources/berka.md.
+#
+# Lenh chuyen tien dinh ky (standing order). `order` la TU KHOA SQL — reader boc
+# bang backtick theo driver mysql. k_symbol: SIPO (ho gia dinh) | UVER (tra no vay)
+# | POJISTNE (bao hiem) | LEASING | '' (1.379 dong de trong). amount decimal(6,1).
+# bank_to + account_to: tai khoan NGOAI ngan hang nhan tien.
+# 6.471 dong, khoa chinh order_id. Nguon TINH (khong co updated_at) va nho ->
+# CDC5: moi lan chay keo lai toan bo, ghi de partition hom nay.
+
+name: berka_order
+source_type: jdbc
+description: Berka order tu MariaDB CTU (financial.order)
+owner: namth
+enabled: true
+
+jdbc:
+  # {host, port, username, password, dbname}. Tai khoan guest CONG KHAI cua CTU,
+  # van de trong Secrets Manager de entry khong bao gio chua thong tin ket noi.
+  secret_name: fingraph/berka_ctu
+  driver: mysql
+  schema: financial
+  table: order
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: berka/order
+
+schedule:
+  # Nguon khong doi tu 1999: chay tay (Lambda trigger) la du, khong can lich.
+  enabled: false
+  expression: "cron(0 20 ? * SUN *)"
+
+runtime:
+  engine: python_shell
+  timeout_minutes: 15
+  additional_python_modules:
+    - PyMySQL==1.1.1

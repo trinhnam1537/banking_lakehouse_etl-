@@ -55,13 +55,30 @@ def test_sql_cdc5_khong_order_khong_loc():
     assert sql == 'SELECT * FROM "public"."instruments"' and params == []
 
 
+def test_sql_mysql_boc_backtick_ke_ca_tu_khoa():
+    """MariaDB coi "x" la CHUOI; bang `order` cua Berka la tu khoa SQL."""
+    cfg = _jdbc_cfg(driver="mysql", schema="financial", table="order",
+                    cdc={"mode": "cdc1", "watermark_column": "order_id", "watermark_type": "int"})
+    sql, params = JdbcReader(cfg)._build_sql("10")
+    assert sql == ("SELECT * FROM `financial`.`order` WHERE `order_id` > %s "
+                   "ORDER BY `order_id` ASC")
+    assert params == ["10"]
+
+
+def test_sql_boc_dinh_danh_chua_ky_tu_boc():
+    pg = JdbcReader(_jdbc_cfg(table='a"b'))
+    my = JdbcReader(_jdbc_cfg(driver="mysql", table="a`b"))
+    assert pg._quote('a"b') == '"a""b"' and my._quote("a`b") == "`a``b`"
+
+
 def test_jsonable_ep_kieu_driver():
     u = uuid.UUID(int=1)
     out = _jsonable({
         "ts": dt.datetime(2026, 9, 1, 7, 30), "d": dt.date(2026, 9, 1),
         "n": decimal.Decimal("1.25"), "id": u, "raw": memoryview(b"\x01\xff"), "s": "x",
     })
-    assert out == {"ts": "2026-09-01T07:30:00", "d": "2026-09-01", "n": 1.25,
+    # Decimal -> chuoi: float lam sai so tien ngay o tang raw
+    assert out == {"ts": "2026-09-01T07:30:00", "d": "2026-09-01", "n": "1.25",
                    "id": str(u), "raw": "01ff", "s": "x"}
 
 
@@ -86,7 +103,9 @@ class _Cursor:
 def _jdbc_reader_with_rows(monkeypatch, rows, cfg):
     r = JdbcReader(cfg)
     cur = _Cursor(rows)
-    conn = types.SimpleNamespace(cursor=lambda **kw: cur, close=lambda: None)
+    conn = types.SimpleNamespace(cursor=lambda *a, **kw: cur.opened.append((a, kw)) or cur,
+                                 close=lambda: None)
+    cur.opened = []
     monkeypatch.setattr(r, "_connect", lambda: conn)
     # read() import psycopg2.extras cho driver postgresql
     fake = types.ModuleType("psycopg2")
@@ -122,6 +141,23 @@ def test_jdbc_chia_lo_theo_fetch_size(monkeypatch):
     r, _ = _jdbc_reader_with_rows(monkeypatch, [{"id": i, "updated_at": str(i)} for i in range(5)],
                                   _jdbc_cfg())
     assert [len(b) for b in r.read(None)] == [2, 2, 1]
+
+
+def test_jdbc_mysql_dung_cursor_doc_dan(monkeypatch):
+    """Cursor mac dinh cua PyMySQL tai CA bang vao RAM — trans Berka 1,06 trieu dong."""
+    cfg = _jdbc_cfg(driver="mysql", cdc={"mode": "cdc1", "watermark_column": "trans_id",
+                                         "watermark_type": "int"})
+    r, cur = _jdbc_reader_with_rows(monkeypatch, [{"trans_id": 7, "amount": decimal.Decimal("1.5")}], cfg)
+    sscursor = object()
+    fake = types.ModuleType("pymysql")
+    fake.cursors = types.SimpleNamespace(SSDictCursor=sscursor)
+    monkeypatch.setitem(sys.modules, "pymysql", fake)
+    monkeypatch.setitem(sys.modules, "pymysql.cursors", fake.cursors)
+
+    (b,) = list(r.read(None))
+    assert cur.opened == [((sscursor,), {})]
+    assert b.watermark == "7" and b.records[0]["amount"] == "1.5"
+    assert cur.executed[0].startswith("SELECT * FROM `public`.`instruments`")
 
 
 def test_jdbc_driver_khong_ho_tro(aws):
