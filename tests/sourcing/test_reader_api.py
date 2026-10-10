@@ -252,7 +252,7 @@ def test_response_trang_cuoi_rong_khong_ghi(monkeypatch):
 
 def test_response_khong_ghi_secret_xuong_raw(secret, monkeypatch):
     cfg = make_cfg(api={"raw_mode": "response", "query": {"symbol": "IBM"},
-                        "secret_name": "fingraph/test", "secret_inject": {"apikey": "query.apikey"}})
+                        "secret_name": "fingraph/src/test", "secret_inject": {"apikey": "query.apikey"}})
     r = ApiReader(cfg)
     assert r._query_extra == {"apikey": "K123"}        # khoa da nap that
     monkeypatch.setattr(r, "_fetch", FakeApi([[{"a": 1}]]))
@@ -367,7 +367,7 @@ def test_throttle_gian_cach(monkeypatch, no_sleep):
 @pytest.fixture
 def secret(aws):
     sm = boto3.client("secretsmanager")
-    sm.create_secret(Name="fingraph/test", SecretString=json.dumps({"apikey": "K123", "tok": "T9"}))
+    sm.create_secret(Name="fingraph/src/test", SecretString=json.dumps({"apikey": "K123", "tok": "T9"}))
     return sm
 
 
@@ -375,7 +375,7 @@ def test_secret_chen_vao_query_va_header(secret, monkeypatch, no_sleep):
     sent = []
     opener = _fake_urlopen(sent, [[]])
     monkeypatch.setattr("urllib.request.urlopen", opener)
-    r = ApiReader(make_cfg(api={"secret_name": "fingraph/test",
+    r = ApiReader(make_cfg(api={"secret_name": "fingraph/src/test",
                                 "secret_inject": {"apikey": "query.apikey",
                                                   "tok": "header.Authorization"}}))
     r._fetch({})
@@ -385,13 +385,13 @@ def test_secret_chen_vao_query_va_header(secret, monkeypatch, no_sleep):
 
 def test_secret_thieu_khoa(secret):
     with pytest.raises(KeyError, match="khong co khoa 'nope'"):
-        ApiReader(make_cfg(api={"secret_name": "fingraph/test",
+        ApiReader(make_cfg(api={"secret_name": "fingraph/src/test",
                                 "secret_inject": {"nope": "query.x"}}))
 
 
 def test_secret_inject_sai_dinh_dang(secret):
     with pytest.raises(ValueError, match="header.<Ten>"):
-        ApiReader(make_cfg(api={"secret_name": "fingraph/test",
+        ApiReader(make_cfg(api={"secret_name": "fingraph/src/test",
                                 "secret_inject": {"apikey": "body.x"}}))
 
 

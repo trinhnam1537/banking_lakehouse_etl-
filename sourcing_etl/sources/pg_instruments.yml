@@ -14,7 +14,7 @@ owner: namth
 enabled: false               # bat khi da dung RDS
 
 jdbc:
-  secret_name: fingraph/rds/instruments
+  secret_name: fingraph/src/rds/instruments
   driver: postgresql
   schema: public
   table: instruments

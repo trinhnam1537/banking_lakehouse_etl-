@@ -113,7 +113,7 @@ def test_jdbc_num_partitions_chi_cho_spark():
     raw = {
         "name": "j",
         "source_type": "jdbc",
-        "jdbc": {"secret_name": "s", "schema": "public", "table": "t", "num_partitions": 4},
+        "jdbc": {"secret_name": "fingraph/src/s", "schema": "public", "table": "t", "num_partitions": 4},
         "cdc": {"mode": "cdc5"},
     }
     with pytest.raises(ConfigError, match="num_partitions"):
@@ -271,3 +271,35 @@ def test_entry_that_lich_duoc_dispatcher_ho_tro(real_entries):
 
 def test_thu_muc_sources_ton_tai():
     assert os.path.isdir(SOURCES_DIR)
+
+
+# ---------- profile + tien to secret (Glue job dung chung) ----------
+
+
+def test_profile_mac_dinh_la_src_shell():
+    assert make_cfg().runtime.profile == "src-shell"
+
+
+def test_profile_la_bi_chan():
+    with pytest.raises(ConfigError, match="runtime.profile"):
+        make_cfg(runtime={"profile": "src-khong-co"})
+
+
+@pytest.mark.parametrize("block, secret", [
+    ("api", "fingraph/alphavantage"),          # thieu src/
+    ("api", "rds!db-1234"),                    # secret master RDS tu sinh
+    ("jdbc", "fingraph/rds/core_banking"),
+])
+def test_secret_ngoai_tien_to_bi_chan(block, secret):
+    over = ({"api": {"base_url": "https://x", "secret_name": secret}} if block == "api" else
+            {"source_type": "jdbc", "jdbc": {"secret_name": secret, "schema": "s", "table": "t"},
+             "cdc": {"mode": "cdc5"}})
+    with pytest.raises(ConfigError, match="fingraph/src/"):
+        make_cfg(**over)
+
+
+def test_moi_entry_that_dung_tien_to_secret():
+    from sourcing.config import SECRET_PREFIX, load_all
+    for name, cfg in load_all(str(SOURCES_DIR)).items():
+        s = (cfg.api and cfg.api.secret_name) or (cfg.jdbc and cfg.jdbc.secret_name)
+        assert not s or s.startswith(SECRET_PREFIX), name

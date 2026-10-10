@@ -31,7 +31,7 @@ api:
   query:
     function: "NEWS_SENTIMENT"
     tickers: "IBM"
-  secret_name: fingraph/alphavantage
+  secret_name: fingraph/src/alphavantage
   secret_inject:
     apikey: query.apikey
 

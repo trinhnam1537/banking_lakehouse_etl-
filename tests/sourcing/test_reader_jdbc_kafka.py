@@ -25,7 +25,7 @@ from .conftest import make_cfg
 def _jdbc_cfg(cdc=None, **jdbc):
     return make_cfg(
         source_type="jdbc",
-        jdbc={"secret_name": "s", "schema": "public", "table": "instruments", **jdbc},
+        jdbc={"secret_name": "fingraph/src/s", "schema": "public", "table": "instruments", **jdbc},
         cdc=cdc or {"mode": "cdc1", "watermark_column": "updated_at"},
     )
 
@@ -165,7 +165,7 @@ def test_jdbc_driver_khong_ho_tro(aws):
 
     import boto3
 
-    boto3.client("secretsmanager").create_secret(Name="s", SecretString=json.dumps(
+    boto3.client("secretsmanager").create_secret(Name="fingraph/src/s", SecretString=json.dumps(
         {"host": "h", "username": "u", "password": "p", "dbname": "d"}))
     with pytest.raises(ValueError, match="driver khong ho tro: oracle"):
         JdbcReader(_jdbc_cfg(driver="oracle"))._connect()

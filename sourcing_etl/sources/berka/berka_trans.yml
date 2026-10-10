@@ -28,7 +28,7 @@ owner: namth
 enabled: true
 
 jdbc:
-  secret_name: fingraph/berka_ctu
+  secret_name: fingraph/src/berka_ctu
   driver: mysql
   schema: financial
   table: trans

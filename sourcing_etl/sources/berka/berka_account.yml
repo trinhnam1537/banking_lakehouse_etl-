@@ -18,7 +18,7 @@ enabled: true
 jdbc:
   # {host, port, username, password, dbname}. Tai khoan guest CONG KHAI cua CTU,
   # van de trong Secrets Manager de entry khong bao gio chua thong tin ket noi.
-  secret_name: fingraph/berka_ctu
+  secret_name: fingraph/src/berka_ctu
   driver: mysql
   schema: financial
   table: account

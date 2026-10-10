@@ -60,18 +60,32 @@ class Prepared:
     config: Dict[str, Any]
     chain: bool
     notes: List[str] = field(default_factory=list)
+    timeout_minutes: int = 60
+    # Ten profile neu chay tren Glue job DUNG CHUNG; None = job rieng theo entry (cu)
+    profile: Optional[str] = None
 
 
 class JobType:
     code = ""
+    default_profile = ""
 
     def __init__(self, config_table: str, log_table: str, glue_prefix: str,
-                 dynamodb=None):
+                 dynamodb=None, profile_jobs: Optional[Dict[str, str]] = None):
         self.config_table = config_table
         self.log_table = log_table
         self.glue_prefix = glue_prefix
+        # profile -> ten Glue job dung chung, vd {"src-shell": "fingraph-dev-src-shell"}.
+        # Repo ha tang khai trong JOB_TYPES. Profile chua co o day thi roi ve job
+        # rieng theo entry (glue_prefix + ten) — giu chay duoc trong luc chuyen doi.
+        self.profile_jobs = dict(profile_jobs or {})
         self.configs = JobConfigStore(config_table, client=dynamodb)
         self.log = JobLogStore(log_table, client=dynamodb)
+
+    def glue_job_for(self, name: str, profile: str):
+        """(ten Glue job, profile neu dung job chung / None neu job rieng)."""
+        if profile in self.profile_jobs:
+            return self.profile_jobs[profile], profile
+        return f"{self.glue_prefix}{name}", None
 
     def get_item(self, name: str) -> Optional[Dict[str, Any]]:
         return self.configs.get(name)
@@ -204,8 +218,10 @@ class SourcingType(JobType):
         else:
             notes.append("snapshot qua lon -> Glue tu doc job_config")
 
-        return Prepared(glue_job=f"{self.glue_prefix}{name}", glue_args=args,
-                        config=raw, chain=chain, notes=notes)
+        glue_job, profile = self.glue_job_for(name, cfg.runtime.profile)
+        return Prepared(glue_job=glue_job, glue_args=args, config=raw, chain=chain,
+                        notes=notes, timeout_minutes=cfg.runtime.timeout_minutes,
+                        profile=profile)
 
     def status(self, name):
         ck = self.log.read_checkpoint(name)
@@ -222,9 +238,12 @@ class SourcingType(JobType):
 class SilverType(JobType):
     code = "slv"
 
+    default_profile = "slv-spark"
+
     def __init__(self, config_table: str, log_table: str, glue_prefix: str,
-                 dynamodb=None):
-        super().__init__(config_table, log_table, glue_prefix, dynamodb=dynamodb)
+                 dynamodb=None, profile_jobs: Optional[Dict[str, str]] = None):
+        super().__init__(config_table, log_table, glue_prefix, dynamodb=dynamodb,
+                         profile_jobs=profile_jobs)
         from silver.state import SilverLogStore
 
         self.silver_log = SilverLogStore(log_table, client=dynamodb)
@@ -236,9 +255,11 @@ class SilverType(JobType):
             raise TriggerError("job slv.* chua ho tro dry_run")
 
         raw = self._raw_config(name, item)
+        runtime = raw.get("runtime") or {}
+        timeout = int(runtime.get("timeout_minutes", 60))
         try:
             from silver.config import from_dict
-            from_dict(copy.deepcopy(raw), default_name=name)
+            timeout = from_dict(copy.deepcopy(raw), default_name=name).runtime.timeout_minutes
         except ImportError:
             pass  # goi Lambda thieu silver/ -> bo qua kiem tra, Glue se kiem
         except (ValueError, TypeError) as e:
@@ -255,8 +276,9 @@ class SilverType(JobType):
         if not req.manifest and not data_date:
             raise TriggerError("job slv.* can \"manifest\" hoac \"data_date\"")
 
+        glue_job, profile = self.glue_job_for(name, runtime.get("profile", self.default_profile))
         return Prepared(
-            glue_job=f"{self.glue_prefix}{name}",
+            glue_job=glue_job,
             glue_args={
                 "--JOB_NAME": name,
                 "--RUN_ID": run_id,
@@ -266,6 +288,8 @@ class SilverType(JobType):
             },
             config=raw,
             chain=req.chain,
+            timeout_minutes=timeout,
+            profile=profile,
         )
 
     def claim(self, name, req, run_id):

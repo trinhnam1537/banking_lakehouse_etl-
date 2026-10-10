@@ -178,14 +178,37 @@ class ScheduleConfig:
     expression: str = "rate(1 hour)"
 
 
+# Glue job DÙNG CHUNG ("profile") mà repo hạ tầng tạo sẵn. Một profile = một bộ
+# thư viện + một kiểu mạng; mọi entry cùng profile chạy trên cùng một Glue job,
+# tham số từng lần chạy (--JOB_NAME, --CONFIG_SNAPSHOT, --ETL_RELEASE) quyết định
+# chạy entry nào bằng bản code nào.
+#
+#   src-shell  Python Shell, có internet: api, s3file, jdbc tới DB công khai.
+#              Thư viện sẵn: PyMySQL.
+#
+# Thêm profile (vd src-vpc cho RDS private, src-kafka) = việc của repo hạ tầng
+# TRƯỚC, rồi mới thêm tên vào đây. Tên lạ bị chặn lúc nạp entry thay vì lúc
+# Lambda gọi một Glue job không tồn tại.
+PROFILES = ("src-shell",)
+DEFAULT_PROFILE = "src-shell"
+
+# Glue sourcing chỉ được đọc secret dưới tiền tố này (IAM ở repo hạ tầng:
+# secret:fingraph/src/*). Khai secret ngoài tiền tố thì job chết AccessDenied
+# lúc chạy — chặn sớm ở đây cho lỗi hiện ra trong pytest.
+SECRET_PREFIX = "fingraph/src/"
+
+
 @dataclass
 class RuntimeConfig:
     engine: Engine = Engine.PYTHON_SHELL
     timeout_minutes: int = 30
     max_retries: int = 0
+    profile: str = DEFAULT_PROFILE
     # Chỉ có tác dụng với engine SPARK
     worker_type: str = "G.1X"
     number_of_workers: int = 2
+    # CŨ: thư viện theo entry, chỉ còn tác dụng với Glue job theo entry (đang
+    # gỡ dần). Glue job profile cài thư viện theo profile, bỏ qua khoá này.
     additional_python_modules: List[str] = field(default_factory=list)
 
 
@@ -316,6 +339,7 @@ def from_dict(raw: Dict[str, Any], default_name: str = "") -> SourceConfig:
                      "runtime.engine", name),
         timeout_minutes=int(runtime_raw.get("timeout_minutes", 30)),
         max_retries=int(runtime_raw.get("max_retries", 0)),
+        profile=str(runtime_raw.get("profile", DEFAULT_PROFILE)),
         worker_type=runtime_raw.get("worker_type", "G.1X"),
         number_of_workers=int(runtime_raw.get("number_of_workers", 2)),
         additional_python_modules=list(runtime_raw.get("additional_python_modules", [])),
@@ -362,6 +386,19 @@ def _validate(cfg: SourceConfig) -> None:
             raise ConfigError(
                 f"[{n}] jdbc.num_partitions > 1 chi co tac dung voi engine=spark."
             )
+
+    if cfg.runtime.profile not in PROFILES:
+        raise ConfigError(
+            f"[{n}] runtime.profile = {cfg.runtime.profile!r} khong co. "
+            f"Profile hien co: {', '.join(PROFILES)} (them profile o repo ha tang truoc)."
+        )
+
+    secret = (cfg.api and cfg.api.secret_name) or (cfg.jdbc and cfg.jdbc.secret_name)
+    if secret and not secret.startswith(SECRET_PREFIX):
+        raise ConfigError(
+            f"[{n}] secret_name = {secret!r} nam ngoai '{SECRET_PREFIX}'. "
+            f"Glue sourcing chi duoc doc secret duoi tien to nay."
+        )
 
     if cfg.target.file_format not in ("ndjson.gz", "ndjson"):
         raise ConfigError(

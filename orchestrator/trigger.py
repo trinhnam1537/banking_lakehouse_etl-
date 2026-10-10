@@ -68,12 +68,23 @@ def _as_bool(v: Any, default: bool) -> bool:
 class Trigger:
     def __init__(self, job_types: Dict[str, JobType], runner_arn: str,
                  default_type: str = "src", sfn=None,
-                 sleep: Callable[[float], None] = time.sleep):
+                 sleep: Callable[[float], None] = time.sleep,
+                 release_param: Optional[str] = None, artifact_bucket: Optional[str] = None,
+                 ssm=None, clock: Callable[[], float] = time.time):
         self.types = job_types
         self.runner_arn = runner_arn
         self.default_type = default_type
         self.sfn = sfn or boto3.client("stepfunctions")
         self.sleep = sleep
+        # Con tro ban code dang deploy (SSM, do CI repo ETL ghi). Job dung chung
+        # can no de biet tai etl.zip nao; job rieng theo entry (cu) thi khong.
+        self.release_param = release_param
+        self.artifact_bucket = artifact_bucket
+        self._ssm = ssm
+        self.clock = clock
+        # at=None = chua doc. KHONG khoi tao 0.0 (bai hoc silver router: so voi
+        # monotonic() tren container moi thi "chua het han" -> gia tri rong).
+        self._release_cache: Dict[str, Any] = {"at": None, "value": None}
 
     @classmethod
     def from_env(cls) -> "Trigger":
@@ -86,9 +97,63 @@ class Trigger:
             if klass is None:
                 raise RuntimeError(f"JOB_TYPES co loai '{code}' ma code khong biet")
             types[code] = klass(conf["config_table"], conf["log_table"],
-                                conf["glue_prefix"], dynamodb=ddb)
+                                conf["glue_prefix"], dynamodb=ddb,
+                                profile_jobs=conf.get("profile_jobs") or {})
         return cls(types, os.environ["RUNNER_ARN"],
-                   default_type=os.environ.get("DEFAULT_JOB_TYPE", "src"))
+                   default_type=os.environ.get("DEFAULT_JOB_TYPE", "src"),
+                   release_param=os.environ.get("ETL_RELEASE_PARAM") or None,
+                   artifact_bucket=os.environ.get("ARTIFACT_BUCKET") or None)
+
+    # ---------- phiên bản code cho job dùng chung ----------
+
+    RELEASE_CACHE_SECONDS = 60
+
+    def current_release(self) -> Optional[str]:
+        """SHA đang deploy, đọc SSM, cache 60 giây trong container."""
+        if not self.release_param:
+            return None
+        now = time.monotonic()
+        at = self._release_cache["at"]
+        if at is None or now - at > self.RELEASE_CACHE_SECONDS:
+            ssm = self._ssm or boto3.client("ssm")
+            try:
+                value = ssm.get_parameter(Name=self.release_param)["Parameter"]["Value"].strip()
+            except ClientError as e:
+                print(f"Khong doc duoc {self.release_param}: {e}")
+                value = None
+            self._release_cache.update(at=now, value=value or None)
+        return self._release_cache["value"]
+
+    def _attach_release(self, jt: JobType, prep) -> Optional[str]:
+        """Job dùng chung: ghim ĐÚNG một bản code cho lần chạy này.
+
+        Không ghim thì bootstrap tự đọc con trỏ SSM lúc Glue khởi động — vẫn
+        chạy được, nhưng deploy giữa lúc chờ khởi động sẽ đổi code dưới chân
+        lần chạy. Spark còn cần --extra-py-files để executor có code.
+        """
+        if not prep.profile:
+            return None
+        release = self.current_release()
+        if not release or release in ("none", "-"):
+            prep.notes.append("chua co ETL_RELEASE (repo ETL chua deploy?) -> Glue doc SSM luc chay")
+            return None
+        prep.glue_args["--ETL_RELEASE"] = release
+        if jt.code == "slv" and self.artifact_bucket:
+            prep.glue_args["--extra-py-files"] = (
+                f"s3://{self.artifact_bucket}/_ops/etl/releases/{release}/etl.zip")
+        return release
+
+    @staticmethod
+    def lease_fields(timeout_minutes: int, now: float) -> Dict[str, str]:
+        """Khoá theo entry cho Step Functions (job dùng chung không còn tự tuần tự).
+
+        lease_until = hết timeout Glue + 10 phút dư: lần chạy treo/bị giết mà không
+        kịp nhả khoá thì khoá tự hết hạn, không khoá entry mãi. Chuỗi số vì
+        Step Functions chỉ nhét chuỗi vào thuộc tính N của DynamoDB.
+        """
+        until = int(now) + int(timeout_minutes) * 60 + 600
+        return {"lease_now": str(int(now)), "lease_until": str(until),
+                "lease_expires": str(until + 86400)}
 
     # ---------- chuẩn hoá event ----------
 
@@ -184,11 +249,13 @@ class Trigger:
         item = self._load(jt, name)
         run_id = req.run_id or "validate"
         prep = jt.prepare(name, item, req, run_id)
+        self._attach_release(jt, prep)
         args = dict(prep.glue_args)
         if "--CONFIG_SNAPSHOT" in args:  # hien ban giai nen cho de doc
             args["--CONFIG_SNAPSHOT"] = f"<{len(args['--CONFIG_SNAPSHOT'])} ky tu>"
         return {"ok": True, "action": "validate", "job_id": f"{jt.code}.{name}",
                 "enabled": bool(item.get("enabled", True)), "glue_job": prep.glue_job,
+                "profile": prep.profile, "timeout_minutes": prep.timeout_minutes,
                 "glue_args": args, "chain": prep.chain, "notes": prep.notes,
                 "config": prep.config}
 
@@ -202,6 +269,7 @@ class Trigger:
 
         run_id = req.run_id or self.make_run_id(job_id, req.trigger)
         prep = jt.prepare(name, item, req, run_id)
+        release = self._attach_release(jt, prep)
         exec_name = self.execution_name(jt.code, name, run_id)
 
         if not jt.claim(name, req, run_id):
@@ -213,6 +281,8 @@ class Trigger:
             "orch_status": "STARTED",
             "execution_name": exec_name,
             "glue_job": prep.glue_job,
+            "profile": prep.profile,
+            "etl_release": release,
             "trigger": req.trigger,
             # Chuoi JSON: override co the co float/None ma DynamoDB kho chiu
             "overrides": json.dumps(req.overrides, ensure_ascii=False),
@@ -233,6 +303,8 @@ class Trigger:
             "glue_args": prep.glue_args,
             "log_table": jt.log_table,
             "chain": prep.chain,
+            "timeout_minutes": prep.timeout_minutes,
+            **self.lease_fields(prep.timeout_minutes, self.clock()),
         }
         try:
             resp = self.sfn.start_execution(stateMachineArn=self.runner_arn, name=exec_name,
@@ -251,7 +323,8 @@ class Trigger:
 
         out: Dict[str, Any] = {
             "ok": True, "job_id": job_id, "run_id": run_id, "status": "STARTED",
-            "glue_job": prep.glue_job, "chain": prep.chain, "dry_run": req.dry_run,
+            "glue_job": prep.glue_job, "profile": prep.profile, "etl_release": release,
+            "chain": prep.chain, "dry_run": req.dry_run,
             "execution_arn": arn, "console": self._console_url(arn),
         }
         if prep.notes:
