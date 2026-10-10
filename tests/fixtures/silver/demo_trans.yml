@@ -1,0 +1,36 @@
+# Entry silver MẪU cho test (không deploy): đọc landing/berka/trans.
+# Test orchestrator dùng nó để kiểm luồng nối sourcing -> silver khi repo chưa
+# có entry silver thật nào. Cấu trúc phải qua được silver.config.from_dict.
+
+name: demo_trans
+description: Giao dich Berka (entry mau cho test)
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/trans
+  records_path: ""
+
+target:
+  database: track_a_silver
+  table: demo_trans
+  partition_by: [ds_partition_date]
+
+columns:
+  - {name: trans_id, type: bigint, nullable: false}
+  - {name: account_id, type: bigint}
+  - {name: trans_date, path: date, type: date}
+  - {name: type}
+  - {name: amount, type: "decimal(18,2)"}
+  - {name: balance, type: "decimal(18,2)"}
+
+technical:
+  keys: [trans_id]
+  cdc_index: trans_id
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [trans_id]

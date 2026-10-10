@@ -267,7 +267,7 @@ class SilverType(JobType):
 
         data_date = req.data_date
         if req.manifest and not data_date:
-            from silver.lambda_router import parse_manifest_key
+            from silver.manifest import parse_manifest_key
 
             parsed = parse_manifest_key(req.manifest)
             if not parsed:
@@ -307,7 +307,7 @@ class SilverType(JobType):
     def consumers_of(self, detail):
         if detail.get("job_type") != "src" or not detail.get("manifest"):
             return []
-        from silver.lambda_router import parse_manifest_key
+        from silver.manifest import parse_manifest_key
 
         parsed = parse_manifest_key(detail["manifest"])
         if not parsed:

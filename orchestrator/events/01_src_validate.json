@@ -1,4 +1,4 @@
 {
-  "job_id": "src.binance_ticker_24hr",
+  "job_id": "src.berka_order",
   "action": "validate"
 }

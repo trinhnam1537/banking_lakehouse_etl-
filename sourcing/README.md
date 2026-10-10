@@ -15,7 +15,6 @@ state.py        2 bang DynamoDB: job_config va job_log
 writer.py       ghi raw NDJSON.gz xuong S3
 runner.py       luong chung source -> raw
 main.py         diem vao cua Glue job va chay tay
-lambda_dispatcher.py   Lambda fan-out: 1 lich -> N job
 readers/
   base.py       giao dien chung
   api.py        REST API (phan trang, rate limit, secret)
@@ -77,13 +76,13 @@ Get-Content .env | ForEach-Object {
 python -c "from sourcing.config import load_all; print(len(load_all('sourcing_etl/sources')), 'entry OK')"
 
 # 2. Doc nguon that nhung KHONG ghi S3, KHONG tien moc
-python -m sourcing.main --config sourcing_etl/sources/gleif_lei.yml `
+python -m sourcing.main --config sourcing_etl/sources/berka/berka_order.yml `
   --RAW_BUCKET $env:LAKEHOUSE_BUCKET `
   --JOBLOG_TABLE fingraph-dev-src-job-log `
   --dry-run
 
 # 3. Chay that (bo --dry-run)
-python -m sourcing.main --config sourcing_etl/sources/gleif_lei.yml `
+python -m sourcing.main --config sourcing_etl/sources/berka/berka_order.yml `
   --RAW_BUCKET $env:LAKEHOUSE_BUCKET `
   --JOBLOG_TABLE fingraph-dev-src-job-log
 ```
@@ -124,17 +123,17 @@ lần ngược về job nào sinh ra nó được.
 ```powershell
 # Checkpoint hien tai
 aws dynamodb get-item --table-name fingraph-dev-src-job-log `
-  --key '{\"job_name\":{\"S\":\"gleif_lei\"},\"run_key\":{\"S\":\"CKPT#LATEST\"}}' `
+  --key '{\"job_name\":{\"S\":\"berka_order\"},\"run_key\":{\"S\":\"CKPT#LATEST\"}}' `
   --profile fingraph
 
 # 5 lan chay gan nhat
 aws dynamodb query --table-name fingraph-dev-src-job-log `
   --key-condition-expression "job_name = :j AND begins_with(run_key, :p)" `
-  --expression-attribute-values '{\":j\":{\"S\":\"gleif_lei\"},\":p\":{\"S\":\"RUN#\"}}' `
+  --expression-attribute-values '{\":j\":{\"S\":\"berka_order\"},\":p\":{\"S\":\"RUN#\"}}' `
   --no-scan-index-forward --max-items 5 --profile fingraph
 
 # Buoc job keo lai tu dau
 aws dynamodb delete-item --table-name fingraph-dev-src-job-log `
-  --key '{\"job_name\":{\"S\":\"gleif_lei\"},\"run_key\":{\"S\":\"CKPT#LATEST\"}}' `
+  --key '{\"job_name\":{\"S\":\"berka_order\"},\"run_key\":{\"S\":\"CKPT#LATEST\"}}' `
   --profile fingraph
 ```

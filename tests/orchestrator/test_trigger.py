@@ -14,8 +14,8 @@ from sourcing.config import decode_snapshot
 from .conftest import ROOT, RUNNER_ARN, Env
 
 
-def succeeded_event(job_id="src.binance_ticker_24hr", run_id="r1",
-                    manifest="landing/_manifests/binance/ticker_24hr/ingest_date=2026-09-28/r1.json",
+def succeeded_event(job_id="src.berka_trans", run_id="r1",
+                    manifest="landing/_manifests/berka/trans/ingest_date=2026-09-28/r1.json",
                     chain=True):
     return {"source": EVENT_SOURCE, "detail-type": SUCCEEDED_DETAIL_TYPE,
             "detail": {"job_id": job_id, "job_type": job_id.split(".")[0],
@@ -286,7 +286,7 @@ def test_slv_tu_choi_override_va_dry_run(env: Env):
 
 
 def test_src_xong_thi_kich_silver_doc_dataset_do(env: Env):
-    name = env.seed_slv_from_repo()  # source.dataset = binance/ticker_24hr
+    name = env.seed_slv_from_repo()  # source.dataset = berka/trans
     res = env.trigger.handle(succeeded_event())
     assert res["status"] == "STARTED" and res["job_id"] == f"slv.{name}"
     inp = env.sfn.started[0]["input"]
@@ -294,7 +294,7 @@ def test_src_xong_thi_kich_silver_doc_dataset_do(env: Env):
     assert inp["glue_args"]["--DATA_DATE"] == "2026-09-28"
     orch = env.item(Env.SLV_LOG, name, f"ORCH#{res['run_id']}")
     assert orch["trigger"]["type"] == "upstream"
-    assert orch["trigger"]["parent_job_id"] == "src.binance_ticker_24hr"
+    assert orch["trigger"]["parent_job_id"] == "src.berka_trans"
 
 
 def test_cung_manifest_hai_lan_chi_chay_mot_lan(env: Env):
@@ -307,7 +307,7 @@ def test_cung_manifest_hai_lan_chi_chay_mot_lan(env: Env):
 
 def test_force_chay_lai_manifest_da_xu_ly(env: Env):
     name = env.seed_slv_from_repo()
-    m = "landing/_manifests/binance/ticker_24hr/ingest_date=2026-09-28/r1.json"
+    m = "landing/_manifests/berka/trans/ingest_date=2026-09-28/r1.json"
     env.trigger.handle({"job_id": f"slv.{name}", "manifest": m})
     res = env.trigger.handle({"job_id": f"slv.{name}", "manifest": m, "force": True})
     assert res["status"] == "STARTED" and len(env.sfn.started) == 2

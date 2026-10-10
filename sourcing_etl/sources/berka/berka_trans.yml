@@ -49,5 +49,3 @@ runtime:
   engine: python_shell
   # ~1 trieu dong qua internet Singapore -> Praha; PARTIAL giu tien do neu het gio
   timeout_minutes: 60
-  additional_python_modules:
-    - PyMySQL==1.1.1

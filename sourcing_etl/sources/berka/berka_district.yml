@@ -38,5 +38,3 @@ schedule:
 runtime:
   engine: python_shell
   timeout_minutes: 15
-  additional_python_modules:
-    - PyMySQL==1.1.1

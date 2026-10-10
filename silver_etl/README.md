@@ -3,12 +3,14 @@
 Code ở [`../silver/`](../silver/). Ở đây chỉ có cấu hình:
 
 ```
-entries/<nguon>/<bang>.yml   mot entry = mot bang silver = mot Glue job
+entries/<nguon>/<bang>.yml   mot entry = mot bang silver (chay tren Glue job dung chung slv-spark)
 ddl/<database>/<bang>.sql    (tuy chon) DDL viet tay; khong co thi sinh tu entry
-glue_entrypoint.py           script Glue chung cho moi job silver
 ```
 
-**Thêm một bảng silver:** tạo `entries/<nguon>/<bang>.yml` → `terraform apply`.
+**Hiện chưa có entry silver nào**: nguồn tài chính đã bỏ (10-12), entry cho Berka viết sau.
+Ví dụ bên dưới (GLEIF, FDIC) giữ lại để minh hoạ cú pháp.
+
+**Thêm một bảng silver:** tạo `entries/<nguon>/<bang>.yml` → merge `main` (CI config-sync ghi vào `slv-job-config`).
 Không viết Python. Tên file phải duy nhất và trùng khoá `name`.
 
 ---
@@ -110,6 +112,6 @@ pytest tests/silver                                          # 14 test Spark tha
 
 # Tren AWS
 aws glue start-job-run --job-name fingraph-dev-slv-ddl-apply                 # tao bang tu thu muc ddl/
-aws lambda invoke --function-name fingraph-dev-slv-router `
-  --payload '{\"job_name\":\"fdic_institution\",\"data_date\":\"2026-09-28\"}' out.json   # chay lai / backfill
+aws lambda invoke --function-name fingraph-dev-trigger --cli-binary-format raw-in-base64-out `
+  --payload '{\"job_id\":\"slv.<bang>\",\"data_date\":\"2026-10-12\"}' out.json   # chay lai / backfill
 ```

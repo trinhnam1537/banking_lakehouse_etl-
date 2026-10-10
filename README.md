@@ -12,7 +12,7 @@ Repo này chỉ đổ **code** và **cấu hình** vào nền tảng đó.
 | `silver/`, `silver_etl/` | Framework raw → silver (Iceberg, SCD2/SCD4a), entry và DDL |
 | `orchestrator/` | Lambda trigger (một cửa vào theo `job_id`), Lambda schedule-sync, event mẫu |
 | `deploy/` | `glue_bootstrap.py` (script mọi Glue job chạy), `build.py`, `config_sync.py`, `deploy.py` |
-| `jobs/glue/` | Script PySpark: bronze_ingest, rt_ohlc_1min, onto_closure |
+| `jobs/glue/` | Script PySpark: bronze_ingest, onto_closure (CI upload lên `_ops/glue-scripts/`) |
 | `tests/` | pytest + moto, không chạm AWS |
 | `docs/` | Kiến trúc sourcing/silver, phân tích nguồn (`docs/sources/`) |
 
@@ -41,7 +41,8 @@ push main ─▶ CI: pytest 3.9 + 3.12 ─▶ python -m deploy.deploy --env dev 
               1. build etl.zip ─▶ s3://<bucket>/_ops/etl/releases/<sha>/etl.zip
               2. bootstrap     ─▶ s3://<bucket>/_ops/etl/bootstrap/glue_bootstrap.py
                  DDL silver    ─▶ s3://<bucket>/_ops/silver/ddl/
-              3. update-function-code: trigger, schedule-sync, silver router
+              3. update-function-code: trigger, schedule-sync
+                 script Glue    ─▶ s3://<bucket>/_ops/glue-scripts/*.py
               4. SSM /fingraph/dev/etl/release = <sha>          (con trỏ phiên bản)
               5. config-sync: YAML ─▶ bảng job_config (src, slv)
 ```
@@ -75,8 +76,8 @@ các tham số này (`terraform/envs/<env>/platform.tf`):
 
 Phía repo này phải giữ ổn định:
 - Khoá S3 `_ops/etl/bootstrap/glue_bootstrap.py` và `_ops/etl/releases/<sha>/etl.zip`.
-- Handler Lambda: `orchestrator.trigger.handler`, `orchestrator.schedule_sync.handler`,
-  `silver.lambda_router.handler`.
+- Handler Lambda: `orchestrator.trigger.handler`, `orchestrator.schedule_sync.handler`.
+- Khoá S3 `_ops/glue-scripts/<tên>.py` của script trong `jobs/glue/`.
 - Tên profile trong `sourcing/config.py` (`PROFILES`) phải khớp `var.profiles` của repo hạ tầng.
 - Secret của nguồn phải nằm dưới `fingraph/src/` (`SECRET_PREFIX`), vì Glue chỉ đọc được tiền tố này.
 
@@ -91,7 +92,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pytest -q
 
 # Thu mot job, khong can AWS: goi nguon that, dem ban ghi
-.\scripts\run-source.ps1 -Job binance_ticker_24hr -Mode dry
+.\scripts\run-source.ps1 -Job berka_order -Mode dry
 
 # Xem deploy se lam gi, khong ghi gi (can credential doc SSM + DynamoDB)
 python -m deploy.deploy --env dev --sha $(git rev-parse HEAD) --dry-run

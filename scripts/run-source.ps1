@@ -1,22 +1,24 @@
 ﻿# Chạy thử một job sourcing từ đầu đến cuối: nguồn -> S3 raw -> job_log.
 #
-#   .\scripts\run-source.ps1                                  # binance_ticker_24hr, chay tren Glue
-#   .\scripts\run-source.ps1 -Job gleif_lei                   # job khac
+#   .\scripts\run-source.ps1                                  # berka_order, chay tren AWS qua Lambda trigger
+#   .\scripts\run-source.ps1 -Job berka_trans                 # job khac
 #   .\scripts\run-source.ps1 -Mode local                      # chay tren may, ghi S3 that
 #   .\scripts\run-source.ps1 -Mode dry                        # chi doc nguon, khong ghi gi
 #
 # Ba chế độ, từ rẻ đến đắt:
 #
-#   dry    Đọc nguồn thật, đếm bản ghi. Không cần AWS. Dùng để kiểm YAML.
+#   dry    Đọc nguồn thật, đếm bản ghi, không ghi gì. Nguồn API: không cần AWS.
+#          Nguồn JDBC (Berka): CẦN credential, vì thông tin kết nối nằm trong
+#          Secrets Manager (fingraph/src/...). Cần .venv của repo này (README).
 #   local  Chạy framework trên máy, ghi S3 và DynamoDB thật. Không tốn Glue.
-#   glue   Kích Glue job mà Terraform đã tạo (fingraph-<env>-src-<job>).
-#          Đây là đường chạy thật khi có lịch — test đúng IAM, đúng gói
-#          framework trên S3, đúng tham số mặc định.
+#   glue   Gọi Lambda trigger -> Step Functions -> Glue job dùng chung của profile.
+#          Đây là đường chạy thật khi có lịch — test đúng IAM, đúng bản code
+#          đã deploy (ETL_RELEASE), đúng khoá theo entry.
 #
 # Yêu cầu cho local/glue: credential còn hạn (. .\docs\iam\assume.ps1).
 
 param(
-    [string]$Job = "binance_ticker_24hr",
+    [string]$Job = "berka_order",
     [ValidateSet("dry", "local", "glue")]
     [string]$Mode = "glue",
     [string]$EnvName = "dev",
@@ -96,30 +98,25 @@ if isinstance(rec, dict):
         if ($LASTEXITCODE -ne 0) { throw "Job that bai (exit $LASTEXITCODE)" }
     }
     else {
-        $glueJob = "$prefix-src-$Job"
-        Write-Host "== [3] Kich Glue job $glueJob" -ForegroundColor Cyan
-        # Bo --RUN_ID: framework tu sinh. Step Functions moi can truyen de
-        # hai ben cung ghi vao mot ban ghi RUN#.
-        $runId = aws glue start-job-run --job-name $glueJob --query JobRunId --output text --region $Region
-        if ($LASTEXITCODE -ne 0) {
-            throw "Khong kich duoc $glueJob. Job co ton tai khong? (enabled: true + terraform apply)"
-        }
-        Write-Host "   JobRunId: $runId"
-
-        # Python Shell khoi dong ~30-60s, chay binance vai giay
-        $terminal = "SUCCEEDED", "FAILED", "STOPPED", "TIMEOUT", "ERROR"
-        do {
-            Start-Sleep -Seconds 15
-            $state = aws glue get-job-run --job-name $glueJob --run-id $runId `
-                --query JobRun.JobRunState --output text --region $Region
-            Write-Host ("   {0:HH:mm:ss} {1}" -f (Get-Date), $state)
-        } while ($terminal -notcontains $state)
-
-        if ($state -ne "SUCCEEDED") {
-            aws glue get-job-run --job-name $glueJob --run-id $runId `
-                --query JobRun.ErrorMessage --output text --region $Region
-            Write-Host "   Log: CloudWatch /aws-glue/python-jobs/error, stream $runId" -ForegroundColor Yellow
-            throw "Glue job $state"
+        # Glue job theo entry da go (10-12): moi entry chay tren Glue job DUNG CHUNG
+        # cua profile, qua Lambda trigger -> Step Functions (khoa entry, Timeout,
+        # ghim ban code --ETL_RELEASE). Chay qua Lambda la dung duong chay that.
+        $fn = "$prefix-trigger"
+        Write-Host "== [3] Lambda $fn {job_id: src.$Job}, doi toi da 14 phut" -ForegroundColor Cyan
+        $payload = Join-Path ([System.IO.Path]::GetTempPath()) "run-source-payload.json"
+        $out = Join-Path ([System.IO.Path]::GetTempPath()) "run-source-out.json"
+        # PS 5.1 nuot dau nhay kep khi truyen JSON cho aws.exe -> ghi file, UTF-8 khong BOM
+        [System.IO.File]::WriteAllText($payload, "{`"job_id`": `"src.$Job`", `"chain`": false, `"wait_seconds`": 840}",
+            (New-Object System.Text.UTF8Encoding($false)))
+        aws lambda invoke --function-name $fn --cli-binary-format raw-in-base64-out `
+            --cli-read-timeout 900 --region $Region --payload "file://$payload" $out | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Khong goi duoc $fn" }
+        $res = Get-Content $out -Raw | ConvertFrom-Json
+        Write-Host ("   status={0} glue_job={1} run_id={2} release={3}" -f $res.status, $res.glue_job, $res.run_id, $res.etl_release)
+        if ($res.console) { Write-Host "   $($res.console)" }
+        if (-not $res.ok -or $res.status -ne "SUCCEEDED") {
+            Write-Host ($res | ConvertTo-Json -Depth 6) -ForegroundColor Yellow
+            throw "Lan chay khong thanh cong: $($res.status) $($res.error)"
         }
     }
 

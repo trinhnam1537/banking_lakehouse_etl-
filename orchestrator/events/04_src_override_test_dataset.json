@@ -1,8 +1,7 @@
 {
-  "job_id": "src.fdic_institutions",
+  "job_id": "src.berka_loan",
   "overrides": {
-    "api.max_pages": 1,
-    "target.dataset": "_test/fdic_institutions"
+    "target.dataset": "_test/berka_loan"
   },
   "wait_seconds": 600
 }

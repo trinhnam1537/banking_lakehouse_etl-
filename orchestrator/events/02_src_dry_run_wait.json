@@ -1,5 +1,5 @@
 {
-  "job_id": "src.binance_ticker_24hr",
+  "job_id": "src.berka_district",
   "dry_run": true,
   "wait_seconds": 600
 }

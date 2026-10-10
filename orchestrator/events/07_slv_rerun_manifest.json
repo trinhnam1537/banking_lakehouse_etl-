@@ -1,6 +1,0 @@
-{
-  "job_id": "slv.binance_ticker_24h",
-  "manifest": "landing/_manifests/binance/ticker_24hr/ingest_date=2026-09-28/<run_id>.json",
-  "force": true,
-  "wait_seconds": 840
-}

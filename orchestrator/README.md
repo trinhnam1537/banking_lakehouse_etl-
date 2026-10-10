@@ -17,7 +17,7 @@ Chỉ cần truyền `job_id`. Không cần script trên máy, không cần `sta
 
 ## `job_id`
 
-`<loại>.<tên entry>`: `src.gleif_lei`, `slv.gleif_legal_entity`. Không có tiền tố thì
+`<loại>.<tên entry>`: `src.berka_trans`, `slv.<bảng silver>`. Không có tiền tố thì
 mặc định là `src`.
 
 ## Các trường của event
@@ -44,17 +44,15 @@ Event mẫu nằm trong [events/](events/). Có test canh để mọi `job_id` t
 
 | File | Làm gì |
 |---|---|
-| `01_src_validate.json` | Xem config + tham số Glue sẽ truyền. **Chạy cái này trước tiên** |
-| `02_src_dry_run_wait.json` | Gọi nguồn thật trên Glue, không ghi S3, đợi kết quả |
-| `03_src_run_wait_no_chain.json` | Chạy thật, ghi landing/, **không** kích silver |
-| `04_src_override_test_dataset.json` | 1 trang, ghi vào `landing/_test/...`, không đụng dataset thật |
-| `05_src_run_chain_to_silver.json` | Chạy thật, xong thì silver `binance_ticker_24h` tự chạy theo |
-| `06_slv_run_by_date.json` | Chạy silver theo ngày |
-| `07_slv_rerun_manifest.json` | Chạy lại silver cho một manifest (thay `<run_id>`) |
-| `08_src_status.json` / `09_src_status_one_run.json` | Checkpoint + 5 lần chạy gần nhất / một run_id |
-| `10_src_many_jobs.json` | Nhiều job một lần |
-| `11_schedule_tick.json` | Giả lập Scheduler. Gửi hai lần: lần hai trả `DUPLICATE` |
-| `12_upstream_succeeded_event.json` | Giả lập event job-runner bắn khi sourcing xong |
+| `01_src_validate.json` | Xem config + Glue job (profile) + tham số sẽ truyền. **Chạy cái này trước tiên** |
+| `02_src_dry_run_wait.json` | Đọc nguồn thật trên Glue, không ghi S3, đợi kết quả |
+| `03_src_run_wait.json` | Chạy thật `berka_order`, ghi landing/, không kích silver |
+| `04_src_override_test_dataset.json` | Ghi vào `landing/_test/...`, không đụng dataset thật |
+| `05_src_all_berka.json` | Cả 8 bảng Berka một lần |
+| `06_src_status.json` / `07_src_status_one_run.json` | Checkpoint + 5 lần chạy gần nhất / một run_id |
+| `08_schedule_tick.json` | Giả lập Scheduler. Gửi hai lần: lần hai trả `DUPLICATE` |
+
+Event silver (chain, chạy theo ngày, chạy lại manifest) thêm lại khi có entry silver cho Berka.
 
 **Trên console:** Lambda → `fingraph-dev-trigger` → tab *Test* → dán nội dung file → *Test*.
 

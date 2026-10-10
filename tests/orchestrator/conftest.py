@@ -101,7 +101,7 @@ class Env:
             "job_name": name, "enabled": enabled, "config": json.dumps(cfg)})
         return cfg
 
-    def seed_slv_from_repo(self, rel: str = "silver_etl/entries/binance/binance_ticker_24h.yml") -> str:
+    def seed_slv_from_repo(self, rel: str = "tests/fixtures/silver/demo_trans.yml") -> str:
         with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         self.ddb.Table(self.SLV_CFG).put_item(Item={

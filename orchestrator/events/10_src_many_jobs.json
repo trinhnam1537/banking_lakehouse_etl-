@@ -1,4 +1,0 @@
-{
-  "job_ids": ["src.binance_exchange_info", "src.okx_instruments_spot", "src.fdic_failures"],
-  "chain": false
-}

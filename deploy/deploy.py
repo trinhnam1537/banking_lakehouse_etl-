@@ -6,6 +6,8 @@ Repo hạ tầng dựng sẵn nền tảng và công bố tên mọi thứ ở S
   1. build etl.zip, upload  _ops/etl/releases/<sha>/etl.zip
   2. upload bootstrap       _ops/etl/bootstrap/glue_bootstrap.py   (khoá cố định)
      upload DDL silver      _ops/silver/ddl/**.sql
+     upload script Glue     _ops/glue-scripts/*.py   (bronze_ingest, onto_closure — khoá
+                            cố định mà module glue_jobs của repo hạ tầng trỏ tới)
   3. update-function-code   mọi Lambda trong platform/lambda_functions
   4. con trỏ release        SSM <release_param> = <sha>
   5. config-sync            YAML -> bảng job_config (src, slv)
@@ -35,6 +37,7 @@ RELEASE_RE = re.compile(r"^[0-9a-f]{7,40}$")
 RELEASE_PREFIX = "_ops/etl/releases"
 BOOTSTRAP_KEY = "_ops/etl/bootstrap/glue_bootstrap.py"
 DDL_PREFIX = "_ops/silver/ddl"
+GLUE_SCRIPTS_PREFIX = "_ops/glue-scripts"
 
 REQUIRED = ("artifact_bucket", "src_config_table", "slv_config_table",
             "lambda_functions", "release_param")
@@ -102,6 +105,12 @@ def deploy(env: str, sha: str, dry_run: bool = False, root: pathlib.Path = REPO,
             s3.upload_file(str(f), bucket, f"{DDL_PREFIX}/{rel}",
                            ExtraArgs={"ContentType": "text/plain"})
     log(f"{tag}   + {len(ddl_files)} file DDL -> s3://{bucket}/{DDL_PREFIX}/")
+
+    glue_scripts = sorted((root / "jobs" / "glue").glob("*.py"))
+    if not dry_run:
+        for f in glue_scripts:
+            s3.upload_file(str(f), bucket, f"{GLUE_SCRIPTS_PREFIX}/{f.name}")
+    log(f"{tag}   + {len(glue_scripts)} script Glue -> s3://{bucket}/{GLUE_SCRIPTS_PREFIX}/")
 
     for fn in _functions(params):
         log(f"{tag}3. Lambda {fn} <- {key}")

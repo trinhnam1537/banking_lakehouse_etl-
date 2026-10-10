@@ -1,94 +1,52 @@
 # sourcing_etl — cấu hình job
 
-Thư mục này chứa **cấu hình**, không chứa code. Mỗi file YAML trong
-`sources/` là một job kéo dữ liệu.
+Thư mục này chứa **cấu hình**, không chứa code. Mỗi file YAML trong `sources/` là
+một job kéo dữ liệu.
 
 ```
-sourcing/          code framework  — sua khi them LOAI nguon moi
-sourcing_etl/      entry cau hinh  — sua khi them MOT nguon cu the
+sourcing/          code framework  — sửa khi thêm LOẠI nguồn mới
+sourcing_etl/      entry cấu hình  — sửa khi thêm MỘT nguồn cụ thể
 ```
 
 ---
 
 ## Bố cục: một thư mục cho mỗi nguồn
 
-Một nguồn dữ liệu thường có nhiều bảng — SEC có `frames`, `companyfacts`,
-`submissions`; SSI có từng sàn và từng rổ. Mỗi bảng là **một job riêng**, vì
-chúng khác nhau về nhịp chạy, kích thước và khả năng hỏng.
+Một nguồn thường có nhiều bảng, mỗi bảng là **một entry riêng** (khác nhịp chạy,
+kích thước, chế độ CDC).
 
 ```
 sources/
-  sec/           6 entry    gleif/      6 entry
-  ssi/           7 entry    binance/    2 entry
-  okx/           5 entry    coingecko/  7 entry
-  treasury/      4 entry    fdic/       6 entry
-  comtrade/      6 entry    alphavantage/ 7 entry (tat, cho khoa)
-  kafka_trades.yml  market_files_s3.yml  pg_instruments.yml   <- entry le
+  berka/         8 entry   core banking Berka (MariaDB CTU): account, card, client,
+                           disp, district, loan, order, trans
 ```
 
-**Tên file phải duy nhất trên toàn bộ cây**, không chỉ trong một thư mục.
-Terraform khoá theo `basename(f)` vì tên job Glue và khoá DynamoDB không
-chứa được dấu `/`. Hai file trùng tên ở hai thư mục sẽ đè lên nhau mà
-Terraform không báo lỗi — nên cả `load_all` lẫn
-`terraform_data.unique_entry_names` đều chặn việc này lúc plan.
+Phân tích nguồn: [docs/sources/berka.md](../docs/sources/berka.md).
 
-Quy ước: đặt tên `<nguồn>_<bảng>.yml`, và khoá `name` bên trong **trùng tên
-file**. `load_all` bắt lỗi nếu lệch, vì Terraform lấy tên job từ tên file
-còn framework lúc chạy lấy từ khoá `name`.
+**Tên file phải duy nhất trên toàn cây** và trùng khoá `name` bên trong. Tên này là
+khoá của bảng `job_config` và là phần `<tên>` trong `job_id = src.<tên>`.
+`load_all` chặn trùng tên và lệch tên ngay trong pytest. Quy ước đặt tên là
+`<nguồn>_<bảng>.yml`.
 
 ---
 
 ## Thêm một nguồn mới
 
 ```
-1. Tao sources/<nguon>/<ten_job>.yml
-2. terraform plan      -> thay 1 Glue job + 1 dong job_config
-3. terraform apply
+1. Tạo sources/<nguồn>/<tên>.yml
+2. pytest                     -> kiểm tra entry (schema, profile, tiền tố secret)
+3. PR -> merge main           -> CI deploy: config-sync ghi entry vào job_config
+4. Lambda trigger {"job_id": "src.<tên>", "action": "validate"}, rồi dry_run, rồi chạy thật
 ```
 
-Không viết dòng Python nào.
+**Không chạy Terraform, không viết Python, không tạo Glue job.** Entry chạy trên Glue
+job dùng chung của profile (`runtime.profile`, mặc định `src-shell`).
 
-Thử phần đọc nguồn trước khi apply — không cần AWS:
+Thử phần đọc nguồn trước, không cần AWS:
 
 ```powershell
-python -c @'
-from sourcing.config import load_config
-from sourcing.readers.api import ApiReader
-cfg = load_config("sourcing_etl/sources/ssi/ssi_group_vn30.yml")
-for b in ApiReader(cfg).read(None):
-    print(len(b.records), "ban ghi |", list(b.records[0])[:6]); break
-'@
+.\scripts\run-source.ps1 -Job berka_order -Mode dry
 ```
-
----
-
-## Entry hiện có
-
-59 entry, 10 nguồn API cộng ba entry lẻ. Ngày 09-27 đã bỏ 12 entry trùng lặp hoặc không có giá trị
-(xem `docs/SETUP-LOG.md` mục "Rà soát giá trị nguồn").
-
-| Thư mục | Nguồn | Cần khoá | Ghi chú |
-|---|---|---|---|
-| `sec/` | SEC EDGAR | không (cần User-Agent) | `frames_*` trả mảng phẳng, dùng được ngay |
-| `gleif/` | GLEIF | không | pháp nhân + **công ty mẹ** (`include=direct-parent,ultimate-parent`), nguồn cạnh sở hữu cho ontology |
-| `ssi/` | SSI iBoard | không (cần `Referer`) | **danh mục cổ phiếu VN kèm ISIN** |
-| `binance/` `okx/` | Hai sàn crypto | không | để đối chứng giá giữa hai sàn |
-| `coingecko/` | CoinGecko | không | giá tổng hợp + vốn hoá |
-| `treasury/` | US Treasury | không | nợ công, tỷ giá, đấu thầu TP |
-| `fdic/` | FDIC BankFind | không | ~27.800 ngân hàng Mỹ + lịch sử sáp nhập |
-| `comtrade/` | UN Comtrade | không | XNK Việt Nam 2021–2023 |
-| `alphavantage/` | Alpha Vantage | **có** | `enabled: false` cho tới khi có khoá |
-
-Ba entry lẻ ở gốc: `kafka_trades` (cdc1, 5 phút), `market_files_s3`
-(cdc1, 15 phút), `pg_instruments` (**tắt** — chưa có RDS). Lịch của hai entry
-đầu **đang tắt** từ 09-27, bật lại khi Glue chạy được.
-
-**Mọi entry đang để `schedule.enabled: false`.** Job
-được tạo nhưng không tự chạy — bật từng cái khi đã xem dữ liệu và chốt nhịp.
-Glue job không tốn tiền khi không chạy.
-
-Vài nguồn nên chuyển sang cdc1 khi đã ổn định: nhóm `treasury/` có cột
-`record_date` rất đáng tin, kéo incremental rẻ hơn nhiều.
 
 ---
 
@@ -98,111 +56,96 @@ Vài nguồn nên chuyển sang cdc1 khi đã ổn định: nhóm `treasury/` c�
 |---|---|---|
 | Kéo gì | Chỉ phần mới hơn mốc | Toàn bộ, mỗi lần |
 | Ghi raw | Thêm vào | Ghi đè partition hôm nay |
-| Cần gì ở nguồn | Một cột mốc đáng tin | Không cần gì |
-| Hợp với | Bảng giao dịch lớn, Kafka | Bảng tham chiếu nhỏ, tài liệu JSON |
+| Cần gì ở nguồn | Một cột mốc đáng tin (`updated_at`, id tăng dần, offset Kafka) | Không cần gì |
+| Hợp với | Bảng giao dịch lớn, Kafka | Bảng tham chiếu nhỏ |
 
-**Chọn sai là lỗi im lặng nguy hiểm nhất ở tầng này.** CDC1 trên nguồn bị sửa
-hồi tố sẽ bỏ sót thay đổi mà **không báo lỗi gì** — dữ liệu cứ thế sai dần.
-Phân vân thì chọn CDC5: tốn hơn nhưng không bao giờ sót.
+**Chọn sai là lỗi im lặng nguy hiểm nhất ở tầng này.** CDC1 trên nguồn bị sửa hồi tố
+sẽ bỏ sót thay đổi mà **không báo lỗi gì**. Phân vân thì chọn CDC5: tốn hơn nhưng
+không bao giờ sót. CDC1 cũng không thấy bản ghi bị **xoá cứng**: dùng xoá mềm, hoặc
+thêm một entry CDC5 định kỳ để đối soát.
 
-Nguồn vừa lớn vừa bị sửa hồi tố thì dùng CDC1 kèm `lookback_seconds` để kéo
-chồng lấn. Cái giá là bản ghi trùng, bronze phải khử.
+Ví dụ trong repo: 7 bảng Berka nhỏ dùng CDC5; `berka_trans` (1,06 triệu dòng) dùng CDC1
+theo `trans_id`, để job dừng giữa chừng thì lần sau chạy tiếp từ ảnh chụp PARTIAL.
 
 ---
 
 ## Khung một entry
 
 ```yaml
-name: ten_job                    # trung ten file
-source_type: api                 # api | jdbc | kafka | s3file
-description: Mo ta ngan
+name: ten_job                    # trùng tên file
+source_type: jdbc                # api | jdbc | kafka | s3file
+description: Mô tả ngắn
 owner: namth
-enabled: true                    # false = giu trong repo, khong tao job
+enabled: true                    # false = giữ trong repo, Lambda trả SKIPPED
 
-api:                             # khoi rieng theo source_type
-  base_url: https://...
-  records_path: data             # duong toi mang ban ghi trong JSON
-  pagination: page               # none | page | cursor | offset
+jdbc:                            # khối riêng theo source_type
+  secret_name: fingraph/src/ten  # BẮT BUỘC dưới fingraph/src/ — Glue chỉ đọc được tiền tố này
+  driver: mysql                  # mysql | postgresql
+  schema: financial
+  table: trans
 
 cdc:
   mode: cdc1
-  watermark_column: updated_at   # BAT BUOC voi cdc1 (tru kafka)
-  lookback_seconds: 600          # keo chong lan, bat ban ghi den muon
+  watermark_column: trans_id     # BẮT BUỘC với cdc1 (trừ kafka)
+  watermark_type: int            # timestamp | int | string
+  lookback_seconds: 0            # kéo chồng lấn để bắt bản ghi đến muộn
 
 target:
   dataset: nhom/ten              # -> landing/nhom/ten/ingest_date=YYYY-MM-DD/
 
 schedule:
-  enabled: true
-  expression: "rate(5 minutes)"
+  enabled: false                 # true -> Lambda schedule-sync tạo lịch EventBridge
+  expression: "cron(0 20 ? * SUN *)"   # giờ UTC; rate(N minutes|hours|days) hoặc cron 6 trường
 
 runtime:
-  engine: python_shell           # python_shell (re) | spark (dat)
-  timeout_minutes: 30
-  additional_python_modules:
-    - confluent-kafka==2.5.3
+  profile: src-shell             # Glue job dùng chung; thư viện thuộc profile (src-shell có PyMySQL)
+  timeout_minutes: 30            # truyền theo từng lần chạy
 ```
 
 ---
 
 ## Ba điều dễ làm sai
 
-**Đừng mặc định dùng Spark.** `python_shell` là 0.0625 DPU (~0.03 USD/giờ),
-Spark tối thiểu 2 DPU. Một job kéo 500 bản ghi từ REST API chạy bằng Spark
-là đốt tiền vô ích.
-
-**Đừng để khoá bí mật trong YAML.** Khai tên secret và chỗ cần chèn:
+**Đừng để khoá bí mật trong YAML.** Khai tên secret (dưới `fingraph/src/`) và chỗ cần chèn:
 
 ```yaml
 api:
-  secret_name: fingraph/finnhub
+  secret_name: fingraph/src/ten_nguon
   secret_inject:
     token: query.token           # secret["token"] -> ?token=...
     api_key: header.X-Api-Key    # secret["api_key"] -> header
 ```
 
-**Dùng biến môi trường cho giá trị đổi theo lần apply.** IP riêng của EC2
-Kafka đổi mỗi lần máy dựng lại:
+Secret JDBC phải là JSON `{host, port, username, password, dbname}`. Dùng một user
+**chỉ đọc** riêng cho ETL, đừng dùng secret master `rds!db-…` mà RDS tự sinh (nằm ngoài
+tiền tố, Glue không đọc được).
 
-```yaml
-kafka:
-  bootstrap_servers: "${KAFKA_BOOTSTRAP}"
-```
+**Cần thư viện không có trong profile** (`confluent-kafka`, `psycopg2`): thêm profile ở
+repo hạ tầng **trước** (`var.profiles`), rồi thêm tên vào `PROFILES` trong
+`sourcing/config.py`. Khoá `additional_python_modules` trong entry không còn tác dụng.
 
-Terraform truyền giá trị qua tham số job, framework đẩy vào `os.environ`
-trước khi nạp cấu hình. Cần vậy vì Glue không cho đặt biến môi trường tuỳ ý.
-
----
-
-## Lịch chạy hoạt động thế nào
-
-Chỉ có **một** lịch EventBridge cho tất cả job:
-
-```
-EventBridge (5 phut/lan)
-  -> SQS dispatch
-    -> Lambda: quet job_config, loc job den han
-      -> SQS run (N message)
-        -> EventBridge Pipes
-          -> Step Functions: chay Glue job, ghi job_log
-```
-
-Lambda so `schedule.expression` với `last_dispatched_at` để quyết định job
-nào đến hạn. Thêm job không cần tạo lịch mới.
-
-Hỗ trợ `rate(N minutes|hours|days)` và cron hằng ngày `cron(M H * * ? *)`.
-Cron phức tạp hơn thì job đó cần lịch EventBridge riêng.
+**Giá trị đổi theo hạ tầng** (IP Kafka…): dùng `${BIEN}` trong YAML, Glue job truyền
+`--BIEN` và framework đẩy vào `os.environ` trước khi nạp cấu hình.
 
 ---
 
-## Chạy lại một job ngay, không đợi lịch
+## Lịch chạy
+
+Lịch khai ngay trong entry (`schedule`). Khi entry được ghi vào `job_config`, Lambda
+**schedule-sync** (nghe DynamoDB Streams) tạo, sửa hoặc xoá lịch
+`fingraph-<env>-jobs/src-<tên>` trên EventBridge Scheduler. Lịch gọi Lambda trigger với
+`{"job_id": "src.<tên>"}`. Cron đầy đủ cú pháp EventBridge, **giờ UTC**.
+
+Công tắc chung nằm ở repo hạ tầng (`use_orchestrator_schedules`). Khi tắt thì không
+lịch nào được tạo.
+
+## Chạy ngay, không đợi lịch
+
+Gọi Lambda trigger. Event mẫu ở [orchestrator/events/](../orchestrator/events/):
 
 ```powershell
-aws sqs send-message `
-  --queue-url (terraform output -raw sourcing_dispatch_queue) `
-  --message-body '{\"jobs\":[\"gleif_lei\"]}' `
-  --message-group-id manual `
-  --profile fingraph
+aws lambda invoke --function-name fingraph-dev-trigger --cli-binary-format raw-in-base64-out `
+  --cli-read-timeout 900 --payload file://orchestrator/events/03_src_run_wait.json out.json
 ```
 
 ---
@@ -211,8 +154,8 @@ aws sqs send-message `
 
 | Nơi | Vai trò |
 |---|---|
-| `sources/*.yml` trong git | **Nguồn chân lý** — có review, có lịch sử |
-| DynamoDB `fingraph-dev-src-job-config` | Bản đọc lúc chạy, Terraform seed mỗi lần apply |
+| `sources/**/*.yml` trong git | **Nguồn chân lý**: có review, có lịch sử |
+| DynamoDB `fingraph-<env>-src-job-config` | Bản đọc lúc chạy. **config-sync** (CI repo này) ghi mỗi lần deploy |
 
-Đừng sửa item DynamoDB bằng tay: lần apply sau sẽ ghi đè, và thay đổi đó
-không có trong git nên không ai review được.
+Đừng sửa item DynamoDB bằng tay: lần deploy sau sẽ ghi đè, và thay đổi đó không có trong
+git. Entry bị xoá khỏi repo thì config-sync đặt `enabled = false`, không xoá item.

@@ -258,15 +258,18 @@ def test_entry_that_kafka_la_cdc1(real_entries):
             assert cfg.cdc.mode is CdcMode.CDC1, name
 
 
-def test_entry_that_lich_duoc_dispatcher_ho_tro(real_entries):
-    """Lịch dispatcher không hiểu thì job đó KHÔNG BAO GIỜ chạy, và không báo lỗi."""
-    from sourcing.lambda_dispatcher import parse_interval_minutes
+def test_entry_that_lich_dung_cu_phap_eventbridge(real_entries):
+    """Lambda schedule-sync dua thang bieu thuc vao EventBridge Scheduler: sai cu phap
+    thi tao lich that bai. Kiem dang rate(N don_vi) / cron(6 truong) ngay o day."""
+    import re
 
+    rate = re.compile(r"^rate\(\d+ (minute|minutes|hour|hours|day|days)\)$")
     for name, cfg in real_entries.items():
-        if cfg.enabled and cfg.schedule.enabled:
-            assert parse_interval_minutes(cfg.schedule.expression) is not None, (
-                f"{name}: lich '{cfg.schedule.expression}' dispatcher khong ho tro"
-            )
+        expr = cfg.schedule.expression.strip()
+        if expr.startswith("cron("):
+            assert expr.endswith(")") and len(expr[5:-1].split()) == 6, f"{name}: {expr}"
+        else:
+            assert rate.match(expr), f"{name}: {expr}"
 
 
 def test_thu_muc_sources_ton_tai():

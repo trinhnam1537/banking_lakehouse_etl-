@@ -3,7 +3,7 @@
 Package nằm ở gốc zip (sourcing/, silver/, orchestrator/) nên:
   - Glue: bootstrap chèn zip vào sys.path rồi `import sourcing.main`
   - Lambda: handler khai thẳng `orchestrator.trigger.handler`,
-    `orchestrator.schedule_sync.handler`, `silver.lambda_router.handler`
+    `orchestrator.schedule_sync.handler`
 
 Zip TẤT ĐỊNH: thứ tự file cố định, mtime cố định -> cùng code cho cùng byte,
 so hash được giữa hai lần build. Chỉ đóng *.py: không test, không __pycache__.

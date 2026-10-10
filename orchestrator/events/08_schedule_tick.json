@@ -1,0 +1,7 @@
+{
+  "job_id": "src.berka_district",
+  "trigger": {
+    "type": "schedule",
+    "scheduled_time": "2026-10-12T20:00:00Z"
+  }
+}

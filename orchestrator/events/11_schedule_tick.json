@@ -1,7 +1,0 @@
-{
-  "job_id": "src.binance_ticker_24hr",
-  "trigger": {
-    "type": "schedule",
-    "scheduled_time": "2026-09-28T19:00:00Z"
-  }
-}

@@ -21,9 +21,13 @@ def _entry(**over):
 
 
 def test_moi_entry_that_nap_duoc():
-    cfgs = load_all("silver_etl/entries")
-    assert len(cfgs) >= 5
-    assert {c.writer.type.value for c in cfgs.values()} == {"scd2", "scd4a", "simple"}
+    """Moi entry silver co trong repo (hien chua co — nguon tai chinh da bo, entry
+    Berka viet sau) phai nap duoc; them entry sai la do o day."""
+    import os
+    if not os.path.isdir("silver_etl/entries"):
+        pytest.skip("chua co entry silver nao")
+    for name, cfg in load_all("silver_etl/entries").items():
+        assert cfg.name == name
 
 
 def test_moi_ddl_trong_thu_muc_tach_duoc_cau_lenh():

@@ -45,7 +45,7 @@ def test_zip_import_duoc_handler_lambda(tmp_path):
     z = build(tmp_path / "etl.zip")
     import subprocess
     code = ("import sys; sys.path.insert(0, %r); "
-            "import orchestrator.trigger, orchestrator.schedule_sync, silver.lambda_router; "
+            "import orchestrator.trigger, orchestrator.schedule_sync, silver.manifest; "
             "print('pyspark' in sys.modules)" % str(z))
     out = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True,
                          cwd=str(tmp_path))
@@ -177,8 +177,10 @@ def test_config_sync_entry_sai_khong_ghi_gi(tmp_path):
 def test_config_sync_entry_that_cua_repo():
     src = config_sync.load_sourcing(str(REPO / "sourcing_etl" / "sources"))
     slv = config_sync.load_silver(str(REPO / "silver_etl" / "entries"))
+    assert sorted(src) == ["berka_account", "berka_card", "berka_client", "berka_disp",
+                           "berka_district", "berka_loan", "berka_order", "berka_trans"]
     assert src["berka_trans"]["source_type"] == "jdbc" and src["berka_trans"]["cdc_mode"] == "cdc1"
-    assert slv["binance_ticker_24h"]["source_dataset"] == "binance/ticker_24hr"
+    assert slv == {}  # chua co entry silver nao
     assert all(set(v) >= {"enabled", "config", "config_sha"} for v in src.values())
 
 
@@ -242,15 +244,15 @@ def test_deploy_dau_cuoi(dry_run):
         n_src = ddb.Table("src-cfg").scan()["Count"]
         if dry_run:
             assert keys == [] and lam.updated == [] and n_src == 0
-            assert len(out["reports"][0].created) > 50  # bao cao van du
+            assert len(out["reports"][0].created) == 8  # bao cao van du: 8 entry Berka
             return
         assert f"_ops/etl/releases/{SHA}/etl.zip" in keys
         assert "_ops/etl/bootstrap/glue_bootstrap.py" in keys
-        assert any(k.startswith("_ops/silver/ddl/") for k in keys)
+        assert {"_ops/glue-scripts/bronze_ingest.py", "_ops/glue-scripts/onto_closure.py"} <= set(keys)
         assert [u["FunctionName"] for u in lam.updated] == ["fn-trigger", "fn-sync"]
         assert lam.updated[0]["S3Key"] == f"_ops/etl/releases/{SHA}/etl.zip"
         assert ssm.get_parameter(Name="/fingraph/dev/etl/release")["Parameter"]["Value"] == SHA
-        assert n_src > 50 and ddb.Table("slv-cfg").scan()["Count"] == 5
+        assert n_src == 8 and ddb.Table("slv-cfg").scan()["Count"] == 0
 
 
 def test_deploy_chan_sha_la():
