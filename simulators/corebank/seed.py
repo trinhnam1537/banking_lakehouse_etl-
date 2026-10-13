@@ -3,6 +3,11 @@
     python -m simulators.corebank.seed                      # toàn bộ 4.500 tài khoản
     python -m simulators.corebank.seed --limit-accounts 300 # bản nhỏ để thử nhanh
     python -m simulators.corebank.seed --sanction-hits 5    # gieo 5 khách trùng tên cấm vận
+    python -m simulators.corebank.seed --if-empty           # máy nguồn AWS: chỉ nạp khi DB rỗng
+
+Schema `core` chưa có thì seed tự áp `schema.sql` (cạnh file này). Stack local đã áp sẵn
+qua docker-entrypoint-initdb.d; máy nguồn trên AWS thì không — Postgres ở đó do repo hạ tầng
+dựng, schema thuộc về repo này.
 
 Biến đổi so với bản gốc (mọi thứ GIẢ LẬP đều tất định theo id -> chạy lại ra y hệt):
 
@@ -27,6 +32,7 @@ import csv
 import datetime as dt
 import hashlib
 import io
+import pathlib
 import random
 import sys
 import time
@@ -113,24 +119,38 @@ def main(argv=None) -> int:
     ap.add_argument("--limit-accounts", type=int, default=0, help="0 = tat ca 4.500")
     ap.add_argument("--sanction-hits", type=int, default=0)
     ap.add_argument("--truncate", action="store_true", help="xoa du lieu cu trong core.* truoc")
+    ap.add_argument("--if-empty", action="store_true",
+                    help="DB da co du lieu thi thoat 0 (timer tren may nguon goi moi ngay)")
     args = ap.parse_args(argv)
 
     import pymysql
     from faker import Faker
 
     t0 = time.time()
-    src = pymysql.connect(**CTU, connect_timeout=20, cursorclass=pymysql.cursors.DictCursor)
-    scur = src.cursor()
     dst = corebank_conn()
     cur = dst.cursor()
 
+    cur.execute("SELECT to_regclass('core.account')")
+    if cur.fetchone()[0] is None:
+        schema = pathlib.Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
+        cur.execute(schema)
+        dst.commit()
+        print("Da tao schema core (schema.sql)")
+
     cur.execute("SELECT count(*) FROM core.account")
     if cur.fetchone()[0] and not args.truncate:
+        if args.if_empty:
+            print("core.account da co du lieu -> bo qua seed (--if-empty).")
+            return 0
         print("core.account da co du lieu. Them --truncate de nap lai.")
         return 1
     if args.truncate:
         cur.execute("TRUNCATE core.trans, core.standing_order, core.loan, core.card, core.disp, "
                     "core.client, core.account, core.district CASCADE")
+
+    # Mo ket noi CTU SAU kiem tra: --if-empty chay moi ngay khong duoc phu thuoc server CTU
+    src = pymysql.connect(**CTU, connect_timeout=20, cursorclass=pymysql.cursors.DictCursor)
+    scur = src.cursor()
 
     scur.execute("SELECT account_id FROM account ORDER BY account_id")
     accounts = [r["account_id"] for r in scur.fetchall()]

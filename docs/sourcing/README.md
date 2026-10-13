@@ -34,9 +34,14 @@ commit `4d70a79`. Muốn dùng lại thì lấy entry từ lịch sử git.
 | Trạng thái | Entry | Vì sao |
 |---|---|---|
 | **Bật, chạy được ngay trên AWS** (profile `src-shell`) | `berka_*`, `opensanctions_*`, `vcb_exchange_rates`, `cnb_czk_rates`, mọi entry `s3file` (`aml_accounts`, `aml_patterns`, `aml_labels`, `paysim_*`, `cards_chargebacks`, `lending_default_labels`) | Nguồn công khai trên internet hoặc file trong S3 của mình |
-| **Tắt, chờ hạ tầng** (profile `src-vpc`) | `corebank_*`, `lending_*` (JDBC), `aml_transfers`, `cards_authorizations` | Postgres và Kafka nằm trong VPC, xem [mục 7](#7-hạ-tầng-còn-thiếu) |
+| **Bật, có lịch hằng ngày** (profile `src-shell`) | `corebank_*` | Postgres core banking trên máy EC2 nguồn, mở 5432 **chỉ SSL**. Chạy được sau khi apply PR hạ tầng (mục 7) |
+| **Tắt, chờ hạ tầng** (profile `src-vpc`) | `lending_*` (JDBC), `aml_transfers`, `cards_authorizations` | Chưa dựng trên AWS, xem [mục 7](#7-hạ-tầng) |
 
-Mọi entry đều đã **chạy thật end-to-end trên stack local** (mục 6), ngày 13-10-2026. Lịch
+Mọi entry đều đã **chạy thật end-to-end trên stack local** (mục 6), ngày 13-10-2026.
+
+**Silver:** core banking là nguồn đầu tiên thông luồng **nguồn → landing → silver**: 8 entry silver
+trong `silver_etl/entries/corebank/`, chạy bằng `python -m local.run_flow corebank`. Chi tiết ở
+[corebank.md mục 6](corebank.md#6-silver-silver_corebank). Các nguồn khác chưa có entry silver. Lịch
 (`schedule.enabled`) của mọi entry đang tắt theo quy ước của repo: chạy tay thành công rồi mới bật.
 
 ---
@@ -202,10 +207,42 @@ python -m local.run_entry vcb_exchange_rates --override api.date_window.max_wind
 
 ---
 
-## 7. Hạ tầng còn thiếu
+## 7. Hạ tầng
 
-Các entry JDBC (`corebank_*`, `lending_*`) và Kafka (`aml_transfers`, `cards_authorizations`) cần
-profile **`src-vpc`**, hiện chưa có ở repo hạ tầng. Đề xuất cho repo `lakehouse_ontology_project`:
+### 7.1 Core banking trên AWS (đã viết, chờ apply, 14-10-2026)
+
+Phương án đã chọn: **Postgres public chỉ SSL**. Glue `src-shell` chạy ngoài VPC (không có IP cố
+định), nên đọc Postgres qua IP public của máy nguồn.
+
+```
+EC2 nguồn (t3.medium spot, public subnet; module kafka của repo hạ tầng)
+  ├─ Redpanda (như cũ)
+  ├─ Postgres corebank :5432   pg_hba: CHỈ hostssl + scram-sha-256; chứng chỉ tự ký
+  ├─ corebank-init.sh  (mỗi lần boot) sinh/đọc lại mật khẩu -> Secrets Manager, ghi IP public mới
+  └─ timer 17:00 UTC   tải etl.zip của bản đang deploy -> seed Berka nếu DB rỗng -> simulate 1 ngày
+Secrets Manager
+  fingraph/src/corebank_pg      etl_reader (CHỈ SELECT) + sslmode=require   <- Glue src-shell
+  fingraph/sim/corebank_owner   chủ DB                                       <- simulator trên EC2
+EventBridge Schedule 18:00 UTC -> Lambda trigger -> Glue src-shell (corebank_*) -> manifest
+  -> "Job Run Succeeded" -> Lambda trigger -> Glue slv-spark (8 bảng silver_corebank)
+```
+
+| Rủi ro | Giảm thiểu |
+|---|---|
+| Cổng 5432 mở ra internet, bị quét và dò mật khẩu | Chỉ nhận SSL. scram-sha-256. Mật khẩu 48 ký tự hex ngẫu nhiên. Glue dùng user chỉ SELECT, phiên READ ONLY. `log_connections=on` |
+| Mật khẩu lọt qua Terraform state | Terraform **chỉ tạo vỏ secret**. Mật khẩu do máy tự sinh |
+| Chứng chỉ tự ký, không xác thực máy chủ (sslmode=require) | Chấp nhận ở dev: đường truyền vẫn được mã hoá. Lên prd thì dùng RDS + `verify-full` |
+| IP public đổi khi spot bị thay máy | Mỗi lần boot, máy ghi lại `host` vào cả hai secret |
+
+Trước đó đã cân nhắc và bỏ hai phương án: Glue trong VPC với NAT (~32 USD/tháng, hoặc dùng NAT
+instance) và VPC endpoint (~15 USD/tháng, phải đặt wheel lên S3). Lý do: tốn chi phí và công sức hơn
+cho môi trường dev.
+
+### 7.2 Còn thiếu cho các nguồn khác
+
+Các entry `lending_*` (JDBC) và Kafka (`aml_transfers`, `cards_authorizations`) vẫn dùng profile
+**`src-vpc`**, chưa có ở repo hạ tầng. Hai cách: làm như core banking (thêm container Postgres
+`lending`, hoặc Redpanda listener SASL/SSL public), hoặc dựng `src-vpc` theo đề xuất dưới đây:
 
 | Hạng mục | Đề xuất | Chi phí ước tính |
 |---|---|---|

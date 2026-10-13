@@ -68,9 +68,12 @@ class JdbcReader(Reader):
         if self.j.driver == "postgresql":
             import psycopg2  # noqa: PLC0415
 
+            # sslmode trong secret: Postgres nguon mo ra internet (core banking tren
+            # may EC2 nguon) BAT BUOC "require". Mac dinh "prefer": giu hanh vi cu.
             self._conn = psycopg2.connect(
                 host=s["host"], port=int(s.get("port", 5432)),
                 user=s["username"], password=s["password"], dbname=s["dbname"],
+                sslmode=s.get("sslmode", "prefer"),
                 connect_timeout=15, application_name=f"fingraph-src-{self.cfg.name}"[:63],
             )
             if self.j.read_only:

@@ -144,7 +144,9 @@ BEGIN
 END $$;
 
 -- User CHỈ ĐỌC cho ETL (secret fingraph/src/corebank_pg). Không dùng user chủ DB.
-CREATE ROLE etl_reader LOGIN PASSWORD 'etl_reader';
+-- Role PHẢI có sẵn trước file này, và mật khẩu KHÔNG nằm ở đây:
+--   local: local/initdb/corebank-roles.sql (etl_reader/etl_reader, chỉ cho máy dev)
+--   AWS:   máy nguồn tự sinh mật khẩu (repo hạ tầng modules/kafka/scripts/corebank-init.sh)
 GRANT USAGE ON SCHEMA core TO etl_reader;
 GRANT SELECT ON ALL TABLES IN SCHEMA core TO etl_reader;
 ALTER DEFAULT PRIVILEGES IN SCHEMA core GRANT SELECT ON TABLES TO etl_reader;

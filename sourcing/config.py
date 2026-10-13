@@ -265,12 +265,13 @@ class ScheduleConfig:
 # chạy entry nào bằng bản code nào.
 #
 #   src-shell  Python Shell, có internet: api, httpfile, s3file, jdbc tới DB công khai.
-#              Thư viện sẵn: PyMySQL.
+#              Thư viện sẵn: PyMySQL, psycopg2-binary (Postgres core banking public, chỉ SSL).
 #   src-vpc    Python Shell gắn Glue Connection vào VPC: tới được máy "hệ thống
 #              nguồn" (Postgres corebank/lending, Redpanda) trong private subnet.
 #              Thư viện: psycopg2-binary, confluent-kafka, PyMySQL.
-#              CHƯA có ở repo hạ tầng -> mọi entry dùng src-vpc đang enabled: false
-#              (đề xuất: docs/sourcing/README.md mục "Hạ tầng còn thiếu").
+#              CHƯA có ở repo hạ tầng -> entry dùng src-vpc (lending JDBC, Kafka) đang tắt.
+#              Core banking không cần: Postgres public chỉ SSL, đọc bằng src-shell
+#              (docs/sourcing/README.md mục 7).
 #
 # Thêm profile = việc của repo hạ tầng TRƯỚC (var.profiles). Tên lạ bị chặn lúc
 # nạp entry thay vì lúc Lambda gọi một Glue job không tồn tại.

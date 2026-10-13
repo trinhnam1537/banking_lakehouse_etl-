@@ -1,7 +1,8 @@
 # Core banking gia lap: Postgres corebank (Berka doi +24 nam + simulator tu 2023-01-01).
 # Phan tich nguon, schema, credential: docs/sourcing/corebank.md
-# Dung profile src-vpc (Glue trong VPC, toi duoc may "he thong nguon") -> enabled: false
-# cho toi khi repo ha tang tao profile do. Chay tren may: python -m local.run_entry corebank_card
+# Tren AWS: Postgres o may EC2 "he thong nguon" (repo ha tang, modules/kafka), mo 5432 ra
+# internet CHI SSL; Glue src-shell (ngoai VPC, co psycopg2) doc qua IP public trong secret.
+# Chay tren may: python -m local.run_entry corebank_card
 # PCI DSS: so the day du KHONG duoc roi xuong raw. SQL che so the va sinh token
 # ngay tai nguon — ly do chinh de dua cau SQL vao entry thay vi SELECT *.
 # card_token = md5(card_number): cung cong thuc voi simulator the (cards_authorizations).
@@ -10,7 +11,7 @@ name: corebank_card
 source_type: jdbc
 description: The (so the da che + token) — CDC1 theo updated_at
 owner: namth
-enabled: false
+enabled: true
 
 jdbc:
   # {host, port, username, password, dbname} — user etl_reader CHI DOC
@@ -38,10 +39,10 @@ target:
   dataset: corebank/card
 
 schedule:
-  # 01:00 gio VN. Bat sau khi profile src-vpc ton tai va chay tay OK.
-  enabled: false
+  # 01:00 gio VN — sau simulator tren may nguon (17:00 UTC). Silver tu chay theo (orchestrator).
+  enabled: true
   expression: "cron(0 18 * * ? *)"
 
 runtime:
-  profile: src-vpc
+  profile: src-shell
   timeout_minutes: 20

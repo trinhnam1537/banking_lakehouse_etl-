@@ -59,7 +59,24 @@ def pg(dsn_env: str, default: str):
     return conn
 
 
+def _dsn_from_secret(secret_id: str, host_override: Optional[str]) -> str:
+    """DSN từ secret {host, port, username, password, dbname, sslmode} (máy nguồn trên AWS)."""
+    import boto3
+
+    s = json.loads(boto3.client("secretsmanager").get_secret_value(SecretId=secret_id)["SecretString"])
+    return (f"host={host_override or s['host']} port={s.get('port', 5432)} dbname={s['dbname']} "
+            f"user={s['username']} password={s['password']} sslmode={s.get('sslmode', 'prefer')}")
+
+
 def corebank_conn():
+    """Local: COREBANK_DSN (mặc định stack docker). AWS: COREBANK_SECRET (+ COREBANK_HOST)."""
+    secret = os.environ.get("COREBANK_SECRET")
+    if secret:
+        import psycopg2
+
+        conn = psycopg2.connect(_dsn_from_secret(secret, os.environ.get("COREBANK_HOST")))
+        conn.autocommit = False
+        return conn
     return pg("COREBANK_DSN", "postgresql://corebank:corebank@localhost:5433/corebank")
 
 
