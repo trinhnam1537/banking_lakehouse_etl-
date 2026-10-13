@@ -1,0 +1,56 @@
+# Silver core banking — tai lieu: docs/sourcing/corebank.md (muc 6. Silver)
+# Nguon: entry sourcing `corebank_client` -> landing/corebank/client/ (manifest -> Lambda trigger -> entry nay)
+#
+# SCD2: moi lan khach doi dien thoai/dia chi/trang thai la mot phien ban.
+# PII: full_name, national_id, birth_date, email, phone, address -> phan quyen o tang doc
+# (Lake Formation / view che), KHONG che o day: screening AML can ten that.
+
+name: corebank_client
+description: Khach hang ca nhan (PII) - lich su thay doi SCD2
+owner: namth
+enabled: true
+
+source:
+  dataset: corebank/client
+
+target:
+  database: silver_corebank
+  table: client
+
+columns:
+  - {name: client_id, type: int, nullable: false}
+  - {name: full_name, comment: "PII. Gia lap (Berka da an danh)"}
+  - {name: national_id, comment: "PII. rodne cislo gia lap YYMMDD/XXXX"}
+  - {name: gender, comment: "F | M"}
+  - {name: birth_date, type: date, comment: "PII"}
+  - {name: district_id, type: int}
+  - {name: email, comment: "PII"}
+  - {name: phone, comment: "PII"}
+  - {name: address, comment: "PII"}
+  - {name: status, comment: "ACTIVE | CLOSED (xoa mem)"}
+  - {name: source_created_at, path: created_at, type: timestamp, hash: false,
+     comment: "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"}
+  - {name: source_updated_at, path: updated_at, type: timestamp, hash: false,
+     comment: "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"}
+  - {name: is_active, type: boolean, expr: "status = 'ACTIVE'"}
+
+technical:
+  keys: [client_id]
+  # Hai ban cua cung key trong mot lo (lookback keo chong) -> giu ban updated_at lon nhat
+  cdc_index: source_updated_at
+  partition_date: ingest_date
+
+writer:
+  type: scd2
+  # Nguon CDC1: manifest chi chua dong DOI. Key vang mat KHONG co nghia la bi xoa.
+  snapshot: false
+
+quality:
+  not_null: [client_id, full_name, national_id, gender]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+
+runtime:
+  worker_type: G.1X
+  number_of_workers: 2
+  timeout_minutes: 30

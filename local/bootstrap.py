@@ -5,7 +5,7 @@
 
 Tạo:
   S3        fingraph-local-lakehouse           (landing/, landing/_inbox/)
-  DynamoDB  fingraph-local-src-job-log         (cùng key schema với repo hạ tầng)
+  DynamoDB  fingraph-local-src-job-log, fingraph-local-slv-job-log (cùng key schema với repo hạ tầng)
   Secrets   fingraph/src/corebank_pg, fingraph/src/lending_pg   (user etl_reader CHỈ ĐỌC)
             fingraph/src/berka_ctu                               (guest công khai của CTU)
   Kafka     aml.interbank.transfers (6 partition), card.authorizations (6 partition)
@@ -45,16 +45,17 @@ def main() -> int:
         print(f"S3 {bucket}: da co")
 
     ddb = boto3.client("dynamodb")
-    if table not in ddb.list_tables()["TableNames"]:
-        ddb.create_table(
-            TableName=table, BillingMode="PAY_PER_REQUEST",
-            KeySchema=[{"AttributeName": "job_name", "KeyType": "HASH"},
-                       {"AttributeName": "run_key", "KeyType": "RANGE"}],
-            AttributeDefinitions=[{"AttributeName": "job_name", "AttributeType": "S"},
-                                  {"AttributeName": "run_key", "AttributeType": "S"}])
-        print(f"DynamoDB {table}: tao moi")
-    else:
-        print(f"DynamoDB {table}: da co")
+    for t in (table, os.environ["SLV_JOBLOG_TABLE"]):   # job_log cua sourcing va silver
+        if t not in ddb.list_tables()["TableNames"]:
+            ddb.create_table(
+                TableName=t, BillingMode="PAY_PER_REQUEST",
+                KeySchema=[{"AttributeName": "job_name", "KeyType": "HASH"},
+                           {"AttributeName": "run_key", "KeyType": "RANGE"}],
+                AttributeDefinitions=[{"AttributeName": "job_name", "AttributeType": "S"},
+                                      {"AttributeName": "run_key", "AttributeType": "S"}])
+            print(f"DynamoDB {t}: tao moi")
+        else:
+            print(f"DynamoDB {t}: da co")
 
     sm = boto3.client("secretsmanager")
     for name, value in SECRETS.items():

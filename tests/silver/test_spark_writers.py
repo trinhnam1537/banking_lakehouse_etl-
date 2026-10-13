@@ -125,6 +125,45 @@ def test_scd2_key_tai_xuat_hien_sau_khi_xoa(spark, lake, fresh_db):
     assert [x["ds_is_current"] for x in b] == [False, False, True]
 
 
+def _delta(db):
+    """Nguồn CDC1: mỗi manifest chỉ là PHẦN THAY ĐỔI, không phải ảnh chụp."""
+    return _cfg(db, writer={"type": "scd2", "snapshot": False})
+
+
+def test_scd2_delta_hai_lo_cung_ngay_khong_mat_thay_doi(spark, lake, fresh_db):
+    """Lô 2 cùng ngày chỉ có A. Không được hoàn tác B mà lô 1 đã ghi."""
+    cfg = _delta(fresh_db)
+    _run(spark, cfg, lake.api_run("t/entity", "2026-09-01", [_resp(("A", "An", "1", "2026-09-01T00:00:00Z"),
+                                                                   ("B", "Binh", "1", "2026-09-01T00:00:00Z"))]))
+    r = _run(spark, cfg, lake.api_run("t/entity", "2026-09-01", [_resp(("A", "An 2", "1", "2026-09-01T05:00:00Z"))]))
+    assert r.metrics["rolled_back"] == 0 and r.metrics["updated"] == 1
+    cur = {x["id"]: x for x in _rows(spark, cfg, "ds_is_current")}
+    assert cur["A"]["name"] == "An 2" and cur["B"]["name"] == "Binh"
+    assert len(_rows(spark, cfg, "id = 'A'")) == 2
+
+
+def test_scd2_delta_chay_lai_cung_manifest_idempotent(spark, lake, fresh_db):
+    cfg = _delta(fresh_db)
+    _run(spark, cfg, lake.api_run("t/entity", "2026-09-01", [_resp(("A", "An", "1", "2026-09-01T00:00:00Z"),
+                                                                   ("B", "Binh", "1", "2026-09-01T00:00:00Z"))]))
+    m2 = lake.api_run("t/entity", "2026-09-01", [_resp(("A", "An 2", "1", "2026-09-01T05:00:00Z"))])
+    _run(spark, cfg, m2)
+    before = _rows(spark, cfg)
+    r = _run(spark, cfg, m2)                   # SFN retry: chi hoan tac DUNG manifest nay
+    assert r.metrics["rolled_back"] == 1
+    strip = lambda rows: [{k: v for k, v in x.items() if not k.startswith("ds_etl")} for x in rows]  # noqa: E731
+    assert strip(_rows(spark, cfg)) == strip(before)
+
+
+def test_scd2_delta_chay_lai_manifest_cu_sau_manifest_moi_bi_tu_choi(spark, lake, fresh_db):
+    cfg = _delta(fresh_db)
+    m1 = lake.api_run("t/entity", "2026-09-01", [_resp(("A", "An", "1", "2026-09-01T00:00:00Z"))])
+    _run(spark, cfg, m1)
+    _run(spark, cfg, lake.api_run("t/entity", "2026-09-01", [_resp(("A", "An 2", "1", "2026-09-01T05:00:00Z"))]))
+    with pytest.raises(OutOfOrderError, match="REBUILD_FROM"):
+        _run(spark, cfg, m1)
+
+
 def test_scd2_trung_key_trong_lo_giu_ban_moi_nhat(spark, lake, fresh_db):
     cfg = _cfg(fresh_db, writer={"type": "scd2"})
     m = lake.api_run("t/entity", "2026-09-01", [_resp(("A", "cu", "1", "2026-09-01T01:00:00Z"),

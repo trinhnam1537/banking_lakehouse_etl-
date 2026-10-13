@@ -1,0 +1,58 @@
+# Silver core banking — tai lieu: docs/sourcing/corebank.md (muc 6. Silver)
+# Nguon: entry sourcing `corebank_loan` -> landing/corebank/loan/ (manifest -> Lambda trigger -> entry nay)
+#
+# status doi theo thoi gian (C <-> D, ket thuc thanh A/B) -> SCD2 giu duoc thoi diem
+# khoan vay chuyen sang qua han: nhan "vo no" cho mo hinh rui ro tin dung.
+
+name: corebank_loan
+description: Khoan vay - trang thai tra no theo thoi gian, SCD2
+owner: namth
+enabled: true
+
+source:
+  dataset: corebank/loan
+
+target:
+  database: silver_corebank
+  table: loan
+
+columns:
+  - {name: loan_id, type: int, nullable: false}
+  - {name: account_id, type: int, nullable: false}
+  - {name: granted_date, type: date}
+  - {name: amount, type: "decimal(18,2)"}
+  - {name: duration_months, path: duration, type: int}
+  - {name: monthly_payment, path: payments, type: "decimal(18,2)"}
+  - {name: status_code, path: status, comment: "Ma Berka: A | B | C | D"}
+  - {name: source_created_at, path: created_at, type: timestamp, hash: false,
+     comment: "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"}
+  - {name: source_updated_at, path: updated_at, type: timestamp, hash: false,
+     comment: "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"}
+  - name: loan_status
+    expr: >-
+      CASE status_code WHEN 'A' THEN 'FINISHED_PAID' WHEN 'B' THEN 'FINISHED_UNPAID'
+                       WHEN 'C' THEN 'RUNNING_OK' WHEN 'D' THEN 'RUNNING_OVERDUE' END
+  - {name: is_problem_loan, type: boolean, expr: "status_code IN ('B', 'D')",
+     comment: "Da hoac dang khong tra du"}
+  - {name: maturity_date, type: date, expr: "add_months(granted_date, duration_months)"}
+
+technical:
+  keys: [loan_id]
+  # Hai ban cua cung key trong mot lo (lookback keo chong) -> giu ban updated_at lon nhat
+  cdc_index: source_updated_at
+  partition_date: ingest_date
+
+writer:
+  type: scd2
+  # Nguon CDC1: manifest chi chua dong DOI. Key vang mat KHONG co nghia la bi xoa.
+  snapshot: false
+
+quality:
+  not_null: [loan_id, account_id, granted_date, amount, status_code]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+
+runtime:
+  worker_type: G.1X
+  number_of_workers: 2
+  timeout_minutes: 30

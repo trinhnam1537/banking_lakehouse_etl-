@@ -22,8 +22,12 @@ một bản có `_merge_key = ds_key` (khớp -> đóng), một bản `_merge_ke
 (không bao giờ khớp -> chèn).
 
 CHẠY LẠI / THỨ TỰ:
-  - Lô có ngày <= ngày đã có trong bảng: HOÀN TÁC các phiên bản từ ngày đó
-    trở đi rồi áp lại -> chạy lại ngày D cho cùng kết quả.
+  - Nguồn ẢNH CHỤP (snapshot: true): lô có ngày <= ngày đã có trong bảng ->
+    HOÀN TÁC các phiên bản từ ngày đó trở đi rồi áp lại -> chạy lại ngày D cho
+    cùng kết quả.
+  - Nguồn DELTA (snapshot: false, CDC1): nhiều manifest trong một ngày chồng lên
+    nhau; chỉ hoàn tác phiên bản của CHÍNH manifest đang chạy lại (ds_source).
+    Đổi nhiều lần trong một ngày -> phiên bản [D, D) độ dài 0 cho các lần giữa.
   - Lô có ngày < ngày lớn nhất của bảng mà KHÔNG phải chạy lại (dữ liệu đến
     trễ sau khi ngày mới hơn đã ghi): TỪ CHỐI. Áp nó sẽ viết lại lịch sử mà
     các phiên bản sau đã dựa vào; phải backfill có chủ đích (--REBUILD_FROM).
@@ -58,6 +62,47 @@ class Scd2Writer(Writer):
             """)
         return n
 
+    def _rollback_source(self, lo) -> int:
+        """Hoàn tác các phiên bản do CHÍNH manifest này ghi (nguồn delta).
+
+        Hoàn tác theo NGÀY như nguồn ảnh chụp là sai với delta: lô thứ hai trong
+        ngày chỉ chứa những key vừa đổi, nên xoá cả ngày rồi áp lại sẽ làm mất
+        thay đổi của lô thứ nhất. Ở đây chỉ xoá dòng có ds_source = manifest này,
+        rồi mở lại phiên bản liền trước của đúng các key đó.
+
+        Chỉ an toàn khi manifest này là lô CUỐI CÙNG đụng tới các key đó; có lô
+        khác ghi sau thì từ chối, phải dựng lại có chủ đích (--REBUILD_FROM).
+        """
+        t, lbl = self.table, self._lit(self.source_label)
+        mine = self.sql(f"""SELECT ds_key, min(ds_etl_timestamp) AS ts FROM {t}
+                            WHERE ds_source = {lbl} GROUP BY ds_key""").localCheckpoint(eager=True)
+        n = mine.count()
+        if n == 0:
+            return 0
+        mine.createOrReplaceTempView("_x_scd2_mine")
+        later = self.sql(f"""SELECT count(*) FROM {t} x JOIN _x_scd2_mine m ON x.ds_key = m.ds_key
+                             WHERE x.ds_source <> {lbl} AND x.ds_etl_timestamp > m.ts""").collect()[0][0]
+        if later:
+            raise OutOfOrderError(
+                f"[{self.cfg.name}] manifest {self.source_label} da duoc ap, sau do {later} phien ban "
+                f"tu manifest khac da ghi len cung key. Khong hoan tac rieng duoc: dung lai bang "
+                f"(--REBUILD_FROM {lo}) roi ap lai cac manifest theo thu tu.")
+        self.sql(f"DELETE FROM {t} WHERE ds_source = {lbl}")
+        self.sql(f"""
+            MERGE INTO {t} x
+            USING (
+                SELECT ds_key, ds_valid_from, ds_etl_timestamp FROM (
+                    SELECT y.ds_key, y.ds_valid_from, y.ds_etl_timestamp, y.ds_is_current,
+                           row_number() OVER (PARTITION BY y.ds_key
+                                              ORDER BY y.ds_valid_from DESC, y.ds_etl_timestamp DESC) AS rn
+                    FROM {t} y JOIN _x_scd2_mine m ON y.ds_key = m.ds_key)
+                WHERE rn = 1 AND NOT ds_is_current) s
+            ON x.ds_key = s.ds_key AND x.ds_valid_from = s.ds_valid_from
+               AND x.ds_etl_timestamp = s.ds_etl_timestamp
+            WHEN MATCHED THEN UPDATE SET x.ds_valid_to = DATE'{OPEN_END}', x.ds_is_current = true
+        """)
+        return n
+
     def write(self, df, rebuild_from=None) -> Dict[str, int]:
         from pyspark.sql import functions as F
 
@@ -70,12 +115,20 @@ class Scd2Writer(Writer):
 
         table_max = self.sql(f"SELECT max(ds_valid_from) FROM {self.table}").collect()[0][0]
         rolled = 0
-        if table_max is not None and table_max >= lo:
-            if table_max > hi and rebuild_from is None:
-                raise OutOfOrderError(
-                    f"[{self.cfg.name}] lo ngay {lo}..{hi} den tre: bang da co phien ban ngay "
-                    f"{table_max}. Chay lai theo thu tu tu ngay {lo} (--REBUILD_FROM {lo}).")
-            rolled = self._rollback_from(rebuild_from or lo)
+        if table_max is not None and table_max > hi and rebuild_from is None:
+            raise OutOfOrderError(
+                f"[{self.cfg.name}] lo ngay {lo}..{hi} den tre: bang da co phien ban ngay "
+                f"{table_max}. Chay lai theo thu tu tu ngay {lo} (--REBUILD_FROM {lo}).")
+        if rebuild_from is not None:
+            rolled = self._rollback_from(rebuild_from)
+        elif self.cfg.writer.snapshot:
+            # Anh chup: lo cua ngay D THAY THE moi thu cua ngay D -> hoan tac ca ngay
+            if table_max is not None and table_max >= lo:
+                rolled = self._rollback_from(lo)
+        else:
+            # Delta (CDC1): nhieu manifest trong mot ngay CHONG len nhau. Chi hoan
+            # tac dung manifest nay neu no da duoc ap (retry / chay lai tay).
+            rolled = self._rollback_source(lo)
 
         cols = df.columns
         cur = (self.spark.table(self.table).where("ds_is_current")

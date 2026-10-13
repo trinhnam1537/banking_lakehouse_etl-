@@ -7,8 +7,11 @@ entries/<nguon>/<bang>.yml   mot entry = mot bang silver (chay tren Glue job dun
 ddl/<database>/<bang>.sql    (tuy chon) DDL viet tay; khong co thi sinh tu entry
 ```
 
-**Hiện chưa có entry silver nào**: nguồn tài chính đã bỏ (10-12), entry cho Berka viết sau.
-Ví dụ bên dưới (GLEIF, FDIC) giữ lại để minh hoạ cú pháp.
+Entry hiện có: **8 bảng core banking** (`entries/corebank/` → database `silver_corebank`), mô tả ở
+[docs/sourcing/corebank.md](../docs/sourcing/corebank.md) mục 6. Ví dụ GLEIF và FDIC bên dưới giữ lại
+để minh hoạ cú pháp.
+
+Chạy thông luồng nguồn → landing → silver trên máy: `python -m local.run_flow corebank`.
 
 **Thêm một bảng silver:** tạo `entries/<nguon>/<bang>.yml` → merge `main` (CI config-sync ghi vào `slv-job-config`).
 Không viết Python. Tên file phải duy nhất và trùng khoá `name`.
@@ -63,7 +66,8 @@ technical:
 writer:
   type: scd2                     # scd2 | scd4a | simple
   mode: append                   # simple: append | overwrite_partition | overwrite_table
-  snapshot: true                 # scd2: nguon la anh chup day du -> key vang mat = xoa
+  snapshot: true                 # scd2: true = anh chup (CDC5): key vang mat = xoa, chay lai hoan tac CA NGAY
+                                 #       false = delta (CDC1): chay lai chi hoan tac DUNG manifest do
   emit_deletes: true             # scd4a: ghi dong D cho key bien mat
 
 quality:
@@ -97,7 +101,7 @@ runtime:
 
 | Dữ liệu | Writer | Ví dụ |
 |---|---|---|
-| Thực thể đổi chậm, cần lịch sử từng lần đổi | `scd2` | pháp nhân GLEIF |
+| Thực thể đổi chậm, cần lịch sử từng lần đổi | `scd2` | pháp nhân GLEIF, khách hàng core banking |
 | Ảnh chụp đầy đủ mỗi ngày, cần "hôm nay khác hôm qua gì" | `scd4a` | ngân hàng FDIC |
 | Sự kiện / chuỗi thời gian | `simple` + `append` | ticker, lệnh khớp, frames SEC |
 | Ảnh chụp theo ngày, không cần I/U/D | `simple` + `overwrite_partition` | công ty mẹ GLEIF |
