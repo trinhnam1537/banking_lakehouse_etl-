@@ -1,0 +1,36 @@
+# IBM AML phat lai vao Kafka (simulators.aml.replay stream). Key = tai khoan nguon.
+# Value JSON: txn_id, event_ts, from_bank, from_account, to_bank, to_account, amount_*,
+# *_currency, payment_format. KHONG co is_laundering (xem aml_labels).
+# Raw: moi dong = mot ban tin (value la chuoi JSON) -> silver boc. Tai lieu: docs/sourcing/ibm-aml.md
+
+name: aml_transfers
+source_type: kafka
+description: "IBM AML: giao dich lien ngan hang (khong nhan) tu Kafka"
+owner: namth
+# Can broker (EC2 Redpanda trong VPC) + profile src-vpc. Bat cung luc voi Kafka.
+enabled: false
+
+kafka:
+  # IP rieng cua EC2 doi moi lan spot bi dung lai -> tham so Glue, khong ghi cung
+  bootstrap_servers: "${KAFKA_BOOTSTRAP}"
+  topic: aml.interbank.transfers
+  group_id: fingraph-src-aml
+  auto_offset_reset: earliest
+  max_records_per_run: 500000
+  poll_timeout_seconds: 10
+
+cdc:
+  mode: cdc1   # moc = offset tung partition, khong can watermark_column
+
+target:
+  dataset: aml/transfers
+  max_records_per_file: 100000
+
+schedule:
+  # Micro-batch: 15 phut mot lan. Glue Streaming ton ~20 USD/ngay.
+  enabled: false
+  expression: "rate(15 minutes)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 15

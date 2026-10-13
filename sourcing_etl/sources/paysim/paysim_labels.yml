@@ -1,0 +1,35 @@
+# NHAN TRE: nhan khong di cung giao dich (ngan hang chi biet sau dieu tra/chargeback).
+# Simulator ghi file nhan sau N ngay nghiep vu. KHONG dung lam dac trung cho mo hinh
+# phat hien thoi gian thuc — chi de huan luyen/danh gia.
+# Tai lieu: docs/sourcing/paysim.md
+
+name: paysim_labels
+source_type: s3file
+description: "PaySim: nhan gian lan (txn_ref, is_fraud, is_flagged_fraud), den tre 30 ngay"
+owner: namth
+enabled: true
+
+s3file:
+  bucket: "${RAW_BUCKET}"
+  prefix: landing/_inbox/paysim/labels/
+  file_format: csv
+  compression: gzip
+  batch_size: 20000
+
+cdc:
+  mode: cdc1
+  # Moc = KHOA S3 cua file cuoi da nap; prefix dt=YYYY-MM-DD giu thu tu tu dien
+  watermark_column: _s3_key
+  watermark_type: string
+
+target:
+  dataset: paysim/labels
+
+schedule:
+  # Bat sau khi chay tay thanh cong it nhat mot lan.
+  enabled: false
+  expression: "cron(0 1 * * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 30

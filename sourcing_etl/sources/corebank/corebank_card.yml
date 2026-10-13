@@ -1,0 +1,47 @@
+# Core banking gia lap: Postgres corebank (Berka doi +24 nam + simulator tu 2023-01-01).
+# Phan tich nguon, schema, credential: docs/sourcing/corebank.md
+# Dung profile src-vpc (Glue trong VPC, toi duoc may "he thong nguon") -> enabled: false
+# cho toi khi repo ha tang tao profile do. Chay tren may: python -m local.run_entry corebank_card
+# PCI DSS: so the day du KHONG duoc roi xuong raw. SQL che so the va sinh token
+# ngay tai nguon — ly do chinh de dua cau SQL vao entry thay vi SELECT *.
+# card_token = md5(card_number): cung cong thuc voi simulator the (cards_authorizations).
+
+name: corebank_card
+source_type: jdbc
+description: The (so the da che + token) — CDC1 theo updated_at
+owner: namth
+enabled: false
+
+jdbc:
+  # {host, port, username, password, dbname} — user etl_reader CHI DOC
+  secret_name: fingraph/src/corebank_pg
+  driver: postgresql
+  query: |
+    SELECT card_id, disp_id, card_type, issued_date,
+           left(card_number, 6) || '******' || right(card_number, 4) AS card_number_masked,
+           md5(card_number) AS card_token,
+           status, created_at, updated_at
+    FROM core.card
+    WHERE updated_at > :watermark
+    ORDER BY updated_at
+
+cdc:
+  mode: cdc1
+  watermark_column: updated_at
+  watermark_type: timestamp
+  # Keo chong 5 phut: transaction mo truoc mot transaction khac nhung COMMIT sau no
+  # se mang updated_at nho hon moc vua luu -> khong lookback la mat dong do.
+  lookback_seconds: 300
+  initial_watermark: "1970-01-01T00:00:00+00:00"
+
+target:
+  dataset: corebank/card
+
+schedule:
+  # 01:00 gio VN. Bat sau khi profile src-vpc ton tai va chay tay OK.
+  enabled: false
+  expression: "cron(0 18 * * ? *)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 20

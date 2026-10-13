@@ -17,11 +17,17 @@ kích thước, chế độ CDC).
 
 ```
 sources/
-  berka/         8 entry   core banking Berka (MariaDB CTU): account, card, client,
-                           disp, district, loan, order, trans
+  berka/          8 entry  Berka gốc trên MariaDB công khai của CTU (jdbc)
+  corebank/       8 entry  core banking giả lập, Postgres (jdbc, src-vpc)
+  lending/        8 entry  hệ thống cho vay Home Credit, Postgres (jdbc) + nhãn vỡ nợ (s3file)
+  ibm_aml/        4 entry  chuyển tiền liên ngân hàng: Kafka + tài khoản, mẫu rửa tiền, nhãn (s3file)
+  paysim/         2 entry  file EOD của đối tác ví điện tử + nhãn (s3file)
+  cards/          2 entry  giao dịch thẻ: Kafka + chargeback (s3file)
+  opensanctions/  3 entry  danh sách cấm vận (httpfile)
+  fx/             2 entry  tỷ giá VCB (api, cửa sổ ngày) + CNB (httpfile)
 ```
 
-Phân tích nguồn: [docs/sources/berka.md](../docs/sources/berka.md).
+Tài liệu từng nguồn (bảng, schema, credential, luồng giả lập): [docs/sourcing/](../docs/sourcing/README.md).
 
 **Tên file phải duy nhất trên toàn cây** và trùng khoá `name` bên trong. Tên này là
 khoá của bảng `job_config` và là phần `<tên>` trong `job_id = src.<tên>`.
@@ -73,7 +79,7 @@ theo `trans_id`, để job dừng giữa chừng thì lần sau chạy tiếp t�
 
 ```yaml
 name: ten_job                    # trùng tên file
-source_type: jdbc                # api | jdbc | kafka | s3file
+source_type: jdbc                # api | jdbc | kafka | s3file | httpfile
 description: Mô tả ngắn
 owner: namth
 enabled: true                    # false = giữ trong repo, Lambda trả SKIPPED
@@ -81,14 +87,20 @@ enabled: true                    # false = giữ trong repo, Lambda trả SKIPPE
 jdbc:                            # khối riêng theo source_type
   secret_name: fingraph/src/ten  # BẮT BUỘC dưới fingraph/src/ — Glue chỉ đọc được tiền tố này
   driver: mysql                  # mysql | postgresql
-  schema: financial
-  table: trans
+  chunk_size: 50000              # (tuỳ chọn) chia khúc keyset, cần :chunk_size + mốc int
+  query: |                       # NGUYÊN câu SQL; framework chỉ bind tham số
+    SELECT trans_id, account_id, amount
+    FROM financial.trans
+    WHERE trans_id > :watermark  -- CDC1 bắt buộc lọc :watermark
+    ORDER BY trans_id
+    LIMIT :chunk_size
 
 cdc:
   mode: cdc1
-  watermark_column: trans_id     # BẮT BUỘC với cdc1 (trừ kafka)
+  watermark_column: trans_id     # BẮT BUỘC với cdc1 (trừ kafka): cột trong KẾT QUẢ query
   watermark_type: int            # timestamp | int | string
   lookback_seconds: 0            # kéo chồng lấn để bắt bản ghi đến muộn
+  initial_watermark: "0"         # JDBC + CDC1: giá trị :watermark cho lần chạy đầu
 
 target:
   dataset: nhom/ten              # -> landing/nhom/ten/ingest_date=YYYY-MM-DD/
@@ -103,6 +115,29 @@ runtime:
 ```
 
 ---
+
+## SQL trong entry JDBC
+
+Reader JDBC **không tự dựng câu SQL**: entry khai nguyên câu, framework chỉ bind tham số có tên.
+
+| Tham số | Giá trị |
+|---|---|
+| `:watermark` | Mốc CDC1 (checkpoint trừ `lookback_seconds`; lần đầu = `cdc.initial_watermark`). Ép đúng kiểu: `int` thành số, `timestamp` với MySQL thành `YYYY-MM-DD HH:MM:SS` UTC |
+| `:chunk_size` | `jdbc.chunk_size`: framework chạy lại câu với mốc mới tới khi khúc trả ít hơn N dòng |
+| `:run_ts` | Thời điểm bắt đầu lần chạy (UTC), dùng làm cận trên nếu cần |
+| `:<khoá>` | Mọi khoá trong `jdbc.params` (override được: `{"jdbc.params.branch": "HN"}`) |
+
+pytest chặn ngay những lỗi im lặng: CDC1 mà không lọc `:watermark` (mỗi lần kéo lại toàn bộ),
+CDC5 có `:watermark`, tham số chưa khai, câu không phải `SELECT`/`WITH` hoặc có nhiều câu,
+`chunk_size` mà thiếu `LIMIT :chunk_size` hoặc mốc không phải `int`. Lúc chạy, nếu kết quả thiếu
+cột mốc thì job báo lỗi ở dòng đầu, thay vì để mốc không bao giờ tiến.
+
+`%` trong câu (`LIKE 'VN%'`) và ép kiểu `::timestamp` của Postgres viết bình thường, không cần
+thoát. Phiên đọc mở `READ ONLY` (`jdbc.read_only`, mặc định true). Câu cần chạy trước truy vấn
+thì đặt ở `jdbc.init_sql`, ví dụ `SET statement_timeout = '10min'`.
+
+Lợi ích có thật trong repo: `corebank_card` **che số thẻ ngay trong SQL**, nên số thẻ đầy đủ
+không bao giờ xuống raw.
 
 ## Ba điều dễ làm sai
 

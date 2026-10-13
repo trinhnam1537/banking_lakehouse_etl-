@@ -84,7 +84,7 @@ def test_khoi_nguon_co_khoa_la():
 
 def test_khoi_nguon_thieu_khoa_bat_buoc():
     raw = entry(source_type="jdbc")
-    raw["jdbc"] = {"schema": "public"}  # thieu secret_name, table
+    raw["jdbc"] = {"driver": "mysql"}  # thieu secret_name, query
     with pytest.raises(ConfigError, match="khoi 'jdbc' sai"):
         from_dict(raw)
 
@@ -109,17 +109,32 @@ def test_cdc5_cam_watermark_column():
         make_cfg(cdc={"mode": "cdc5", "watermark_column": "updated_at"})
 
 
-def test_jdbc_num_partitions_chi_cho_spark():
-    raw = {
-        "name": "j",
-        "source_type": "jdbc",
-        "jdbc": {"secret_name": "fingraph/src/s", "schema": "public", "table": "t", "num_partitions": 4},
-        "cdc": {"mode": "cdc5"},
-    }
-    with pytest.raises(ConfigError, match="num_partitions"):
+def test_jdbc_khoi_cu_schema_table_khong_con_nhan():
+    """SQL nằm trong entry (jdbc.query); khoá cũ schema/table bị từ chối rõ ràng."""
+    raw = {"name": "j", "source_type": "jdbc", "cdc": {"mode": "cdc5"},
+           "jdbc": {"secret_name": "fingraph/src/s", "schema": "public", "table": "t"}}
+    with pytest.raises(ConfigError, match="khoi 'jdbc' sai"):
         from_dict(raw)
-    raw["runtime"] = {"engine": "spark"}
-    assert from_dict(raw).jdbc.num_partitions == 4
+
+
+def test_api_date_window_can_cdc1_va_ngay_bat_dau():
+    api = {"base_url": "https://x", "date_window": {"param": "date"}}
+    with pytest.raises(ConfigError, match="chi dung voi cdc1"):
+        make_cfg(api=api)
+    with pytest.raises(ConfigError, match="initial_watermark"):
+        make_cfg(api=api, cdc={"mode": "cdc1", "watermark_column": "_window"})
+    cfg = make_cfg(api=api, cdc={"mode": "cdc1", "watermark_column": "_window",
+                                 "watermark_type": "string", "initial_watermark": "2020-06-01"})
+    assert cfg.api.date_window.param == "date" and cfg.api.date_window.end_offset_days == 1
+
+
+def test_httpfile_khai_mot_trong_hai_nguon_danh_sach():
+    base = {"source_type": "httpfile", "cdc": {"mode": "cdc5"}}
+    with pytest.raises(ConfigError, match="MOT trong hai"):
+        make_cfg(**base, httpfile={})
+    with pytest.raises(ConfigError, match="files_path"):
+        make_cfg(**base, httpfile={"index_url": "https://x/index.json"})
+    assert make_cfg(**base, httpfile={"urls": {"a": "https://x/a.csv"}}).httpfile.file_format == "csv"
 
 
 @pytest.mark.parametrize("fmt, ok", [("ndjson.gz", True), ("ndjson", True), ("parquet", False)])
@@ -295,7 +310,7 @@ def test_profile_la_bi_chan():
 ])
 def test_secret_ngoai_tien_to_bi_chan(block, secret):
     over = ({"api": {"base_url": "https://x", "secret_name": secret}} if block == "api" else
-            {"source_type": "jdbc", "jdbc": {"secret_name": secret, "schema": "s", "table": "t"},
+            {"source_type": "jdbc", "jdbc": {"secret_name": secret, "query": "SELECT 1"},
              "cdc": {"mode": "cdc5"}})
     with pytest.raises(ConfigError, match="fingraph/src/"):
         make_cfg(**over)

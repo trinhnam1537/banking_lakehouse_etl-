@@ -1,6 +1,6 @@
 """Reader cho file do bên ngoài đẩy vào S3.
 
-Đây là nhánh batch: ai đó (script, đối tác, tải tay) đặt file vào một prefix,
+Đây là nhánh batch: ai đó (đối tác, file EOD, tải tay) đặt file vào một prefix,
 job này quét và nạp vào raw.
 
 Mốc CDC1 ở đây là **khoá S3 của file cuối cùng đã xử lý**, không phải thời
@@ -11,14 +11,14 @@ còn khoá thì duy nhất và `list_objects_v2` trả về theo thứ tự từ
 Đánh đổi: file có khoá đứng trước X mà upload muộn sẽ bị bỏ sót. Với bố cục
 prefix theo ngày (`.../dt=2026-09-26/...`) thì điều đó hầu như không xảy ra;
 nếu nguồn không bảo đảm được, dùng luồng Lambda theo sự kiện S3 thay vì quét.
+
+File được đọc THEO LUỒNG (`fileparse.iter_records`) và chia lô `batch_size`:
+không file nào phải nằm trọn trong RAM. Chỉ lô CUỐI của mỗi file mang mốc, nên
+checkpoint không bao giờ ghi nhận một file mới đọc được một nửa.
 """
 
 from __future__ import annotations
 
-import csv
-import gzip
-import io
-import json
 from typing import Any, Dict, Iterator, List, Optional
 
 import boto3
@@ -26,8 +26,7 @@ import boto3
 from ..config import SourceConfig
 from ..state import Checkpoint
 from .base import Batch, Reader
-
-MAX_FILES_PER_RUN = 500
+from .fileparse import is_gzip, iter_records
 
 
 class S3FileReader(Reader):
@@ -49,27 +48,14 @@ class S3FileReader(Reader):
         for page in paginator.paginate(**kwargs):
             for obj in page.get("Contents", []):
                 k = obj["Key"]
-                if k.endswith("/") or obj["Size"] == 0:
-                    continue  # bo qua "thu muc" va file rong
+                name = k.rsplit("/", 1)[-1]
+                if k.endswith("/") or obj["Size"] == 0 or name.startswith(("_", ".")):
+                    # thu muc, file rong, file danh dau (_SUCCESS, .keep)
+                    continue
                 keys.append(k)
-                if len(keys) >= MAX_FILES_PER_RUN:
+                if len(keys) >= self.s.max_files_per_run:
                     return keys
         return keys
-
-    def _parse(self, key: str, body: bytes) -> List[Dict[str, Any]]:
-        if self.s.compression == "gzip" or key.endswith(".gz"):
-            body = gzip.decompress(body)
-
-        fmt = self.s.file_format
-        if fmt == "json":
-            doc = json.loads(body.decode("utf-8"))
-            return doc if isinstance(doc, list) else [doc]
-        if fmt == "ndjson":
-            return [json.loads(line) for line in body.decode("utf-8").splitlines() if line.strip()]
-        if fmt == "csv":
-            text = io.StringIO(body.decode("utf-8-sig"))  # -sig: bo BOM neu co
-            return list(csv.DictReader(text, delimiter=self.s.csv_delimiter))
-        raise ValueError(f"[{self.cfg.name}] file_format khong ho tro: {fmt}")
 
     def read(self, checkpoint: Optional[Checkpoint]) -> Iterator[Batch]:
         after = None if self.is_full_snapshot else self.effective_since(checkpoint)
@@ -78,18 +64,34 @@ class S3FileReader(Reader):
             return
 
         for key in keys:
-            body = self._s3.get_object(Bucket=self.s.bucket, Key=key)["Body"].read()
-            records = self._parse(key, body)
-            for r in records:
-                r["_src_file"] = key
-            # Mốc chỉ tiến sau khi cả file đã ghi xong: file nửa vời không
-            # bao giờ được đánh dấu là đã xử lý.
-            yield Batch(
-                records=[self.stamp(r) for r in records],
-                watermark=key,
-                meta={"file": key, "records": len(records)},
-            )
+            body = self._s3.get_object(Bucket=self.s.bucket, Key=key)["Body"]
+            buf: List[Dict[str, Any]] = []
+            total = 0
+            try:
+                for row_no, rec in iter_records(
+                    body, self.s.file_format, name=key,
+                    # compression: none van giai nen file duoi .gz (hanh vi cu)
+                    gzip_on=is_gzip(key, "gzip" if self.s.compression == "gzip" else "auto"),
+                    encoding=self.s.encoding, csv_delimiter=self.s.csv_delimiter,
+                    repeated_header=self.s.csv_repeated_header,
+                ):
+                    rec["_src_file"] = key
+                    rec["_src_row"] = row_no
+                    buf.append(self.stamp(rec))
+                    if len(buf) >= self.s.batch_size:
+                        total += len(buf)
+                        # Lo giua file: KHONG mang moc
+                        yield Batch(records=buf, watermark=None, meta={"file": key})
+                        buf = []
+            finally:
+                close = getattr(body, "close", None)
+                if close:
+                    close()
+            total += len(buf)
+            # Lo cuoi cua file mang moc = khoa file (ke ca khi lo rong: file chi co
+            # header van phai duoc danh dau la da xu ly, neu khong se doc lai mai).
+            yield Batch(records=buf, watermark=key, meta={"file": key, "records": total})
 
-        if len(keys) >= MAX_FILES_PER_RUN:
-            print(f"[{self.cfg.name}] Da xu ly {MAX_FILES_PER_RUN} file (tran mot lan chay). "
+        if len(keys) >= self.s.max_files_per_run:
+            print(f"[{self.cfg.name}] Da xu ly {self.s.max_files_per_run} file (tran mot lan chay). "
                   f"Con file chua doc — lan chay sau se tiep tuc tu checkpoint.")

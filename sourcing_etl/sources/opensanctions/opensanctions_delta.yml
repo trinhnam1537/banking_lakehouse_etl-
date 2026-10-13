@@ -1,0 +1,39 @@
+# OpenSanctions — danh sach cam van (bo `sanctions`: ~72 nghin doi tuong, ~300 nghin entity).
+# Giay phep CC BY-NC 4.0: dung cho do an phi thuong mai, ghi nguon. Bo `default` (co PEP)
+# nang 2,6 GB -> khong dung tren Glue Python Shell. Tai lieu: docs/sourcing/opensanctions.md
+#
+# Thay doi gia tang (ADD/MOD/DEL) giua cac phien ban, phat hanh ~4 lan/ngay, nguon GIU 100 ban.
+# index.json --delta_url--> delta.json {versions: {phien_ban: url}} -> chi tai phien ban > moc.
+# require_contiguous: moc cu hon ban cu nhat con giu = da MAT delta -> bao loi, phai nap lai
+# opensanctions_entities roi reset_checkpoint. Chay it nhat moi ~20 ngay de khong vo.
+
+name: opensanctions_delta
+source_type: httpfile
+description: OpenSanctions sanctions — delta entity theo phien ban (CDC1)
+owner: namth
+enabled: true
+
+httpfile:
+  index_url: https://data.opensanctions.org/datasets/latest/sanctions/index.json
+  index_follow: [delta_url]
+  files_path: versions
+  file_format: ndjson
+  require_contiguous: true
+  max_files_per_run: 100
+
+cdc:
+  mode: cdc1
+  watermark_column: _file_key   # = chuoi phien ban, vd 20261010194704-euu
+  watermark_type: string
+
+target:
+  dataset: opensanctions/delta
+
+schedule:
+  # Bat sau khi chay tay thanh cong it nhat mot lan.
+  enabled: false
+  expression: "cron(0 */6 * * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 20

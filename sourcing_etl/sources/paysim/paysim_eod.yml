@@ -1,0 +1,33 @@
+# PaySim: doi tac vi dien tu gui MOT file CSV gzip moi cuoi ngay (simulators.paysim.eod).
+# txn_ref do producer cap (PaySim goc khong co ma giao dich). Tai lieu: docs/sourcing/paysim.md
+
+name: paysim_eod
+source_type: s3file
+description: "PaySim: file doi soat cuoi ngay cua doi tac vi dien tu"
+owner: namth
+enabled: true
+
+s3file:
+  bucket: "${RAW_BUCKET}"
+  prefix: landing/_inbox/paysim/eod/
+  file_format: csv
+  compression: gzip
+  batch_size: 20000
+
+cdc:
+  mode: cdc1
+  # Moc = KHOA S3 cua file cuoi da nap; prefix dt=YYYY-MM-DD giu thu tu tu dien
+  watermark_column: _s3_key
+  watermark_type: string
+
+target:
+  dataset: paysim/eod
+
+schedule:
+  # Bat sau khi chay tay thanh cong it nhat mot lan.
+  enabled: false
+  expression: "cron(30 0 * * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 30

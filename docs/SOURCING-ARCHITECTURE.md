@@ -63,9 +63,10 @@ Ba nguyên tắc định hình mọi thứ còn lại:
 3. **At-least-once, không bao giờ mất dữ liệu.** Dữ liệu được ghi trước, checkpoint
    mới tiến sau. Phần chồng lấn khi chạy lại do silver khử trùng theo khoá nghiệp vụ.
 
-Hiện có **59 entry từ 10 nguồn**: SEC, GLEIF, SSI, Binance, OKX, CoinGecko, Treasury,
-FDIC, Comtrade và Alpha Vantage. Trong đó 51 entry đang bật, 56 entry là CDC5 (full
-snapshot) và 3 entry là CDC1 (incremental).
+Hiện có **37 entry từ 8 nhóm nguồn** của ngân hàng giả lập: Berka, core banking, cho vay
+(Home Credit), IBM AML, PaySim, thẻ, OpenSanctions và tỷ giá (VCB, CNB). Danh mục, schema,
+credential và luồng giả lập của từng nguồn: [docs/sourcing/](sourcing/README.md). (59 entry của
+10 nguồn tài chính công khai cũ, như SEC, GLEIF hay FDIC, đã được gỡ ở commit `4d70a79`.)
 
 ---
 
@@ -76,7 +77,9 @@ snapshot) và 3 entry là CDC1 (incremental).
 ```
 sourcing/                  FRAMEWORK — code chạy trong Glue job
   config.py                  schema entry, kiểm tra, override, snapshot
-  readers/                   api · jdbc · kafka · s3file — mọi khác biệt nguồn nằm sau read()
+  readers/                   api · jdbc · kafka · s3file · httpfile — mọi khác biệt nguồn nằm sau read()
+                               fileparse.py: đọc CSV/NDJSON/JSON (gzip) THEO LUỒNG
+  sqltemplate.py             SQL trong entry JDBC: tham số :watermark/:chunk_size, kiểm tra tĩnh
   writer.py                  NDJSON gzip -> landing/, manifest
   runner.py                  luồng chung: checkpoint -> đọc -> ghi -> tiến mốc
   state.py                   JobConfigStore, JobLogStore (checkpoint + nhật ký + ORCH#)
@@ -257,11 +260,12 @@ runner.run()
   RUN#<iso>#<run_id>  status=RUNNING                 (ghi NGAY, job bị giết vẫn còn dấu vết)
   CDC1: đọc CKPT#LATEST
   reader.read() ──▶ từng lô
-      ├─ writer.write()        landing/<dataset>/ingest_date=<hôm nay>/part-<run_id>-<seq>-*.ndjson.gz
-      │                        CDC5: xoá partition HÔM NAY một lần trước lô đầu (idempotent trong ngày)
-      └─ mỗi 20 lô: CKPT# PARTIAL                    (backlog lớn vẫn nhích dần)
-  CKPT#LATEST = mốc cuối      (SAU khi mọi dữ liệu đã nằm trên S3)
+      ├─ writer.write()        gom vào bộ đệm gzip, cuộn file ở max_records_per_file / max_file_mb:
+      │                        landing/<dataset>/ingest_date=<hôm nay>/part-<run_id>-<seq>-*.ndjson.gz
+      └─ mỗi 20 lô: writer.flush() rồi CKPT# PARTIAL   (backlog lớn vẫn nhích dần)
+  writer.flush(); CKPT#LATEST = mốc cuối      (SAU khi mọi dữ liệu đã nằm trên S3)
   manifest landing/_manifests/<dataset>/ingest_date=…/<run_id>.json   (SAU CÙNG — trigger của silver)
+  CDC5: xoá file của lần chạy TRƯỚC trong partition hôm nay   (ghi mới trước, xoá cũ sau)
   ORCH#<run_id>  run_status + manifest                (chỉ khi luồng mới kích)
   RUN#  status = SUCCESS | NO_DATA | FAILED  + số liệu
 ```

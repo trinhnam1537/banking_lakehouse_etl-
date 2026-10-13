@@ -1,0 +1,33 @@
+# IBM AML (NeurIPS 2023): file tai khoan tinh, do simulators.aml.replay static day vao inbox.
+# Cot da doi ten snake_case. Tai lieu: docs/sourcing/ibm-aml.md
+
+name: aml_accounts
+source_type: s3file
+description: "IBM AML: danh sach tai khoan -> phap nhan (bank, account, entity)"
+owner: namth
+enabled: true
+
+s3file:
+  bucket: "${RAW_BUCKET}"
+  prefix: landing/_inbox/aml/accounts/
+  file_format: csv
+  compression: gzip
+  batch_size: 20000
+
+cdc:
+  mode: cdc1
+  # Moc = KHOA S3 cua file cuoi da nap; prefix dt=YYYY-MM-DD giu thu tu tu dien
+  watermark_column: _s3_key
+  watermark_type: string
+
+target:
+  dataset: aml/accounts
+
+schedule:
+  # Bat sau khi chay tay thanh cong it nhat mot lan.
+  enabled: false
+  expression: "cron(0 1 * * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 30

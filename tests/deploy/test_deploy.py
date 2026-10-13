@@ -174,11 +174,14 @@ def test_config_sync_entry_sai_khong_ghi_gi(tmp_path):
         config_sync.load_sourcing(str(d))
 
 
+N_ENTRIES = len(list((REPO / "sourcing_etl" / "sources").rglob("*.yml")))
+
+
 def test_config_sync_entry_that_cua_repo():
     src = config_sync.load_sourcing(str(REPO / "sourcing_etl" / "sources"))
     slv = config_sync.load_silver(str(REPO / "silver_etl" / "entries"))
-    assert sorted(src) == ["berka_account", "berka_card", "berka_client", "berka_disp",
-                           "berka_district", "berka_loan", "berka_order", "berka_trans"]
+    on_disk = sorted(f.stem for f in (REPO / "sourcing_etl" / "sources").rglob("*.yml"))
+    assert sorted(src) == on_disk and "berka_trans" in src
     assert src["berka_trans"]["source_type"] == "jdbc" and src["berka_trans"]["cdc_mode"] == "cdc1"
     assert slv == {}  # chua co entry silver nao
     assert all(set(v) >= {"enabled", "config", "config_sha"} for v in src.values())
@@ -244,7 +247,7 @@ def test_deploy_dau_cuoi(dry_run):
         n_src = ddb.Table("src-cfg").scan()["Count"]
         if dry_run:
             assert keys == [] and lam.updated == [] and n_src == 0
-            assert len(out["reports"][0].created) == 8  # bao cao van du: 8 entry Berka
+            assert len(out["reports"][0].created) == N_ENTRIES  # bao cao van du moi entry
             return
         assert f"_ops/etl/releases/{SHA}/etl.zip" in keys
         assert "_ops/etl/bootstrap/glue_bootstrap.py" in keys
@@ -252,7 +255,7 @@ def test_deploy_dau_cuoi(dry_run):
         assert [u["FunctionName"] for u in lam.updated] == ["fn-trigger", "fn-sync"]
         assert lam.updated[0]["S3Key"] == f"_ops/etl/releases/{SHA}/etl.zip"
         assert ssm.get_parameter(Name="/fingraph/dev/etl/release")["Parameter"]["Value"] == SHA
-        assert n_src == 8 and ddb.Table("slv-cfg").scan()["Count"] == 0
+        assert n_src == N_ENTRIES and ddb.Table("slv-cfg").scan()["Count"] == 0
 
 
 def test_deploy_chan_sha_la():

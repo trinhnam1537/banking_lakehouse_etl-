@@ -1,0 +1,83 @@
+# Stack "hệ thống nguồn" chạy trên máy — mô phỏng đúng những gì sẽ có trên AWS:
+#
+#   corebank-db   Postgres "core banking" (Berka + simulator)      localhost:5433
+#   lending-db    Postgres "hệ thống cho vay" (Home Credit)        localhost:5434
+#   redpanda      Kafka: aml.interbank.transfers, card.authorizations   localhost:19092
+#   console       Redpanda Console xem topic                       http://localhost:8088
+#   moto          Giả lập S3 + DynamoDB + Secrets Manager          http://localhost:5050
+#
+# Framework sourcing chạy NGUYÊN BẢN trên stack này (boto3 trỏ AWS_ENDPOINT_URL
+# vào moto), nên một entry chạy được ở đây thì chỉ còn khác AWS ở mạng và IAM.
+#
+#   docker compose -f local/docker-compose.yml up -d
+#   python -m local.bootstrap          # bucket, bảng DynamoDB, secret, topic
+#
+# Ghim phiên bản image, không dùng latest.
+name: fingraph-sources
+
+services:
+  corebank-db:
+    image: postgres:16.4
+    environment:
+      POSTGRES_DB: corebank
+      POSTGRES_USER: corebank
+      POSTGRES_PASSWORD: corebank
+    ports: ["5433:5432"]
+    volumes:
+      - corebank-data:/var/lib/postgresql/data
+      - ../simulators/corebank/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U corebank -d corebank"]
+      interval: 5s
+      retries: 20
+
+  lending-db:
+    image: postgres:16.4
+    environment:
+      POSTGRES_DB: lending
+      POSTGRES_USER: lending
+      POSTGRES_PASSWORD: lending
+    ports: ["5434:5432"]
+    volumes:
+      - lending-data:/var/lib/postgresql/data
+      - ../simulators/lending/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lending -d lending"]
+      interval: 5s
+      retries: 20
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=1G
+      - --overprovisioned
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports: ["19092:19092"]
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      retries: 15
+
+  console:
+    image: redpandadata/console:v2.7.2
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports: ["8088:8080"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  moto:
+    image: motoserver/moto:5.0.28
+    ports: ["5050:5000"]
+
+volumes:
+  corebank-data:
+  lending-data:
+  redpanda-data:

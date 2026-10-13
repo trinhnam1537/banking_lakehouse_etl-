@@ -8,7 +8,6 @@ import json
 import boto3
 import pytest
 
-import sourcing.readers.s3file as s3file_mod
 from sourcing.readers.s3file import S3FileReader
 from sourcing.state import Checkpoint
 
@@ -72,16 +71,48 @@ def test_khong_co_file_moi(raw_bucket):
     assert list(S3FileReader(_cfg(raw_bucket)).read(None)) == []
 
 
-def test_tran_so_file_moi_lan_chay(raw_bucket, monkeypatch, capsys):
-    monkeypatch.setattr(s3file_mod, "MAX_FILES_PER_RUN", 2)
+def test_tran_so_file_moi_lan_chay(raw_bucket, capsys):
     for i in range(3):
         _put(raw_bucket, f"{i}.json", b"[]")
-    batches = list(S3FileReader(_cfg(raw_bucket)).read(None))
+    batches = list(S3FileReader(_cfg(raw_bucket, max_files_per_run=2)).read(None))
     assert len(batches) == 2
     assert "tran mot lan chay" in capsys.readouterr().out
 
 
-def test_dinh_dang_khong_ho_tro(raw_bucket):
-    _put(raw_bucket, "a.xml", b"<x/>")
-    with pytest.raises(ValueError, match="file_format khong ho tro: xml"):
-        list(S3FileReader(_cfg(raw_bucket, file_format="xml")).read(None))
+def test_dinh_dang_khong_ho_tro_bi_chan_luc_nap_cau_hinh(raw_bucket):
+    from sourcing.config import ConfigError
+
+    with pytest.raises(ConfigError, match="file_format = 'xml' khong ho tro"):
+        _cfg(raw_bucket, file_format="xml")
+
+
+def test_file_lon_chia_lo_chi_lo_cuoi_mang_moc(raw_bucket):
+    """Đọc theo luồng: file không nằm trọn trong RAM, và checkpoint không bao giờ
+    ghi nhận một file mới đọc được một nửa."""
+    rows = "".join(json.dumps({"i": i}) + "\n" for i in range(25))
+    _put(raw_bucket, "dt=2026-10-01/big.ndjson.gz", gzip.compress(rows.encode()))
+    batches = list(S3FileReader(_cfg(raw_bucket, file_format="ndjson", batch_size=10)).read(None))
+    assert [len(b) for b in batches] == [10, 10, 5]
+    assert [b.watermark for b in batches] == [None, None, INBOX + "dt=2026-10-01/big.ndjson.gz"]
+    # (_src_file, _src_row) la khoa tu nhien cho file khong co ma ban ghi (PaySim)
+    assert [r["_src_row"] for r in batches[-1].records] == [21, 22, 23, 24, 25]
+
+
+def test_file_chi_co_header_van_tien_moc(raw_bucket):
+    _put(raw_bucket, "a.csv", b"x,y\n")
+    (b,) = list(S3FileReader(_cfg(raw_bucket, file_format="csv")).read(None))
+    assert len(b) == 0 and b.watermark == INBOX + "a.csv"
+
+
+def test_csv_trung_ten_cot_bi_chan(raw_bucket):
+    """IBM AML có HAI cột 'Account': DictReader sẽ ghi đè, mất tài khoản nguồn."""
+    _put(raw_bucket, "aml.csv", b"From Bank,Account,To Bank,Account\n1,A,2,B\n")
+    with pytest.raises(ValueError, match="trung ten"):
+        list(S3FileReader(_cfg(raw_bucket, file_format="csv")).read(None))
+
+
+def test_bo_qua_file_danh_dau(raw_bucket):
+    _put(raw_bucket, "dt=1/_SUCCESS", b"x")
+    _put(raw_bucket, "dt=1/a.json", b"[{\"a\": 1}]")
+    (b,) = list(S3FileReader(_cfg(raw_bucket)).read(None))
+    assert b.records[0]["_src_file"].endswith("a.json")

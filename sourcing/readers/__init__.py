@@ -37,4 +37,9 @@ def build_reader(cfg: SourceConfig, **kwargs) -> Reader:
 
         return S3FileReader(cfg, s3_client=kwargs.get("s3_client"))
 
+    if cfg.source_type is SourceType.HTTPFILE:
+        from .httpfile import HttpFileReader
+
+        return HttpFileReader(cfg)
+
     raise ValueError(f"[{cfg.name}] chua co reader cho '{cfg.source_type}'")

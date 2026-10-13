@@ -1,0 +1,40 @@
+# He thong cho vay gia lap: Postgres lending theo Home Credit Default Risk (Kaggle).
+# Phan tich nguon, schema, credential: docs/sourcing/lending.md
+# Profile src-vpc -> enabled: false cho toi khi repo ha tang tao profile.
+# Chay tren may: python -m local.run_entry lending_pos_cash_balance
+
+name: lending_pos_cash_balance
+source_type: jdbc
+description: So du thang vay tieu dung/tien mat — CDC1 chia khuc theo id
+owner: namth
+enabled: false
+
+jdbc:
+  secret_name: fingraph/src/lending_pg
+  driver: postgresql
+  chunk_size: 100000
+  query: |
+    SELECT id, sk_id_prev, sk_id_curr, months_balance, cnt_instalment, cnt_instalment_future,
+           name_contract_status, sk_dpd, sk_dpd_def, created_at
+    FROM lending.pos_cash_balance
+    WHERE id > :watermark
+    ORDER BY id
+    LIMIT :chunk_size
+
+cdc:
+  mode: cdc1
+  watermark_column: id
+  watermark_type: int
+  initial_watermark: "0"
+
+target:
+  dataset: lending/pos_cash_balance
+
+schedule:
+  # 01:30 gio VN.
+  enabled: false
+  expression: "cron(30 18 * * ? *)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 60

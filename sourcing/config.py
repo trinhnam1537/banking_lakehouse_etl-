@@ -46,6 +46,7 @@ class SourceType(str, Enum):
     JDBC = "jdbc"
     KAFKA = "kafka"
     S3FILE = "s3file"
+    HTTPFILE = "httpfile"
 
 
 class Engine(str, Enum):
@@ -95,20 +96,56 @@ class ApiSource:
     secret_inject: Dict[str, str] = field(default_factory=dict)
     rate_limit_per_sec: float = 5.0
     timeout_seconds: int = 30
+    # Gọi theo cửa sổ ngày (CDC1): mỗi ngày từ sau mốc tới hôm nay một request,
+    # tham số ngày đặt vào query[date_window.param]. Dành cho API chỉ trả MỘT
+    # ngày mỗi lần gọi (tỷ giá VCB). Mốc là chính ngày đã gọi, không lấy từ
+    # bản ghi -> cdc.watermark_column: _window.
+    date_window: Optional["DateWindow"] = None
+
+
+@dataclass
+class DateWindow:
+    param: str
+    format: str = "%Y-%m-%d"
+    step_days: int = 1
+    # Dừng trước hôm nay N ngày: dữ liệu của ngày đang chạy còn đổi (tỷ giá
+    # công bố nhiều lần trong ngày), chỉ kéo những ngày đã chốt.
+    end_offset_days: int = 1
+    # Múi giờ của nguồn để xác định "hôm nay" (VCB: +7)
+    utc_offset_hours: int = 0
+    # Trần số cửa sổ mỗi lần chạy: backfill nhiều năm chia ra nhiều lần chạy,
+    # checkpoint giữ chỗ dừng.
+    max_windows: int = 400
 
 
 @dataclass
 class JdbcSource:
-    # Secrets Manager chứa host/port/user/password/dbname
+    """Nguồn quan hệ: entry khai NGUYÊN câu SQL, framework chỉ bind tham số.
+
+    Xem `sourcing/sqltemplate.py` cho cú pháp `:watermark`, `:chunk_size`,
+    `:run_ts`, `:<params>`. Framework không ghép WHERE/ORDER BY nào: CDC1 nghĩa
+    là câu SQL tự lọc theo `:watermark` và tự sắp xếp theo cột mốc.
+    """
+
+    # Secrets Manager chứa host/port/username/password/dbname
     secret_name: str
-    schema: str
-    table: str
-    driver: str = "postgresql"
-    # Chỉ dùng cho SPARK: chia truy vấn thành N luồng theo cột số này
-    partition_column: Optional[str] = None
-    num_partitions: int = 1
-    # Lọc thêm, dán vào sau WHERE. Để rỗng nếu không cần.
-    extra_where: str = ""
+    query: str
+    driver: str = "postgresql"  # postgresql | mysql
+    # Tham số tĩnh, tham chiếu bằng :ten. Orchestrator override được
+    # (jdbc.params.limit) để thử nhanh mà không sửa câu SQL.
+    params: Dict[str, Any] = field(default_factory=dict)
+    # Số dòng mỗi lô ghi xuống S3 / mỗi lần fetch của cursor
+    fetch_size: int = 5_000
+    # > 0: chia khúc theo keyset. Câu SQL phải có `LIMIT :chunk_size` và lọc
+    # `> :watermark`; framework chạy lại câu đó với mốc mới cho tới khi một
+    # khúc trả ít hơn chunk_size dòng. Mỗi khúc là một truy vấn ngắn: không giữ
+    # cursor/transaction hàng giờ (MySQL net_write_timeout, Postgres snapshot).
+    # Cột mốc phải DUY NHẤT và tăng dần (watermark_type: int).
+    chunk_size: int = 0
+    # Câu lệnh chạy sau khi kết nối, trước truy vấn (SET statement_timeout...)
+    init_sql: List[str] = field(default_factory=list)
+    # Mở phiên READ ONLY. SQL do entry tự viết -> đây là hàng rào ở phía DB.
+    read_only: bool = True
 
 
 @dataclass
@@ -135,7 +172,48 @@ class S3FileSource:
     prefix: str
     file_format: str = "json"  # json | ndjson | csv
     csv_delimiter: str = ","
-    compression: str = "none"  # none | gzip
+    compression: str = "none"  # none | gzip (đuôi .gz luôn được giải nén)
+    encoding: str = "utf-8-sig"  # -sig: bỏ BOM của file xuất từ Excel
+    # CSV nhiều đoạn: dòng có ô đầu trùng tên cột đầu là header mới (CNB)
+    csv_repeated_header: bool = False
+    # Số bản ghi mỗi lô. File được đọc THEO LUỒNG, không nạp cả file vào RAM.
+    batch_size: int = 10_000
+    max_files_per_run: int = 500
+
+
+@dataclass
+class HttpFileSource:
+    """File tải qua HTTP(S): bulk export, file công bố định kỳ.
+
+    Danh sách file lấy theo một trong hai cách:
+
+      urls:         {khoa: url} tĩnh — CDC5 tải lại toàn bộ (OpenSanctions targets)
+      index_url:    tài liệu JSON liệt kê file. `index_follow` là chuỗi trường
+                    chứa URL của tài liệu kế tiếp (index.json -> delta_url ->
+                    delta.json); `files_path` chỉ tới {khoa: url} hoặc [url].
+
+    CDC1: mốc là KHOÁ của file cuối đã nạp (phiên bản OpenSanctions
+    `20261010194704-euu` sắp xếp được theo thứ tự từ điển); chỉ tải file có
+    khoá lớn hơn. `cdc.watermark_column: _file_key`.
+    """
+
+    urls: Dict[str, str] = field(default_factory=dict)
+    index_url: str = ""
+    index_follow: List[str] = field(default_factory=list)
+    files_path: str = ""
+    file_format: str = "csv"  # csv | ndjson | json
+    csv_delimiter: str = ","
+    compression: str = "auto"  # auto (theo đuôi .gz) | none | gzip
+    encoding: str = "utf-8-sig"
+    csv_repeated_header: bool = False
+    headers: Dict[str, str] = field(default_factory=dict)
+    timeout_seconds: int = 120
+    batch_size: int = 10_000
+    max_files_per_run: int = 50
+    # Nguồn chỉ giữ N phiên bản gần nhất (OpenSanctions: 100 delta). Mốc cũ hơn
+    # phiên bản cũ nhất còn lại nghĩa là đã MẤT delta ở giữa -> báo lỗi thay vì
+    # nạp tiếp và để silver thiếu thay đổi mà không ai biết.
+    require_contiguous: bool = False
 
 
 @dataclass
@@ -168,7 +246,10 @@ class TargetConfig:
     # NDJSON nén gzip: không cần pyarrow, giữ nguyên hình dạng dữ liệu nguồn,
     # và job bronze_ingest đã đọc JSON sẵn. Tầng raw không nên áp schema.
     file_format: str = "ndjson.gz"
+    # Writer gom bản ghi QUA CÁC LÔ rồi mới cắt file, theo ngưỡng nào chạm trước.
+    # Tránh "small files": JDBC đọc lô 5.000 dòng không còn sinh 200 file nhỏ.
     max_records_per_file: int = 50_000
+    max_file_mb: int = 64  # dung lượng NÉN mỗi file
 
 
 @dataclass
@@ -183,13 +264,20 @@ class ScheduleConfig:
 # tham số từng lần chạy (--JOB_NAME, --CONFIG_SNAPSHOT, --ETL_RELEASE) quyết định
 # chạy entry nào bằng bản code nào.
 #
-#   src-shell  Python Shell, có internet: api, s3file, jdbc tới DB công khai.
+#   src-shell  Python Shell, có internet: api, httpfile, s3file, jdbc tới DB công khai.
 #              Thư viện sẵn: PyMySQL.
+#   src-vpc    Python Shell gắn Glue Connection vào VPC: tới được máy "hệ thống
+#              nguồn" (Postgres corebank/lending, Redpanda) trong private subnet.
+#              Thư viện: psycopg2-binary, confluent-kafka, PyMySQL.
+#              CHƯA có ở repo hạ tầng -> mọi entry dùng src-vpc đang enabled: false
+#              (đề xuất: docs/sourcing/README.md mục "Hạ tầng còn thiếu").
 #
-# Thêm profile (vd src-vpc cho RDS private, src-kafka) = việc của repo hạ tầng
-# TRƯỚC, rồi mới thêm tên vào đây. Tên lạ bị chặn lúc nạp entry thay vì lúc
-# Lambda gọi một Glue job không tồn tại.
-PROFILES = ("src-shell",)
+# Thêm profile = việc của repo hạ tầng TRƯỚC (var.profiles). Tên lạ bị chặn lúc
+# nạp entry thay vì lúc Lambda gọi một Glue job không tồn tại.
+PROFILES = ("src-shell", "src-vpc")
+# Profile khai ở đây nhưng repo hạ tầng chưa tạo: entry đang BẬT mà dùng chúng bị
+# chặn trong pytest. Xoá tên khỏi tuple này sau khi apply xong ở repo hạ tầng.
+PENDING_PROFILES = ("src-vpc",)
 DEFAULT_PROFILE = "src-shell"
 
 # Glue sourcing chỉ được đọc secret dưới tiền tố này (IAM ở repo hạ tầng:
@@ -227,6 +315,7 @@ class SourceConfig:
     jdbc: Optional[JdbcSource] = None
     kafka: Optional[KafkaSource] = None
     s3file: Optional[S3FileSource] = None
+    httpfile: Optional[HttpFileSource] = None
 
     @property
     def dataset(self) -> str:
@@ -264,8 +353,11 @@ def _build_source_block(raw: Dict[str, Any], stype: SourceType, name: str):
         SourceType.JDBC: JdbcSource,
         SourceType.KAFKA: KafkaSource,
         SourceType.S3FILE: S3FileSource,
+        SourceType.HTTPFILE: HttpFileSource,
     }[stype]
     try:
+        if stype is SourceType.API and block.get("date_window"):
+            block = {**block, "date_window": DateWindow(**block["date_window"])}
         return klass(**block)
     except TypeError as e:
         raise ConfigError(f"[{name}] khoi '{stype.value}' sai: {e}") from None
@@ -362,6 +454,64 @@ def from_dict(raw: Dict[str, Any], default_name: str = "") -> SourceConfig:
     return cfg
 
 
+FILE_FORMATS = ("csv", "ndjson", "json")
+
+
+def _validate_jdbc(cfg: SourceConfig) -> None:
+    """Kiểm tra câu SQL của entry ngay lúc nạp (pytest/CI), không đợi tới Glue.
+
+    Ràng buộc giữa câu SQL và chế độ CDC là chỗ dễ sai im lặng nhất:
+      - CDC1 không lọc `:watermark` -> mỗi lần chạy kéo lại toàn bộ, raw phình ra.
+      - CDC5 có `:watermark` -> lọc theo một mốc mà CDC5 không bao giờ lưu.
+    """
+    from .sqltemplate import BUILTIN_PARAMS, check_select, referenced_params
+
+    n, j = cfg.name, cfg.jdbc
+    ok, why = check_select(j.query or "")
+    if not ok:
+        raise ConfigError(f"[{n}] jdbc.query: {why}")
+    if j.driver not in ("postgresql", "mysql"):
+        raise ConfigError(f"[{n}] jdbc.driver = {j.driver!r} khong ho tro (postgresql | mysql).")
+
+    clash = set(j.params) & set(BUILTIN_PARAMS)
+    if clash:
+        raise ConfigError(f"[{n}] jdbc.params khong duoc dat ten trung tham so co san: {sorted(clash)}")
+    used = referenced_params(j.query)
+    unknown = used - set(BUILTIN_PARAMS) - set(j.params)
+    if unknown:
+        raise ConfigError(
+            f"[{n}] jdbc.query dung tham so chua khai: {sorted(':' + u for u in unknown)}. "
+            f"Them vao jdbc.params, hoac dung :watermark / :chunk_size / :run_ts."
+        )
+
+    if cfg.cdc.mode is CdcMode.CDC1:
+        if "watermark" not in used:
+            raise ConfigError(
+                f"[{n}] cdc1 nhung jdbc.query khong loc theo :watermark — moi lan chay se "
+                f"keo lai toan bo. Them `WHERE {cfg.cdc.watermark_column} > :watermark`."
+            )
+        if cfg.cdc.initial_watermark is None:
+            raise ConfigError(
+                f"[{n}] cdc1 + jdbc can cdc.initial_watermark (gia tri :watermark cho lan "
+                f"chay dau, vd '0' hoac '1970-01-01T00:00:00+00:00')."
+            )
+    elif "watermark" in used:
+        raise ConfigError(f"[{n}] cdc5 khong co moc: bo :watermark khoi jdbc.query.")
+
+    if j.chunk_size > 0:
+        if cfg.cdc.mode is not CdcMode.CDC1 or cfg.cdc.watermark_type != "int":
+            raise ConfigError(
+                f"[{n}] jdbc.chunk_size can cdc1 + watermark_type int: chia khuc theo keyset "
+                f"chi dung khi cot moc DUY NHAT va tang dan (timestamp trung nhau se mat dong)."
+            )
+        if "chunk_size" not in used:
+            raise ConfigError(f"[{n}] jdbc.chunk_size > 0 nhung query thieu `LIMIT :chunk_size`.")
+    elif "chunk_size" in used:
+        raise ConfigError(f"[{n}] query dung :chunk_size nhung jdbc.chunk_size = 0.")
+    if j.fetch_size < 1:
+        raise ConfigError(f"[{n}] jdbc.fetch_size phai >= 1.")
+
+
 def _validate(cfg: SourceConfig) -> None:
     n = cfg.name
 
@@ -381,16 +531,39 @@ def _validate(cfg: SourceConfig) -> None:
                 f"Bo khoa nay, hoac doi sang cdc1."
             )
 
-    if cfg.source_type is SourceType.JDBC and cfg.runtime.engine is Engine.PYTHON_SHELL:
-        if cfg.jdbc and cfg.jdbc.num_partitions > 1:
+    if cfg.jdbc is not None:
+        _validate_jdbc(cfg)
+    if cfg.api is not None and cfg.api.date_window is not None:
+        if cfg.cdc.mode is not CdcMode.CDC1:
+            raise ConfigError(f"[{n}] api.date_window chi dung voi cdc1 (moc la ngay da goi).")
+        if cfg.api.date_window.step_days < 1 or cfg.api.date_window.max_windows < 1:
+            raise ConfigError(f"[{n}] api.date_window: step_days va max_windows phai >= 1.")
+        if not cfg.cdc.initial_watermark:
             raise ConfigError(
-                f"[{n}] jdbc.num_partitions > 1 chi co tac dung voi engine=spark."
+                f"[{n}] api.date_window can cdc.initial_watermark (ngay bat dau, YYYY-MM-DD)."
             )
+    for block in (cfg.s3file, cfg.httpfile):
+        if block is not None and block.file_format not in FILE_FORMATS:
+            raise ConfigError(
+                f"[{n}] file_format = {block.file_format!r} khong ho tro. "
+                f"Cho phep: {', '.join(FILE_FORMATS)}"
+            )
+    if cfg.httpfile is not None:
+        h = cfg.httpfile
+        if bool(h.urls) == bool(h.index_url):
+            raise ConfigError(f"[{n}] httpfile: khai MOT trong hai: urls hoac index_url.")
+        if h.index_url and not h.files_path:
+            raise ConfigError(f"[{n}] httpfile.index_url can files_path (duong toi danh sach file).")
 
     if cfg.runtime.profile not in PROFILES:
         raise ConfigError(
             f"[{n}] runtime.profile = {cfg.runtime.profile!r} khong co. "
             f"Profile hien co: {', '.join(PROFILES)} (them profile o repo ha tang truoc)."
+        )
+    if cfg.enabled and cfg.runtime.profile in PENDING_PROFILES:
+        raise ConfigError(
+            f"[{n}] profile {cfg.runtime.profile!r} chua duoc repo ha tang tao: de "
+            f"enabled: false cho toi khi apply xong (roi xoa ten khoi PENDING_PROFILES)."
         )
 
     secret = (cfg.api and cfg.api.secret_name) or (cfg.jdbc and cfg.jdbc.secret_name)

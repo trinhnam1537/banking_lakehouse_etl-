@@ -93,6 +93,10 @@ def main(argv=None) -> int:
 
     args, unknown = p.parse_known_args(argv)
     _promote_to_env(unknown)
+    # --RAW_BUCKET la tham so DA BIET nen _promote_to_env bo qua no; entry s3file
+    # tham chieu "${RAW_BUCKET}" (inbox nam cung bucket) thi phai co bien moi truong.
+    if args.raw_bucket:
+        os.environ.setdefault("RAW_BUCKET", args.raw_bucket)
     dry_run = args.dry_run or str(args.dry_run_flag).lower() == "true"
 
     if args.config:

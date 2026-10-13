@@ -1,0 +1,33 @@
+# Moi dong = mot giao dich thuoc mot vu (attempt_id, typology, txn_id).
+# Ground truth cho tang do thi/ontology. Tai lieu: docs/sourcing/ibm-aml.md
+
+name: aml_patterns
+source_type: s3file
+description: "IBM AML: cac vu rua tien theo kieu (FAN-OUT, CYCLE...) — ground truth do thi"
+owner: namth
+enabled: true
+
+s3file:
+  bucket: "${RAW_BUCKET}"
+  prefix: landing/_inbox/aml/patterns/
+  file_format: ndjson
+  compression: gzip
+  batch_size: 20000
+
+cdc:
+  mode: cdc1
+  # Moc = KHOA S3 cua file cuoi da nap; prefix dt=YYYY-MM-DD giu thu tu tu dien
+  watermark_column: _s3_key
+  watermark_type: string
+
+target:
+  dataset: aml/patterns
+
+schedule:
+  # Bat sau khi chay tay thanh cong it nhat mot lan.
+  enabled: false
+  expression: "cron(0 1 * * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 30

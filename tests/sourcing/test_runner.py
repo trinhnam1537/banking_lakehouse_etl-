@@ -96,7 +96,8 @@ def test_cdc1_thanh_cong_ghi_s3_va_tien_moc(use_reader, raw_bucket, joblog_table
 
     assert res.ok and res.status == "SUCCESS"
     assert (res.stats.records_read, res.stats.records_written, res.stats.batches) == (5, 5, 2)
-    assert res.stats.files_written == 2 and len(_s3_keys(raw_bucket)) == 2
+    # Hai lo gom vao MOT file (writer co bo dem)
+    assert res.stats.files_written == 1 and len(_s3_keys(raw_bucket)) == 1
     assert res.watermarks == {"default": "t2"}
 
     # Manifest: trigger cua silver, liet ke DUNG cac file cua lan chay nay
@@ -188,13 +189,13 @@ def test_that_bai_khong_tien_moc_phan_doc_do(use_reader, raw_bucket, joblog_tabl
         _run(make_cfg(cdc=CDC1), raw_bucket, joblog_table)
 
     log = JobLogStore(joblog_table)
-    # Lo t1 DA nam tren S3 nhung moc van o t0: at-least-once, lan sau doc lai.
+    # Lo t1 chua tung duoc flush (con trong bo dem) va moc van o t0: lan sau doc lai.
     assert log.read_checkpoint("t_job").get() == "t0"
-    assert len(_s3_keys(raw_bucket)) == 1
+    assert len(_s3_keys(raw_bucket)) == 0
     (run,) = log.recent_runs("t_job")
     assert run["status"] == "FAILED"
     assert "Boom: nguon chet giua chung" in run["err"]
-    assert run["records_written"] == 2
+    assert run["records_written"] == 0
     assert run["watermarks"] == {"default": "t0"}
 
 
@@ -240,4 +241,41 @@ def test_that_bai_khong_ghi_manifest(use_reader, raw_bucket, joblog_table):
     use_reader([_batch(2), _batch(2)], fail_after=1)
     with pytest.raises(Exception):
         _run(make_cfg(), raw_bucket, joblog_table)
-    assert _manifests(raw_bucket) == [] and len(_s3_keys(raw_bucket)) == 1
+    assert _manifests(raw_bucket) == [] and len(_s3_keys(raw_bucket)) == 0
+
+
+# ---------- bộ đệm writer và bất biến "ghi trước, tiến mốc sau" ----------
+
+
+def test_partial_flush_truoc_khi_tien_moc(use_reader, raw_bucket, joblog_table, monkeypatch):
+    """Mốc PARTIAL chỉ được ghi khi mọi bản ghi tới mốc đó đã nằm trên S3."""
+    monkeypatch.setattr(runner_mod, "PARTIAL_EVERY_N_BATCHES", 2)
+    seen = []
+    real = JobLogStore.advance_checkpoint
+
+    def spy(self, job, run_id, wm, status):
+        seen.append((dict(wm), len(_s3_keys(raw_bucket))))
+        return real(self, job, run_id, wm, status)
+
+    monkeypatch.setattr(JobLogStore, "advance_checkpoint", spy)
+    use_reader([_batch(1, "t1"), _batch(1, "t2"), _batch(1, "t3")])
+    _run(make_cfg(cdc=CDC1), raw_bucket, joblog_table)
+    # PARTIAL t2: da co 1 file tren S3 (2 lo dau); SUCCESS t3: 2 file
+    assert seen == [({"default": "t2"}, 1), ({"default": "t3"}, 2)]
+
+
+def test_cdc5_xoa_anh_cu_sau_manifest(use_reader, raw_bucket, joblog_table):
+    use_reader([_batch(2)])
+    SourceRunner(make_cfg(), raw_bucket, joblog_table, run_id="a").run()
+    use_reader([_batch(3)])
+    SourceRunner(make_cfg(), raw_bucket, joblog_table, run_id="b").run()
+    keys = _s3_keys(raw_bucket)
+    assert len(keys) == 1 and "part-b-" in keys[0]
+
+
+def test_manifest_ghi_cot_reader_quan_sat(use_reader, raw_bucket, joblog_table):
+    reader = use_reader([_batch(1)])
+    reader.observed_columns = ["i"]
+    _run(make_cfg(), raw_bucket, joblog_table)
+    (m,) = _manifests(raw_bucket)
+    assert m["columns"] == ["i"]

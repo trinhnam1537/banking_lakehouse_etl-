@@ -37,6 +37,15 @@ class Batch:
         return len(self.records)
 
 
+def _as_utc(value: str) -> Optional[dt.datetime]:
+    """Chuỗi ISO 8601 -> datetime UTC; không múi giờ thì coi là UTC. Lỗi -> None."""
+    try:
+        ts = dt.datetime.fromisoformat(value.replace("Z", "+00:00").replace(" ", "T", 1))
+    except ValueError:
+        return None
+    return ts.replace(tzinfo=dt.timezone.utc) if ts.tzinfo is None else ts
+
+
 class Reader(ABC):
     """Lớp cha của mọi reader.
 
@@ -117,6 +126,13 @@ class Reader(ABC):
             return sv
         if self.cfg.cdc.watermark_type == "int":
             return sv if int(sv) > int(current) else current
+        if self.cfg.cdc.watermark_type == "timestamp":
+            # So theo THỜI ĐIỂM, không so chuỗi: driver trả datetime không múi giờ
+            # ("2026-09-02T03:00:00") còn mốc khởi tạo có "+00:00"; so chuỗi giữa
+            # hai định dạng, hoặc giữa hai múi giờ, cho kết quả sai.
+            a, b = _as_utc(sv), _as_utc(current)
+            if a is not None and b is not None:
+                return sv if a > b else current
         return sv if sv > current else current
 
     def stamp(self, rec: Dict[str, Any]) -> Dict[str, Any]:

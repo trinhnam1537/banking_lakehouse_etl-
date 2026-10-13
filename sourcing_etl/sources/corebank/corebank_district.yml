@@ -1,0 +1,37 @@
+# Core banking gia lap: Postgres corebank (Berka doi +24 nam + simulator tu 2023-01-01).
+# Phan tich nguon, schema, credential: docs/sourcing/corebank.md
+# Dung profile src-vpc (Glue trong VPC, toi duoc may "he thong nguon") -> enabled: false
+# cho toi khi repo ha tang tao profile do. Chay tren may: python -m local.run_entry corebank_district
+# Bang tham chieu 77 dong, hau nhu khong doi -> CDC5 re hon va khong bao gio sot.
+
+name: corebank_district
+source_type: jdbc
+description: Danh muc quan/huyen (77 dong) — CDC5
+owner: namth
+enabled: false
+
+jdbc:
+  # {host, port, username, password, dbname} — user etl_reader CHI DOC
+  secret_name: fingraph/src/corebank_pg
+  driver: postgresql
+  query: |
+    SELECT district_id, district_name, region, inhabitants, munic_lt_500, munic_500_1999,
+           munic_2000_9999, munic_ge_10000, cities, urban_ratio, avg_salary,
+           unemployment_95, unemployment_96, entrepreneurs_per_1000, crimes_95, crimes_96,
+           updated_at
+    FROM core.district
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: corebank/district
+
+schedule:
+  # 01:00 gio VN. Bat sau khi profile src-vpc ton tai va chay tay OK.
+  enabled: false
+  expression: "cron(0 18 * * ? *)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 20

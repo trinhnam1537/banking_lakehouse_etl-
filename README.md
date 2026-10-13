@@ -13,8 +13,10 @@ Repo này chỉ đổ **code** và **cấu hình** vào nền tảng đó.
 | `orchestrator/` | Lambda trigger (một cửa vào theo `job_id`), Lambda schedule-sync, event mẫu |
 | `deploy/` | `glue_bootstrap.py` (script mọi Glue job chạy), `build.py`, `config_sync.py`, `deploy.py` |
 | `jobs/glue/` | Script PySpark: bronze_ingest, onto_closure (CI upload lên `_ops/glue-scripts/`) |
+| `simulators/` | Hệ thống nguồn giả lập: seed + simulator cho core banking, cho vay, IBM AML, PaySim, thẻ (không deploy) |
+| `local/` | Stack local (Postgres, Redpanda, moto), `bootstrap`, `run_entry` chạy một entry bằng framework thật |
 | `tests/` | pytest + moto, không chạm AWS |
-| `docs/` | Kiến trúc sourcing/silver, phân tích nguồn (`docs/sources/`) |
+| `docs/` | Kiến trúc sourcing/silver, tài liệu từng nguồn (`docs/sourcing/`) |
 
 ## Chạy thế nào trên AWS
 

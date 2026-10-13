@@ -1,0 +1,5 @@
+# Thu vien cho simulator va stack local (KHONG dong goi vao etl.zip, KHONG can cho pytest)
+psycopg2-binary==2.9.9
+PyMySQL==1.1.1
+confluent-kafka==2.5.3
+Faker>=30.0

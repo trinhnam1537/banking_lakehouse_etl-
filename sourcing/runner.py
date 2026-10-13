@@ -25,6 +25,7 @@ vụ — rẻ và dễ kiểm chứng hơn nhiều so với giao dịch hai pha 
 
 from __future__ import annotations
 
+import os
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -87,8 +88,8 @@ class SourceRunner:
         """Hình dạng dòng raw, để silver biết cách bóc mà không phải đoán."""
         if self.cfg.api is not None:
             return self.cfg.api.raw_mode
-        return {"kafka": "kafka_message", "jdbc": "records",
-                "s3file": "records"}.get(self.cfg.source_type.value, "records")
+        return {"kafka": "kafka_message", "jdbc": "records", "s3file": "records",
+                "httpfile": "records"}.get(self.cfg.source_type.value, "records")
 
     def run(self) -> RunResult:
         stats = RunStats()
@@ -110,6 +111,7 @@ class SourceRunner:
                       f"(tu {checkpoint.source_status or 'khong co'} "
                       f"luc {checkpoint.updated_at or '-'})")
 
+            observed_columns = None
             with build_reader(self.cfg, checkpoint=checkpoint) as reader:
                 for batch in reader.read(checkpoint):
                     stats.records_read += len(batch)
@@ -128,14 +130,19 @@ class SourceRunner:
                         pending[batch.partition] = batch.watermark
 
                     # Ảnh chụp định kỳ. Đây là thứ giữ cho job backlog lớn
-                    # không lặp vô hạn ở cùng một chỗ.
+                    # không lặp vô hạn ở cùng một chỗ. flush() TRƯỚC: bản ghi
+                    # còn trong bộ đệm writer chưa nằm trên S3, tiến mốc lúc đó
+                    # là vi phạm "ghi trước, tiến mốc sau".
                     if pending and stats.batches % PARTIAL_EVERY_N_BATCHES == 0:
+                        writer.flush()
                         self.log.advance_checkpoint(
                             self.cfg.name, self.run_id, pending, "PARTIAL"
                         )
                         print(f"[{self.cfg.name}] PARTIAL sau {stats.batches} lo: {pending}")
                         pending = {}
+                observed_columns = getattr(reader, "observed_columns", None)
 
+            writer.flush()
             stats.records_written = writer.result.records
             stats.bytes_written = writer.result.bytes_out
             stats.files_written = writer.result.files
@@ -153,9 +160,18 @@ class SourceRunner:
             # khu trung lap theo ds_key.
             mkey = None
             if not self.dry_run:
-                mkey = writer.write_manifest(status, {"raw_mode": self._raw_mode()})
+                extra = {"raw_mode": self._raw_mode(), "etl_release": os.environ.get("ETL_RELEASE", "")}
+                if observed_columns:
+                    # Schema drift: silver so cot giua hai manifest ma khong doc file
+                    extra["columns"] = list(observed_columns)
+                mkey = writer.write_manifest(status, extra)
                 if mkey:
                     print(f"[{self.cfg.name}] manifest s3://{self.raw_bucket}/{mkey}")
+                    if self.cfg.cdc.mode is CdcMode.CDC5:
+                        # Anh chup moi da du (manifest la bang chung) -> moi xoa cai cu
+                        n_old = writer.cleanup_superseded()
+                        if n_old:
+                            print(f"[{self.cfg.name}] CDC5: xoa {n_old} file cua lan chay truoc trong ngay")
 
             # Bao cho orchestrator (neu lan chay do no kich). Loi o day KHONG
             # lam hong lan chay: du lieu + moc + manifest da xong, cai mat di

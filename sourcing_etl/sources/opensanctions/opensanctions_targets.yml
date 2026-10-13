@@ -1,0 +1,33 @@
+# OpenSanctions — danh sach cam van (bo `sanctions`: ~72 nghin doi tuong, ~300 nghin entity).
+# Giay phep CC BY-NC 4.0: dung cho do an phi thuong mai, ghi nguon. Bo `default` (co PEP)
+# nang 2,6 GB -> khong dung tren Glue Python Shell. Tai lieu: docs/sourcing/opensanctions.md
+#
+# Ban PHANG mot dong mot doi tuong (targets.simple.csv, ~74 MB): du cho sang loc ten.
+# CDC5 hang tuan: anh chup day du, doc theo luong (khong nap 74 MB vao RAM).
+
+name: opensanctions_targets
+source_type: httpfile
+description: OpenSanctions sanctions — doi tuong bi cam van, ban phang CSV (CDC5)
+owner: namth
+enabled: true
+
+httpfile:
+  urls:
+    sanctions: https://data.opensanctions.org/datasets/latest/sanctions/targets.simple.csv
+  file_format: csv
+  batch_size: 20000
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: opensanctions/targets
+
+schedule:
+  # Bat sau khi chay tay thanh cong it nhat mot lan.
+  enabled: false
+  expression: "cron(0 20 ? * SUN *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 30

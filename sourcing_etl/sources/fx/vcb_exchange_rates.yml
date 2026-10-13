@@ -1,0 +1,46 @@
+# Ty gia Vietcombank (VND) — endpoint JSON co LICH SU theo ngay (tu ~06/2020):
+#   https://www.vietcombank.com.vn/api/exchangerates?date=YYYY-MM-DD
+#   -> {Count, Date, UpdatedDate, Data: [{currencyCode, currencyName, cash, transfer, sell}]}
+# Khong dung endpoint XML pXML.aspx: chi co ty gia HIEN TAI, ghi ro "1 request moi 5 phut".
+# 20 ngoai te, KHONG co CZK/MXN/BRL/ILS/BTC. Gia tri la CHUOI, co "-" khi khong niem yet.
+# Day la endpoint cua website, khong phai API chinh thuc: co the doi hoac chan IP AWS bat ky luc nao.
+# Tai lieu: docs/sourcing/fx-rates.md
+
+name: vcb_exchange_rates
+source_type: api
+description: Ty gia VCB theo ngay (cash/transfer/sell, VND) — CDC1 theo cua so ngay
+owner: namth
+enabled: true
+
+api:
+  base_url: https://www.vietcombank.com.vn/api/exchangerates
+  records_path: Data
+  raw_mode: response
+  headers:
+    User-Agent: "Mozilla/5.0 (FinGraph research; HUST)"
+  rate_limit_per_sec: 0.5
+  date_window:
+    param: date
+    format: "%Y-%m-%d"
+    # Chi keo ngay da CHOT: ty gia trong ngay con doi nhieu lan
+    end_offset_days: 1
+    utc_offset_hours: 7
+    max_windows: 400        # backfill 2020-06 -> nay ~2.300 ngay = 6 lan chay
+
+cdc:
+  mode: cdc1
+  watermark_column: _window   # moc = ngay da goi xong, khong lay tu ban ghi
+  watermark_type: string
+  initial_watermark: "2020-06-01"
+
+target:
+  dataset: fx/vcb_rates
+
+schedule:
+  # 09:00 gio VN: keo ty gia ngay hom qua.
+  enabled: false
+  expression: "cron(0 2 * * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 30

@@ -6,7 +6,9 @@ và lấy khoá bí mật ra khỏi file cấu hình.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
+import random
 import time
 import urllib.error
 import urllib.parse
@@ -27,6 +29,27 @@ DEFAULT_UA = "HUST FinGraph Research (contact via repo)"
 SINCE = "{since}"
 
 RAW_MODES = ("response", "records")
+
+# Tran thoi gian cho theo Retry-After: header cua nguon co the doi hang gio,
+# Glue job khong nen ngoi cho het timeout.
+MAX_RETRY_AFTER = 60.0
+
+
+def _retry_after(err: urllib.error.HTTPError, backoff: float) -> float:
+    """Thời gian chờ trước lần thử lại.
+
+    Tôn trọng `Retry-After` (giây) khi nguồn gửi — đó là con số nguồn muốn,
+    đoán bằng backoff thì hoặc thử quá sớm (lại 429) hoặc chờ thừa. Không có
+    header thì backoff cấp số nhân + jitter, để nhiều job cùng bị chặn không
+    thử lại đúng cùng một khoảnh khắc (thundering herd).
+    """
+    header = err.headers.get("Retry-After") if err.headers else None
+    if header:
+        try:
+            return min(float(header), MAX_RETRY_AFTER)
+        except ValueError:
+            pass  # dang ngay HTTP: bo qua, dung backoff
+    return backoff + random.uniform(0, backoff / 4)
 
 
 class ApiReader(Reader):
@@ -127,7 +150,7 @@ class ApiReader(Reader):
                 if e.code == 429 or e.code >= 500:
                     if attempt == 4:
                         raise
-                    time.sleep(delay)
+                    time.sleep(_retry_after(e, delay))
                     delay *= 2
                     continue
                 body = e.read()[:300].decode("utf-8", "replace")
@@ -189,7 +212,45 @@ class ApiReader(Reader):
 
     # ---------- vòng lặp chính ----------
 
+    def _read_windows(self, checkpoint: Optional[Checkpoint]) -> Iterator[Batch]:
+        """Một request cho mỗi ngày, từ ngày sau mốc tới (hôm nay - end_offset_days).
+
+        Cùng ý tưởng với DatetimeBasedCursor của Airbyte low-code: mốc là cửa sổ
+        đã gọi xong, không phụ thuộc nội dung response. Ngày nguồn trả rỗng (cuối
+        tuần, nghỉ lễ) vẫn tiến mốc — gọi lại cũng chỉ nhận rỗng.
+        """
+        w = self.api.date_window
+        saved = checkpoint.get() if checkpoint is not None else None
+        if saved:
+            start = dt.date.fromisoformat(saved[:10]) + dt.timedelta(days=w.step_days)
+        else:
+            start = dt.date.fromisoformat(str(self.cfg.cdc.initial_watermark)[:10])
+        now_src = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=w.utc_offset_hours)
+        end = now_src.date() - dt.timedelta(days=w.end_offset_days)
+
+        day, n = start, 0
+        while day <= end and n < w.max_windows:
+            q = {w.param: day.strftime(w.format)}
+            payload = self._fetch(q)
+            n += 1
+            records = self._extract(payload)
+            if self.api.raw_mode == "response":
+                out = [self._raw_response(payload, q, 1)]
+            else:
+                out = [self.stamp(r) for r in records]
+            yield Batch(records=out, watermark=day.isoformat(),
+                        meta={"page": n, "records": len(records), "window": day.isoformat()})
+            day += dt.timedelta(days=w.step_days)
+
+        if day <= end:
+            print(f"[{self.cfg.name}] cham tran max_windows={w.max_windows}, dung o {day}; "
+                  f"lan chay sau tiep tuc tu checkpoint.")
+
     def read(self, checkpoint: Optional[Checkpoint]) -> Iterator[Batch]:
+        if self.api.date_window is not None:
+            yield from self._read_windows(checkpoint)
+            return
+
         since = self.effective_since(checkpoint)
         base_query: Dict[str, Any] = {}
 

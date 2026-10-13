@@ -1,6 +1,6 @@
 # Berka (PKDD'99): du lieu THAT da an danh cua mot ngan hang Sec, 1993-1998.
 # Nguon: MariaDB cong khai cua CTU, relational.fel.cvut.cz:3306, database `financial`
-# (BAN GOC, khong phai Financial_std). Phan tich nguon: docs/sources/berka.md.
+# (BAN GOC, khong phai Financial_std). Phan tich nguon: docs/sourcing/berka.md.
 #
 # Khach hang. Ban CTU da giai ma birth_number goc thanh gender (M/F) + birth_date.
 # birth_date 1911..1987. FK: district_id -> berka_district.
@@ -19,8 +19,11 @@ jdbc:
   # van de trong Secrets Manager de entry khong bao gio chua thong tin ket noi.
   secret_name: fingraph/src/berka_ctu
   driver: mysql
-  schema: financial
-  table: client
+  # Liet ke cot TUONG MINH (khong SELECT *): nguon them cot thi raw khong tu doi
+  # hinh dang; muon lay cot moi thi sua entry nay va review.
+  query: |
+    SELECT client_id, gender, birth_date, district_id
+    FROM financial.client
 
 cdc:
   mode: cdc5

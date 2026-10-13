@@ -1,0 +1,41 @@
+# He thong cho vay gia lap: Postgres lending theo Home Credit Default Risk (Kaggle).
+# Phan tich nguon, schema, credential: docs/sourcing/lending.md
+# Profile src-vpc -> enabled: false cho toi khi repo ha tang tao profile.
+# Chay tren may: python -m local.run_entry lending_previous_application
+
+name: lending_previous_application
+source_type: jdbc
+description: Ho so/hop dong vay truoc do — CDC1 theo updated_at
+owner: namth
+enabled: false
+
+jdbc:
+  secret_name: fingraph/src/lending_pg
+  driver: postgresql
+  query: |
+    SELECT sk_id_prev, sk_id_curr, name_contract_type, amt_annuity, amt_application, amt_credit,
+           amt_goods_price, name_contract_status, days_decision, name_payment_type,
+           code_reject_reason, name_client_type, cnt_payment, name_yield_group,
+           created_at, updated_at
+    FROM lending.previous_application
+    WHERE updated_at > :watermark
+    ORDER BY updated_at
+
+cdc:
+  mode: cdc1
+  watermark_column: updated_at
+  watermark_type: timestamp
+  lookback_seconds: 300
+  initial_watermark: "1970-01-01T00:00:00+00:00"
+
+target:
+  dataset: lending/previous_application
+
+schedule:
+  # 01:30 gio VN.
+  enabled: false
+  expression: "cron(30 18 * * ? *)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 20

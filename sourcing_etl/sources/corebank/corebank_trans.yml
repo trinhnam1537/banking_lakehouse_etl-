@@ -1,0 +1,43 @@
+# Core banking gia lap: Postgres corebank (Berka doi +24 nam + simulator tu 2023-01-01).
+# Phan tich nguon, schema, credential: docs/sourcing/corebank.md
+# Dung profile src-vpc (Glue trong VPC, toi duoc may "he thong nguon") -> enabled: false
+# cho toi khi repo ha tang tao profile do. Chay tren may: python -m local.run_entry corebank_trans
+# So giao dich CHI INSERT (sua sai bang but toan dao) -> trans_id tang dan la moc chat.
+# Chia khuc 50.000 dong: moi khuc mot truy van ngan, khong giu snapshot hang gio.
+
+name: corebank_trans
+source_type: jdbc
+description: So giao dich (chi INSERT) — CDC1 chia khuc theo trans_id
+owner: namth
+enabled: false
+
+jdbc:
+  # {host, port, username, password, dbname} — user etl_reader CHI DOC
+  secret_name: fingraph/src/corebank_pg
+  driver: postgresql
+  chunk_size: 50000
+  query: |
+    SELECT trans_id, account_id, trans_date, booked_at, trans_type, operation, amount, balance,
+           k_symbol, bank, counter_account, created_at
+    FROM core.trans
+    WHERE trans_id > :watermark
+    ORDER BY trans_id
+    LIMIT :chunk_size
+
+cdc:
+  mode: cdc1
+  watermark_column: trans_id
+  watermark_type: int
+  initial_watermark: "0"
+
+target:
+  dataset: corebank/trans
+
+schedule:
+  # 01:00 gio VN. Bat sau khi profile src-vpc ton tai va chay tay OK.
+  enabled: false
+  expression: "cron(0 18 * * ? *)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 60

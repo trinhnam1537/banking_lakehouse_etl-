@@ -1,0 +1,45 @@
+# He thong cho vay gia lap: Postgres lending theo Home Credit Default Risk (Kaggle).
+# Phan tich nguon, schema, credential: docs/sourcing/lending.md
+# Profile src-vpc -> enabled: false cho toi khi repo ha tang tao profile.
+# Chay tren may: python -m local.run_entry lending_application
+# days_employed = 365243 la MA 'khong di lam/huu' cua nguon, khong phai so ngay.
+# extra: cac cot it dung cua 122 cot goc (jsonb) — raw giu nguyen, silver chon.
+
+name: lending_application
+source_type: jdbc
+description: Ho so vay — CDC1 theo updated_at (status doi SUBMITTED -> APPROVED/REJECTED -> DISBURSED)
+owner: namth
+enabled: false
+
+jdbc:
+  secret_name: fingraph/src/lending_pg
+  driver: postgresql
+  query: |
+    SELECT sk_id_curr, customer_ref, application_date, status, name_contract_type, code_gender,
+           flag_own_car, flag_own_realty, cnt_children, amt_income_total, amt_credit,
+           amt_annuity, amt_goods_price, name_income_type, name_education_type,
+           name_family_status, name_housing_type, days_birth, days_employed,
+           occupation_type, organization_type, ext_source_1, ext_source_2, ext_source_3,
+           extra, created_at, updated_at
+    FROM lending.application
+    WHERE updated_at > :watermark
+    ORDER BY updated_at
+
+cdc:
+  mode: cdc1
+  watermark_column: updated_at
+  watermark_type: timestamp
+  lookback_seconds: 300
+  initial_watermark: "1970-01-01T00:00:00+00:00"
+
+target:
+  dataset: lending/application
+
+schedule:
+  # 01:30 gio VN.
+  enabled: false
+  expression: "cron(30 18 * * ? *)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 20

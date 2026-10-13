@@ -328,7 +328,16 @@ def test_fetch_retry_429_va_5xx_roi_thanh_cong(monkeypatch, no_sleep):
                         _fake_urlopen(sent, [_http_error(429), _http_error(503), {"ok": 1}]))
     assert ApiReader(make_cfg())._fetch({}) == {"ok": 1}
     assert len(sent) == 3
-    assert no_sleep == [1.0, 2.0]  # lui theo cap so nhan
+    # lui theo cap so nhan + jitter toi da 25%
+    assert 1.0 <= no_sleep[0] <= 1.25 and 2.0 <= no_sleep[1] <= 2.5
+
+
+def test_fetch_ton_trong_retry_after(monkeypatch, no_sleep):
+    err = urllib.error.HTTPError("https://api.test", 429, "x", {"Retry-After": "7"}, io.BytesIO(b""))
+    big = urllib.error.HTTPError("https://api.test", 503, "x", {"Retry-After": "3600"}, io.BytesIO(b""))
+    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen([], [err, big, {"ok": 1}]))
+    assert ApiReader(make_cfg())._fetch({}) == {"ok": 1}
+    assert no_sleep == [7.0, 60.0]  # theo header nguon, co tran
 
 
 def test_fetch_het_luot_retry_nem_loi(monkeypatch, no_sleep):

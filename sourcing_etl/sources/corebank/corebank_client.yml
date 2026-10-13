@@ -1,0 +1,44 @@
+# Core banking gia lap: Postgres corebank (Berka doi +24 nam + simulator tu 2023-01-01).
+# Phan tich nguon, schema, credential: docs/sourcing/corebank.md
+# Dung profile src-vpc (Glue trong VPC, toi duoc may "he thong nguon") -> enabled: false
+# cho toi khi repo ha tang tao profile do. Chay tren may: python -m local.run_entry corebank_client
+# PII: full_name, national_id, email, phone, address, birth_date -> silver phai che/phan quyen.
+# Xoa mem (status=CLOSED) nen CDC1 van thay ban ghi 'bi xoa'.
+
+name: corebank_client
+source_type: jdbc
+description: Khach hang (PII) — CDC1 theo updated_at
+owner: namth
+enabled: false
+
+jdbc:
+  # {host, port, username, password, dbname} — user etl_reader CHI DOC
+  secret_name: fingraph/src/corebank_pg
+  driver: postgresql
+  query: |
+    SELECT client_id, full_name, national_id, gender, birth_date, district_id, email, phone,
+           address, status, created_at, updated_at
+    FROM core.client
+    WHERE updated_at > :watermark
+    ORDER BY updated_at
+
+cdc:
+  mode: cdc1
+  watermark_column: updated_at
+  watermark_type: timestamp
+  # Keo chong 5 phut: transaction mo truoc mot transaction khac nhung COMMIT sau no
+  # se mang updated_at nho hon moc vua luu -> khong lookback la mat dong do.
+  lookback_seconds: 300
+  initial_watermark: "1970-01-01T00:00:00+00:00"
+
+target:
+  dataset: corebank/client
+
+schedule:
+  # 01:00 gio VN. Bat sau khi profile src-vpc ton tai va chay tay OK.
+  enabled: false
+  expression: "cron(0 18 * * ? *)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 20

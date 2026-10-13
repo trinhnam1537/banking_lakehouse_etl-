@@ -1,0 +1,41 @@
+# He thong cho vay gia lap: Postgres lending theo Home Credit Default Risk (Kaggle).
+# Phan tich nguon, schema, credential: docs/sourcing/lending.md
+# Profile src-vpc -> enabled: false cho toi khi repo ha tang tao profile.
+# Chay tren may: python -m local.run_entry lending_bureau
+
+name: lending_bureau
+source_type: jdbc
+description: Lich su tin dung o to chuc khac (~CIC) — CDC1 theo updated_at
+owner: namth
+enabled: false
+
+jdbc:
+  secret_name: fingraph/src/lending_pg
+  driver: postgresql
+  query: |
+    SELECT sk_id_bureau, sk_id_curr, credit_active, credit_currency, days_credit,
+           credit_day_overdue, days_credit_enddate, amt_credit_sum, amt_credit_sum_debt,
+           amt_credit_sum_overdue, credit_type, days_credit_update, amt_annuity,
+           created_at, updated_at
+    FROM lending.bureau
+    WHERE updated_at > :watermark
+    ORDER BY updated_at
+
+cdc:
+  mode: cdc1
+  watermark_column: updated_at
+  watermark_type: timestamp
+  lookback_seconds: 300
+  initial_watermark: "1970-01-01T00:00:00+00:00"
+
+target:
+  dataset: lending/bureau
+
+schedule:
+  # 01:30 gio VN.
+  enabled: false
+  expression: "cron(30 18 * * ? *)"
+
+runtime:
+  profile: src-vpc
+  timeout_minutes: 20

@@ -45,12 +45,44 @@ cạnh của đồ thị sở hữu `client —OWNER/DISPONENT→ account` cho t
 ### Vì sao `trans` dùng CDC1 dù nguồn tĩnh
 
 - Nguồn không đổi từ 1999, nên lần chạy đầu kéo hết, các lần sau ra `NO_DATA`.
-- Lý do thật sự là **khả năng chạy tiếp**: cứ 20 lô × 5.000 dòng thì ghi một ảnh chụp
-  PARTIAL. Nếu mạng Singapore–Praha đứt giữa chừng, lần sau chạy tiếp từ `trans_id` đã ghi,
-  không kéo lại cả triệu dòng.
+- Lý do thật sự là **khả năng chạy tiếp**: entry **chia khúc** 50.000 dòng
+  (`WHERE trans_id > :watermark ORDER BY trans_id LIMIT :chunk_size`). Mỗi khúc là một truy vấn
+  ngắn, mốc tiến theo từng khúc. Nếu mạng Singapore–Praha đứt giữa chừng, lần sau chạy tiếp từ
+  `trans_id` đã ghi, không kéo lại cả triệu dòng, cũng không giữ một cursor mở hàng chục phút
+  (MariaDB cắt kết nối sau `net_write_timeout`).
 - **Không dùng `date` làm mốc**: `trans_id` không tăng theo ngày (105.300 cặp ngược thứ tự),
   và nhiều giao dịch trùng ngày.
-- Đã thử reader thật trên server: 10.000 dòng mất ~4 giây, RAM đỉnh 8,4 MB (cursor đọc dần).
+- Đã thử trên server (13-10-2026): 3 khúc × 7.000 dòng mất 4,5 giây, phiên `READ ONLY`.
+
+## Entry: câu SQL khai trong YAML
+
+Từ 13-10-2026, entry JDBC khai **nguyên câu SQL** (`jdbc.query`) thay cho `schema`/`table`.
+Mọi bảng Berka liệt kê cột **tường minh**: nguồn thêm cột thì raw không tự đổi hình dạng.
+
+```yaml
+jdbc:
+  secret_name: fingraph/src/berka_ctu
+  driver: mysql
+  chunk_size: 50000
+  query: |
+    SELECT trans_id, account_id, `date`, `type`, operation, amount, balance,
+           k_symbol, bank, `account`
+    FROM financial.trans
+    WHERE trans_id > :watermark
+    ORDER BY trans_id
+    LIMIT :chunk_size
+cdc:
+  mode: cdc1
+  watermark_column: trans_id
+  watermark_type: int
+  initial_watermark: "0"
+```
+
+Bảng `order` là từ khoá SQL nên phải viết `` financial.`order` ``. Các cột `date`, `type`,
+`account` cũng được bọc backtick cho chắc.
+
+Bản Berka **có cột audit, dữ liệu mới mỗi ngày và PII giả lập** là nguồn
+[corebank.md](corebank.md), nạp từ chính server này.
 
 ## Từ điển mã (tiếng Séc → nghĩa)
 

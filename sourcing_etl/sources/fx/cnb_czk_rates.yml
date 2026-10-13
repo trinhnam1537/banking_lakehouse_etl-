@@ -1,0 +1,49 @@
+# Ty gia CZK cua Ngan hang Quoc gia Sec (CNB) — VCB KHONG niem yet CZK, ma Berka/core banking
+# tinh bang CZK. File nam: Date|1 AUD|1 USD|100 JPY|... (don vi trong ten cot!), ngay dd.mm.yyyy.
+# GIUA NAM CNB chen dong header MOI khi danh sach tien doi (1993: 3 header, 1995: 3...)
+# -> csv_repeated_header: true, neu khong cac dong sau lech cot ma khong bao loi.
+# 1993-1998: ty gia THAT cua thoi Berka; 2017-2026: truc thoi gian sau khi doi +24 nam.
+# Tai lieu: docs/sourcing/fx-rates.md
+
+name: cnb_czk_rates
+source_type: httpfile
+description: Ty gia CZK cua CNB theo nam (1993-1998, 2017-nay) — CDC5
+owner: namth
+enabled: true
+
+httpfile:
+  urls:
+    "1993": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=1993
+    "1994": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=1994
+    "1995": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=1995
+    "1996": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=1996
+    "1997": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=1997
+    "1998": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=1998
+    "2017": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2017
+    "2018": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2018
+    "2019": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2019
+    "2020": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2020
+    "2021": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2021
+    "2022": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2022
+    "2023": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2023
+    "2024": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2024
+    "2025": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2025
+    "2026": https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/year.txt?year=2026
+  file_format: csv
+  csv_delimiter: "|"
+  csv_repeated_header: true
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: fx/cnb_rates
+
+schedule:
+  # 22:00 gio VN, sau khi CNB cong bo (14:30 gio Praha).
+  enabled: false
+  expression: "cron(0 15 * * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 15

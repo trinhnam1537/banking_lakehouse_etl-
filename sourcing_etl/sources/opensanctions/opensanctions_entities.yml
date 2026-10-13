@@ -1,0 +1,36 @@
+# OpenSanctions — danh sach cam van (bo `sanctions`: ~72 nghin doi tuong, ~300 nghin entity).
+# Giay phep CC BY-NC 4.0: dung cho do an phi thuong mai, ghi nguon. Bo `default` (co PEP)
+# nang 2,6 GB -> khong dung tren Glue Python Shell. Tai lieu: docs/sourcing/opensanctions.md
+#
+# Ban DAY DU theo mo hinh FollowTheMoney (entities.ftm.json, NDJSON ~370 MB): Person, Company,
+# Sanction, Ownership, Directorship... — CANH quan he cho do thi. Thuoc tinh leiCode noi
+# sang GLEIF. CDC5 hang tuan, doc theo luong; writer cat file 64 MB.
+
+name: opensanctions_entities
+source_type: httpfile
+description: OpenSanctions sanctions — entity FollowTheMoney day du (NDJSON, CDC5)
+owner: namth
+enabled: true
+
+httpfile:
+  urls:
+    sanctions: https://data.opensanctions.org/datasets/latest/sanctions/entities.ftm.json
+  file_format: ndjson
+  batch_size: 10000
+  timeout_seconds: 300
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: opensanctions/entities
+  max_records_per_file: 100000
+
+schedule:
+  # Bat sau khi chay tay thanh cong it nhat mot lan.
+  enabled: false
+  expression: "cron(0 21 ? * SUN *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 60
