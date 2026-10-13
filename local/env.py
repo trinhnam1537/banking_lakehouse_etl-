@@ -12,6 +12,7 @@ LOCAL = {
     "AWS_DEFAULT_REGION": "ap-southeast-1",
     "RAW_BUCKET": "fingraph-local-lakehouse",
     "JOBLOG_TABLE": "fingraph-local-src-job-log",
+    "SLV_JOBLOG_TABLE": "fingraph-local-slv-job-log",
     "KAFKA_BOOTSTRAP": "localhost:19092",
 }
 

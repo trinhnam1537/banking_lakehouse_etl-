@@ -1,0 +1,49 @@
+# Silver core banking — tai lieu: docs/sourcing/corebank.md (muc 6. Silver)
+# Nguon: entry sourcing `corebank_district` -> landing/corebank/district/ (manifest -> Lambda trigger -> entry nay)
+#
+# 77 quan/huyen, sourcing CDC5 (anh chup day du) -> thay ca bang moi lan (simple overwrite_table).
+# Lo rong bi tu choi: nguon loi tra 0 dong khong duoc xoa sach bang tham chieu.
+
+name: corebank_district
+description: Danh muc quan/huyen va chi so kinh te - xa hoi (Berka district)
+owner: namth
+enabled: true
+
+source:
+  dataset: corebank/district
+
+target:
+  database: silver_corebank
+  table: district
+
+columns:
+  - {name: district_id, type: int, nullable: false}
+  - {name: district_name}
+  - {name: region}
+  - {name: inhabitants, type: int}
+  - {name: munic_lt_500, type: int, comment: "So xa < 500 dan"}
+  - {name: munic_500_1999, type: int}
+  - {name: munic_2000_9999, type: int}
+  - {name: munic_ge_10000, type: int}
+  - {name: cities, type: int}
+  - {name: urban_ratio, type: "decimal(5,1)", comment: "Ty le dan thanh thi (%)"}
+  - {name: avg_salary, type: int, comment: "Luong trung binh (CZK)"}
+  - {name: unemployment_95, type: "decimal(5,2)", comment: "Ty le that nghiep 1995 (%), co NULL"}
+  - {name: unemployment_96, type: "decimal(5,2)"}
+  - {name: entrepreneurs_per_1000, type: int}
+  - {name: crimes_95, type: int, comment: "So vu pham toi 1995, co NULL"}
+  - {name: crimes_96, type: int}
+  - {name: source_updated_at, path: updated_at, type: timestamp, hash: false}
+
+technical:
+  keys: [district_id]
+  partition_date: ingest_date
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [district_id, district_name, region]
+  min_rows: 70
+  duplicate_keys: fail

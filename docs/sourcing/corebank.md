@@ -13,7 +13,7 @@ và là người vay của hệ thống cho vay.
 | Quy mô (bản đủ) | 77 quận · 5.369 khách · 4.500 tài khoản · 892 thẻ · 682 khoản vay · 6.471 lệnh định kỳ · ~1,06 triệu giao dịch lịch sử, cộng ~60–70 nghìn giao dịch mỗi tháng simulator |
 | Entry | 8 entry `corebank_*` trong `sourcing_etl/sources/corebank/` |
 | Dataset raw | `landing/corebank/<bảng>/` |
-| Profile | `src-vpc`: **tắt** cho tới khi repo hạ tầng tạo profile (xem [README](README.md#7-hạ-tầng-còn-thiếu)) |
+| Profile | `src-shell` (Glue ngoài VPC, có `psycopg2`). Bật, lịch 18:00 UTC. Hạ tầng: [README mục 7.1](README.md#71-core-banking-trên-aws-đã-viết-chờ-apply-14-10-2026) |
 | Code | `simulators/corebank/{schema.sql, seed.py, simulate.py}` |
 
 Khác với nguồn [berka.md](berka.md): entry `berka_*` đọc **thẳng server CTU**, là dữ liệu tĩnh
@@ -27,16 +27,22 @@ giả lập, nên CDC1 có ý nghĩa thật.
 | Môi trường | Host:port | User ETL | Secret |
 |---|---|---|---|
 | Local (`local/docker-compose.yml`) | `localhost:5433` | `etl_reader` / `etl_reader` | `fingraph/src/corebank_pg` trong moto (tạo bởi `local.bootstrap`) |
-| AWS (đề xuất) | IP riêng của EC2 "hệ thống nguồn", cổng 5432 | `etl_reader`, mật khẩu đặt tay | `fingraph/src/corebank_pg`, **chưa tạo** |
+| AWS | **IP public** của EC2 "hệ thống nguồn", cổng 5432, **chỉ SSL** | `etl_reader`, mật khẩu 48 hex do máy tự sinh | `fingraph/src/corebank_pg` (Terraform tạo vỏ, máy nguồn ghi giá trị) |
 
 ```json
-{"host": "localhost", "port": 5433, "username": "etl_reader", "password": "etl_reader", "dbname": "corebank"}
+{"host": "<IP public>", "port": 5432, "username": "etl_reader", "password": "<48 hex>",
+ "dbname": "corebank", "sslmode": "require"}
 ```
 
-- `etl_reader` được tạo trong `schema.sql`, chỉ có quyền `USAGE` trên schema `core` và `SELECT`
-  trên mọi bảng, kể cả bảng tạo sau này (`ALTER DEFAULT PRIVILEGES`).
+- `etl_reader` chỉ có quyền `USAGE` trên schema `core` và `SELECT` trên mọi bảng, kể cả bảng tạo
+  sau này (`ALTER DEFAULT PRIVILEGES`). Role được tạo **trước** `schema.sql`: local bằng
+  `local/initdb/corebank-roles.sql`, AWS bằng `corebank-init.sh` của repo hạ tầng.
+  `schema.sql` không chứa mật khẩu nào.
 - Reader còn mở phiên `READ ONLY`. Có hai lớp chặn ghi.
-- Chủ DB (`corebank`/`corebank`) chỉ dành cho simulator, ETL không bao giờ dùng.
+- `sslmode` trong secret được reader truyền cho psycopg2. Trên AWS là `require`, và Postgres từ chối
+  mọi kết nối TCP không SSL (đã thử: "no pg_hba.conf entry"). Đã kiểm chứng TLSv1.3.
+- Chủ DB chỉ dành cho simulator (local `corebank`/`corebank`, AWS secret `fingraph/sim/corebank_owner`,
+  Glue không đọc được). ETL không bao giờ dùng user này.
 
 ---
 
@@ -233,7 +239,77 @@ Manifest có thêm danh sách `columns` lấy từ `cursor.description`, để s
 | Trùng lặp do lookback hoặc chạy lại | At-least-once | Khử trùng theo khoá chính và `updated_at` lớn nhất |
 | `created_at`/`updated_at` là giờ **thật** (2026), `trans_date` là giờ **nghiệp vụ** (2023) | Thiết kế simulator | Phân tích nghiệp vụ dùng `trans_date`/`booked_at`, không dùng cột audit |
 
-## 6. Vận hành
+## 6. Silver (`silver_corebank`)
+
+Mỗi entry sourcing có đúng một entry silver đọc cùng dataset, ở
+`silver_etl/entries/corebank/`. Trên AWS, sourcing ghi manifest, SFN bắn "Job Run Succeeded",
+rồi Lambda trigger tìm entry silver có `source.dataset` khớp và chạy Glue `slv-spark`. Không cần
+cấu hình nối nào thêm.
+
+| Bảng silver | Writer | Khoá | Ngày dữ liệu | Vì sao chọn writer này |
+|---|---|---|---|---|
+| `district` | simple `overwrite_table` | `district_id` | ingest | Bảng tham chiếu 77 dòng, nguồn CDC5. Lô rỗng bị từ chối. `min_rows: 70` |
+| `client` | **scd2** delta | `client_id` | ingest | Cần lịch sử đổi điện thoại, địa chỉ, trạng thái |
+| `account` | scd2 delta | `account_id` | ingest | Mỗi lần `balance` đổi là một phiên bản, trả lời được "số dư cuối ngày D" |
+| `disp` | scd2 delta | `disp_id` | ingest | Cạnh sở hữu client → account |
+| `card` | scd2 delta | `card_id` | ingest | Thẻ bị khoá theo thời gian. Chỉ có số đã che và `card_token` |
+| `loan` | scd2 delta | `loan_id` | ingest | Thời điểm C → D (quá hạn) là nhãn rủi ro tín dụng |
+| `standing_order` | scd2 delta | `order_id` | ingest | |
+| `trans` | simple `append` | `trans_id` | **`trans_date`** (nghiệp vụ) | Bảng sự kiện, chỉ INSERT. Idempotent theo `ds_source`. **Partition theo tháng** (DDL viết tay `silver_etl/ddl/silver_corebank/trans.sql`) |
+
+`scd2` với `snapshot: false` (delta): manifest CDC1 chỉ chứa dòng **đổi**, nên key vắng mặt không có
+nghĩa là bị xoá. Nhiều manifest trong một ngày **chồng lên nhau**. Chạy lại một manifest chỉ hoàn tác
+phiên bản của **chính manifest đó** (sửa writer ngày 13-10; trước đó lô thứ hai trong ngày xoá mất thay
+đổi của lô thứ nhất, có test canh). Hai lần đổi trong cùng một ngày cho ra một phiên bản trung gian dài
+0 ngày (`ds_valid_from = ds_valid_to`).
+
+### Chuẩn hoá ở silver
+
+| Bảng | Cột mới | Từ |
+|---|---|---|
+| `trans` | `direction` (CREDIT/DEBIT), `signed_amount` | `trans_type_code`. `VYBER` (lỗi gốc) tính là DEBIT, gắn cờ `is_berka_type_error` |
+| `trans` | `operation_type` (CASH_WITHDRAWAL, TRANSFER_OUT, BANK_POSTING…), `purpose` (INTEREST, PENSION, LOAN_PAYMENT…) | mã tiếng Séc. Cột mã gốc vẫn giữ |
+| `trans`, `standing_order` | `k_symbol` | `NULL`, `''`, `' '` đều thành NULL |
+| `trans` | `is_overdraft` | `balance_after < 0` |
+| `account` | `statement_frequency` (MONTHLY/WEEKLY/AFTER_TRANSACTION), `is_overdrawn` | |
+| `loan` | `loan_status` (FINISHED_PAID…), `is_problem_loan` (B, D), `maturity_date` | |
+| `client`, `disp` | `is_active`, `is_owner` | |
+| mọi bảng scd2 | `source_created_at`, `source_updated_at` (**`hash: false`**) | Cột audit không làm sinh phiên bản. `source_updated_at` là `cdc_index` để chọn bản mới nhất khi lookback kéo trùng |
+
+Kiểm tra chất lượng: `not_null` theo khoá và cột bắt buộc, không chấp nhận lỗi ép kiểu
+(`max_cast_error_ratio: 0`). Trùng khoá trong lô (do lookback) chỉ cảnh báo, và giữ bản có
+`source_updated_at` lớn nhất.
+
+### Chạy và kiểm chứng trên máy
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-21"     # Spark 3.5 + Java 17/21; Windows cần winutils (HADOOP_HOME)
+.\.venv\Scripts\python.exe -m pip install pyspark==3.5.4
+python -m local.run_flow corebank                       # 8 sourcing -> 8 silver
+python -m simulators.corebank.simulate --days 15
+python -m local.run_flow corebank --sql "SELECT * FROM glue_catalog.silver_corebank.loan WHERE loan_id = 5015"
+python -m local.run_flow corebank --silver-only         # chạy lại silver trên manifest mới nhất hôm nay
+```
+
+Bảng Iceberg nằm ở `data/local_warehouse/` (catalog hadoop, vẫn mang tên `glue_catalog`, nên SQL y hệt
+trên Glue). File raw được tải từ moto về `data/local_lake/`.
+
+Kết quả ngày 13-10-2026 (bản seed 300 tài khoản):
+
+| Lần chạy | Kết quả |
+|---|---|
+| Lần 1 | 8/8 bảng SUCCESS: `trans` 71.775, `client` 398, `disp` 398, `standing_order` 434, `account` 332, `district` 77, `card` 66, `loan` 19 |
+| Chạy lại silver trên cùng manifest | `account`: hoàn tác 332, ghi lại 332. Trạng thái bảng không đổi |
+| Lần 2 ngay sau đó | `account` nhận 103 dòng do lookback, **N=103**, không sinh phiên bản rác |
+| Sau 15 ngày simulator | `trans` +1.727. `client` có phiên bản U khi đổi điện thoại. Loan 5015 C → D thành 2 phiên bản |
+| Đối soát `trans` | 73.502 dòng = 73.502 `trans_id` khác nhau. 961 dòng `VYBER` có cờ. 0 `k_symbol` rỗng. Partition theo tháng |
+
+**Trên AWS:** entry sourcing và silver đều đã bật. Khi PR hạ tầng được apply, máy nguồn tự seed Berka
+đầy đủ (4.500 tài khoản, ~1,06 triệu giao dịch) và mỗi ngày sinh thêm một ngày nghiệp vụ. Lịch 18:00 UTC
+kéo về `landing/corebank/*`, silver tự chạy theo. Thứ tự apply nằm trong SETUP-LOG của repo hạ tầng
+(mục 10-14).
+
+## 7. Vận hành
 
 ```powershell
 python -m local.run_entry corebank_trans                                # chạy một lần

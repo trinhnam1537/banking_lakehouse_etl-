@@ -35,9 +35,10 @@ class SilverLogStore(JobLogStore):
         started = dt.datetime.fromisoformat(run_key.split("#")[1])
         self._table.update_item(
             Key={"job_name": job_name, "run_key": run_key},
+            # "status" va "metrics" deu la tu khoa danh rieng cua DynamoDB -> bi danh
             UpdateExpression="SET #s = :s, ended_at = :e, duration_seconds = :d, "
-                             "metrics = :m, err = :err",
-            ExpressionAttributeNames={"#s": "status"},
+                             "#m = :m, err = :err",
+            ExpressionAttributeNames={"#s": "status", "#m": "metrics"},
             ExpressionAttributeValues=_clean({
                 ":s": status,
                 ":e": _iso(),

@@ -37,7 +37,10 @@ def test_zip_chi_co_package_va_tat_dinh(tmp_path):
     assert {"sourcing/main.py", "silver/main.py", "orchestrator/trigger.py",
             "orchestrator/schedule_sync.py"} <= set(names)
     assert not [n for n in names if n.startswith("tests/") or "__pycache__" in n
-                or not n.endswith(".py")]
+                or not n.endswith((".py", ".sql"))]
+    # May nguon AWS chay simulator tu chinh zip nay, ke ca schema.sql
+    assert {"simulators/corebank/seed.py", "simulators/corebank/schema.sql"} <= set(names)
+    assert not [n for n in names if n.startswith("local/")]   # stack local khong len AWS
 
 
 def test_zip_import_duoc_handler_lambda(tmp_path):
@@ -175,6 +178,7 @@ def test_config_sync_entry_sai_khong_ghi_gi(tmp_path):
 
 
 N_ENTRIES = len(list((REPO / "sourcing_etl" / "sources").rglob("*.yml")))
+N_SILVER = len(list((REPO / "silver_etl" / "entries").rglob("*.yml")))
 
 
 def test_config_sync_entry_that_cua_repo():
@@ -183,7 +187,8 @@ def test_config_sync_entry_that_cua_repo():
     on_disk = sorted(f.stem for f in (REPO / "sourcing_etl" / "sources").rglob("*.yml"))
     assert sorted(src) == on_disk and "berka_trans" in src
     assert src["berka_trans"]["source_type"] == "jdbc" and src["berka_trans"]["cdc_mode"] == "cdc1"
-    assert slv == {}  # chua co entry silver nao
+    assert sorted(slv) == sorted(f.stem for f in (REPO / "silver_etl" / "entries").rglob("*.yml"))
+    assert slv["corebank_trans"]["source_dataset"] == "corebank/trans"
     assert all(set(v) >= {"enabled", "config", "config_sha"} for v in src.values())
 
 
@@ -255,7 +260,7 @@ def test_deploy_dau_cuoi(dry_run):
         assert [u["FunctionName"] for u in lam.updated] == ["fn-trigger", "fn-sync"]
         assert lam.updated[0]["S3Key"] == f"_ops/etl/releases/{SHA}/etl.zip"
         assert ssm.get_parameter(Name="/fingraph/dev/etl/release")["Parameter"]["Value"] == SHA
-        assert n_src == N_ENTRIES and ddb.Table("slv-cfg").scan()["Count"] == 0
+        assert n_src == N_ENTRIES and ddb.Table("slv-cfg").scan()["Count"] == N_SILVER
 
 
 def test_deploy_chan_sha_la():

@@ -1,0 +1,52 @@
+# Silver core banking — tai lieu: docs/sourcing/corebank.md (muc 6. Silver)
+# Nguon: entry sourcing `corebank_standing_order` -> landing/corebank/standing_order/ (manifest -> Lambda trigger -> entry nay)
+#
+name: corebank_standing_order
+description: Lenh chuyen tien dinh ky - SCD2
+owner: namth
+enabled: true
+
+source:
+  dataset: corebank/standing_order
+
+target:
+  database: silver_corebank
+  table: standing_order
+
+columns:
+  - {name: order_id, type: int, nullable: false}
+  - {name: account_id, type: int, nullable: false}
+  - {name: bank_to}
+  - {name: account_to, type: bigint}
+  - {name: amount, type: "decimal(12,2)"}
+  - {name: k_symbol, transform: "nullif(trim({col}), '')", comment: "Ma muc dich goc"}
+  - {name: active, type: boolean}
+  - {name: source_created_at, path: created_at, type: timestamp, hash: false,
+     comment: "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"}
+  - {name: source_updated_at, path: updated_at, type: timestamp, hash: false,
+     comment: "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"}
+  - name: purpose
+    expr: >-
+      CASE k_symbol WHEN 'SIPO' THEN 'HOUSEHOLD' WHEN 'POJISTNE' THEN 'INSURANCE'
+                    WHEN 'UVER' THEN 'LOAN_PAYMENT' WHEN 'LEASING' THEN 'LEASING' END
+
+technical:
+  keys: [order_id]
+  # Hai ban cua cung key trong mot lo (lookback keo chong) -> giu ban updated_at lon nhat
+  cdc_index: source_updated_at
+  partition_date: ingest_date
+
+writer:
+  type: scd2
+  # Nguon CDC1: manifest chi chua dong DOI. Key vang mat KHONG co nghia la bi xoa.
+  snapshot: false
+
+quality:
+  not_null: [order_id, account_id, amount]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+
+runtime:
+  worker_type: G.1X
+  number_of_workers: 2
+  timeout_minutes: 30

@@ -1,7 +1,8 @@
 # Core banking gia lap: Postgres corebank (Berka doi +24 nam + simulator tu 2023-01-01).
 # Phan tich nguon, schema, credential: docs/sourcing/corebank.md
-# Dung profile src-vpc (Glue trong VPC, toi duoc may "he thong nguon") -> enabled: false
-# cho toi khi repo ha tang tao profile do. Chay tren may: python -m local.run_entry corebank_trans
+# Tren AWS: Postgres o may EC2 "he thong nguon" (repo ha tang, modules/kafka), mo 5432 ra
+# internet CHI SSL; Glue src-shell (ngoai VPC, co psycopg2) doc qua IP public trong secret.
+# Chay tren may: python -m local.run_entry corebank_trans
 # So giao dich CHI INSERT (sua sai bang but toan dao) -> trans_id tang dan la moc chat.
 # Chia khuc 50.000 dong: moi khuc mot truy van ngan, khong giu snapshot hang gio.
 
@@ -9,7 +10,7 @@ name: corebank_trans
 source_type: jdbc
 description: So giao dich (chi INSERT) — CDC1 chia khuc theo trans_id
 owner: namth
-enabled: false
+enabled: true
 
 jdbc:
   # {host, port, username, password, dbname} — user etl_reader CHI DOC
@@ -34,10 +35,10 @@ target:
   dataset: corebank/trans
 
 schedule:
-  # 01:00 gio VN. Bat sau khi profile src-vpc ton tai va chay tay OK.
-  enabled: false
+  # 01:00 gio VN — sau simulator tren may nguon (17:00 UTC). Silver tu chay theo (orchestrator).
+  enabled: true
   expression: "cron(0 18 * * ? *)"
 
 runtime:
-  profile: src-vpc
+  profile: src-shell
   timeout_minutes: 60

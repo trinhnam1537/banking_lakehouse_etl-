@@ -1,12 +1,14 @@
 """Đóng gói code ETL thành MỘT etl.zip dùng cho cả Glue lẫn Lambda.
 
-Package nằm ở gốc zip (sourcing/, silver/, orchestrator/) nên:
+Package nằm ở gốc zip (sourcing/, silver/, orchestrator/, simulators/) nên:
   - Glue: bootstrap chèn zip vào sys.path rồi `import sourcing.main`
   - Lambda: handler khai thẳng `orchestrator.trigger.handler`,
     `orchestrator.schedule_sync.handler`
+  - Máy nguồn EC2: giải nén rồi `python -m simulators.corebank.simulate` (repo hạ tầng,
+    modules/kafka/scripts/corebank-sim.sh)
 
 Zip TẤT ĐỊNH: thứ tự file cố định, mtime cố định -> cùng code cho cùng byte,
-so hash được giữa hai lần build. Chỉ đóng *.py: không test, không __pycache__.
+so hash được giữa hai lần build. Chỉ đóng *.py và *.sql: không test, không __pycache__.
 """
 
 from __future__ import annotations
@@ -17,7 +19,10 @@ import zipfile
 from typing import Iterable, List
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-PACKAGES = ("sourcing", "silver", "orchestrator")
+PACKAGES = ("sourcing", "silver", "orchestrator", "simulators")
+# Ngoai *.py, dong goi them file du lieu cua package (vd simulators/corebank/schema.sql:
+# simulator tren may nguon AWS tu ap schema khi DB rong). Glue/Lambda khong dung toi.
+DATA_SUFFIXES = (".sql",)
 _FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 
 
@@ -27,7 +32,8 @@ def package_files(root: pathlib.Path = REPO, packages: Iterable[str] = PACKAGES)
         base = root / pkg
         if not (base / "__init__.py").is_file():
             raise SystemExit(f"Thieu package {pkg}/ trong {root}")
-        files.extend(p for p in base.rglob("*.py") if "__pycache__" not in p.parts)
+        files.extend(p for p in base.rglob("*") if p.is_file() and "__pycache__" not in p.parts
+                     and (p.suffix == ".py" or p.suffix in DATA_SUFFIXES))
     return sorted(files, key=lambda p: p.relative_to(root).as_posix())
 
 

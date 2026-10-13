@@ -21,13 +21,37 @@ def _entry(**over):
 
 
 def test_moi_entry_that_nap_duoc():
-    """Moi entry silver co trong repo (hien chua co — nguon tai chinh da bo, entry
-    Berka viet sau) phai nap duoc; them entry sai la do o day."""
-    import os
-    if not os.path.isdir("silver_etl/entries"):
-        pytest.skip("chua co entry silver nao")
-    for name, cfg in load_all("silver_etl/entries").items():
+    """Moi entry silver trong repo phai nap duoc; them entry sai la do o day."""
+    entries = load_all("silver_etl/entries")
+    assert entries, "silver_etl/entries rong"
+    for name, cfg in entries.items():
         assert cfg.name == name
+
+
+def test_entry_silver_doc_dung_dataset_cua_mot_entry_sourcing():
+    """Orchestrator noi sourcing -> silver theo dataset. Go sai mot ky tu la entry
+    silver khong bao gio duoc kich, va khong co loi nao bao ra."""
+    from sourcing.config import load_all as load_sources
+
+    datasets = {c.dataset for c in load_sources("sourcing_etl/sources").values()}
+    for name, cfg in load_all("silver_etl/entries").items():
+        assert cfg.source.dataset in datasets, f"{name}: khong entry sourcing nao ghi '{cfg.source.dataset}'"
+
+
+def test_entry_co_target_ddl_thi_file_ton_tai_va_du_cot():
+    """DDL viet tay phai tao DUNG bang cua entry va co MOI cot entry se ghi."""
+    import os
+
+    from silver.ddl import expected_columns
+
+    for name, cfg in load_all("silver_etl/entries").items():
+        if not cfg.target.ddl:
+            continue
+        path = os.path.join("silver_etl/ddl", cfg.target.ddl)
+        text = open(path, encoding="utf-8").read()
+        assert cfg.target.fqn in text, f"{name}: {path} khong tao {cfg.target.fqn}"
+        for col, _, _ in expected_columns(cfg):
+            assert f"`{col}`" in text, f"{name}: {path} thieu cot {col}"
 
 
 def test_moi_ddl_trong_thu_muc_tach_duoc_cau_lenh():

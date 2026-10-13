@@ -1,0 +1,50 @@
+# Silver core banking — tai lieu: docs/sourcing/corebank.md (muc 6. Silver)
+# Nguon: entry sourcing `corebank_card` -> landing/corebank/card/ (manifest -> Lambda trigger -> entry nay)
+#
+# So the da duoc CHE ngay o cau SQL sourcing: silver chi co ban che + card_token
+# (md5 so the) — khoa noi sang luong the cards_authorizations.
+
+name: corebank_card
+description: The thanh toan (so the da che, token) - SCD2
+owner: namth
+enabled: true
+
+source:
+  dataset: corebank/card
+
+target:
+  database: silver_corebank
+  table: card
+
+columns:
+  - {name: card_id, type: int, nullable: false}
+  - {name: disp_id, type: int, nullable: false}
+  - {name: card_type, comment: "classic | junior | gold"}
+  - {name: issued_date, type: date}
+  - {name: card_number_masked}
+  - {name: card_token, comment: "md5(so the) - khoa noi cards_authorizations.card_token"}
+  - {name: status, comment: "ACTIVE | BLOCKED"}
+  - {name: source_created_at, path: created_at, type: timestamp, hash: false,
+     comment: "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"}
+  - {name: source_updated_at, path: updated_at, type: timestamp, hash: false,
+     comment: "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"}
+technical:
+  keys: [card_id]
+  # Hai ban cua cung key trong mot lo (lookback keo chong) -> giu ban updated_at lon nhat
+  cdc_index: source_updated_at
+  partition_date: ingest_date
+
+writer:
+  type: scd2
+  # Nguon CDC1: manifest chi chua dong DOI. Key vang mat KHONG co nghia la bi xoa.
+  snapshot: false
+
+quality:
+  not_null: [card_id, disp_id, card_token]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+
+runtime:
+  worker_type: G.1X
+  number_of_workers: 2
+  timeout_minutes: 30

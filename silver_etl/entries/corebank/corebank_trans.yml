@@ -1,0 +1,77 @@
+# Silver core banking — tai lieu: docs/sourcing/corebank.md (muc 6. Silver)
+# Nguon: entry sourcing `corebank_trans` -> landing/corebank/trans/ (manifest -> Lambda trigger -> entry nay)
+#
+# Bang SU KIEN: so giao dich chi INSERT o nguon -> simple append (khong lich su phien ban).
+# Idempotent theo ds_source: chay lai cung manifest xoa dong cua manifest do roi ghi lai.
+# ds_partition_date = NGAY NGHIEP VU (trans_date), bang partition theo THANG (DDL viet tay
+# silver_etl/ddl/silver_corebank/trans.sql): 1,06 trieu dong / ~2.200 ngay -> partition
+# theo ngay chi ~500 dong, qua nhieu file nho.
+#
+# Chuan hoa (docs/sourcing/corebank.md muc 5):
+#   trans_type 'VYBER' (loi goc Berka, 16.666 dong) -> direction DEBIT
+#   k_symbol NULL / '' / ' ' -> NULL
+#   ma Sec -> nhom tieng Anh (operation_type, purpose); giu cot ma goc
+
+name: corebank_trans
+description: So giao dich tai khoan - su kien, append theo manifest
+owner: namth
+enabled: true
+
+source:
+  dataset: corebank/trans
+
+target:
+  database: silver_corebank
+  table: trans
+  ddl: silver_corebank/trans.sql
+
+columns:
+  - {name: trans_id, type: bigint, nullable: false}
+  - {name: account_id, type: int, nullable: false}
+  - {name: trans_date, type: date, comment: "Ngay nghiep vu"}
+  - {name: booked_at, type: timestamp, comment: "Lich su Berka: gio sinh tat dinh 07-20h"}
+  - {name: trans_type_code, path: trans_type, comment: "PRIJEM | VYDAJ | VYBER (loi goc)"}
+  - {name: operation_code, path: operation}
+  - {name: amount, type: "decimal(18,2)", comment: "Luon duong; dau xem direction"}
+  - {name: balance_after, path: balance, type: "decimal(18,2)", comment: "So du sau giao dich, co the am"}
+  - {name: k_symbol, transform: "nullif(trim({col}), '')"}
+  - {name: counterparty_bank, path: bank, transform: "nullif(trim({col}), '')"}
+  - {name: counterparty_account, path: counter_account, type: bigint}
+  - {name: source_created_at, path: created_at, type: timestamp, hash: false}
+  - {name: direction, expr: "CASE WHEN trans_type_code = 'PRIJEM' THEN 'CREDIT' ELSE 'DEBIT' END"}
+  - {name: signed_amount, type: "decimal(18,2)",
+     expr: "CASE WHEN trans_type_code = 'PRIJEM' THEN amount ELSE -amount END"}
+  - name: operation_type
+    expr: >-
+      CASE operation_code WHEN 'VYBER' THEN 'CASH_WITHDRAWAL' WHEN 'VKLAD' THEN 'CASH_DEPOSIT'
+                          WHEN 'PREVOD NA UCET' THEN 'TRANSFER_OUT' WHEN 'PREVOD Z UCTU' THEN 'TRANSFER_IN'
+                          WHEN 'VYBER KARTOU' THEN 'CARD_WITHDRAWAL'
+                          ELSE CASE WHEN k_symbol IN ('UROK', 'SANKC. UROK', 'SLUZBY') THEN 'BANK_POSTING' END END
+  - name: purpose
+    expr: >-
+      CASE k_symbol WHEN 'UROK' THEN 'INTEREST' WHEN 'SANKC. UROK' THEN 'PENALTY_INTEREST'
+                    WHEN 'SLUZBY' THEN 'STATEMENT_FEE' WHEN 'SIPO' THEN 'HOUSEHOLD'
+                    WHEN 'DUCHOD' THEN 'PENSION' WHEN 'POJISTNE' THEN 'INSURANCE'
+                    WHEN 'UVER' THEN 'LOAN_PAYMENT' END
+  - {name: is_overdraft, type: boolean, expr: "balance_after < 0"}
+  - {name: is_berka_type_error, type: boolean, expr: "trans_type_code = 'VYBER'",
+     comment: "Loi goc Berka: rut tien ghi o cot type"}
+
+technical:
+  keys: [trans_id]
+  cdc_index: trans_id
+  partition_date: {source: column, column: trans_date}
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [trans_id, account_id, trans_date, amount, balance_after]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+
+runtime:
+  worker_type: G.1X
+  number_of_workers: 2
+  timeout_minutes: 60
