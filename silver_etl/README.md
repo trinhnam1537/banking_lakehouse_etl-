@@ -7,11 +7,16 @@ entries/<nguon>/<bang>.yml   mot entry = mot bang silver (chay tren Glue job dun
 ddl/<database>/<bang>.sql    (tuy chon) DDL viet tay; khong co thi sinh tu entry
 ```
 
-Entry hiện có: **8 bảng core banking** (`entries/corebank/` → database `silver_corebank`), mô tả ở
-[docs/sourcing/corebank.md](../docs/sourcing/corebank.md) mục 6. Ví dụ GLEIF và FDIC bên dưới giữ lại
-để minh hoạ cú pháp.
+Entry hiện có:
 
-Chạy thông luồng nguồn → landing → silver trên máy: `python -m local.run_flow corebank`.
+| Thư mục | Database | Bảng | Mô tả |
+|---|---|---|---|
+| `entries/corebank/` | `silver_corebank` | 8 | Core banking (Berka + simulator), [docs/sourcing/corebank.md](../docs/sourcing/corebank.md) mục 6 |
+| `entries/berka/` | `silver_berka` | 8 | Berka gốc CTU, [docs/sourcing/berka.md](../docs/sourcing/berka.md) mục "Silver" |
+
+Ví dụ GLEIF và FDIC bên dưới giữ lại để minh hoạ cú pháp.
+
+Chạy thông luồng nguồn → landing → silver trên máy: `python -m local.run_flow corebank` (hoặc `berka`).
 
 **Thêm một bảng silver:** tạo `entries/<nguon>/<bang>.yml` → merge `main` (CI config-sync ghi vào `slv-job-config`).
 Không viết Python. Tên file phải duy nhất và trùng khoá `name`.

@@ -24,7 +24,7 @@ jdbc:
   # Liet ke cot TUONG MINH (khong SELECT *): nguon them cot thi raw khong tu doi
   # hinh dang; muon lay cot moi thi sua entry nay va review.
   query: |
-    SELECT district_id, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16
+    SELECT *
     FROM financial.district
 
 cdc:

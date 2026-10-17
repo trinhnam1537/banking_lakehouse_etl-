@@ -1,0 +1,47 @@
+# Silver Berka — tai lieu: docs/sourcing/berka.md (muc "Silver")
+# Nguon: entry sourcing `berka_loan` -> landing/berka/loan/ (manifest -> Lambda trigger -> entry nay)
+#
+# CDC5, nguon tinh -> simple overwrite_table. Toi da 1 khoan vay / tai khoan.
+# payments = amount / duration (decimal(6,2) o nguon, raw giu chuoi).
+
+name: berka_loan
+description: Khoan vay (Berka goc) - trang thai tra no, nhan cho mo hinh rui ro tin dung
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/loan
+
+target:
+  database: silver_berka
+  table: loan
+
+columns:
+  - {name: loan_id, type: int, nullable: false}
+  - {name: account_id, type: int, nullable: false}
+  - {name: granted_date, path: date, type: date}
+  - {name: amount, type: "decimal(18,2)", comment: "CZK"}
+  - {name: duration_months, path: duration, type: int}
+  - {name: monthly_payment, path: payments, type: "decimal(18,2)"}
+  - {name: status_code, path: status, comment: "Ma Berka: A | B | C | D"}
+  - name: loan_status
+    expr: >-
+      CASE status_code WHEN 'A' THEN 'FINISHED_PAID' WHEN 'B' THEN 'FINISHED_UNPAID'
+                       WHEN 'C' THEN 'RUNNING_OK' WHEN 'D' THEN 'RUNNING_OVERDUE' END
+  - {name: is_problem_loan, type: boolean, expr: "status_code IN ('B', 'D')",
+     comment: "Da hoac dang khong tra du"}
+  - {name: maturity_date, type: date, expr: "add_months(granted_date, duration_months)"}
+
+technical:
+  keys: [loan_id]
+  partition_date: ingest_date
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [loan_id, account_id, granted_date, amount, status_code, loan_status]
+  max_cast_error_ratio: 0.0
+  min_rows: 682
+  duplicate_keys: fail

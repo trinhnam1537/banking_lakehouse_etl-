@@ -1,0 +1,38 @@
+# Silver Berka — tai lieu: docs/sourcing/berka.md (muc "Silver")
+# Nguon: entry sourcing `berka_disp` -> landing/berka/disp/ (manifest -> Lambda trigger -> entry nay)
+#
+# CDC5, nguon tinh -> simple overwrite_table. Canh cua do thi so huu
+# client -OWNER/DISPONENT-> account cho tang ontology. Moi tai khoan dung MOT OWNER.
+
+name: berka_disp
+description: Quyen cua khach tren tai khoan (OWNER/DISPONENT) - Berka goc
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/disp
+
+target:
+  database: silver_berka
+  table: disp
+
+columns:
+  - {name: disp_id, type: int, nullable: false}
+  - {name: client_id, type: int, nullable: false}
+  - {name: account_id, type: int, nullable: false}
+  - {name: disp_type, path: type, comment: "OWNER | DISPONENT"}
+  - {name: is_owner, type: boolean, expr: "disp_type = 'OWNER'"}
+
+technical:
+  keys: [disp_id]
+  partition_date: ingest_date
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [disp_id, client_id, account_id, disp_type]
+  max_cast_error_ratio: 0.0
+  min_rows: 5369
+  duplicate_keys: fail

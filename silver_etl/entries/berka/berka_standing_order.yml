@@ -1,0 +1,44 @@
+# Silver Berka — tai lieu: docs/sourcing/berka.md (muc "Silver")
+# Nguon: entry sourcing `berka_order` -> landing/berka/order/ (manifest -> Lambda trigger -> entry nay)
+#
+# Ten bang silver la `standing_order` (khong phai `order`: tu khoa SQL), cung ten voi
+# silver_corebank.standing_order. CDC5, nguon tinh -> simple overwrite_table.
+# k_symbol trong o nguon la '' (1.379 dong) -> NULL.
+
+name: berka_standing_order
+description: Lenh chuyen tien dinh ky (Berka goc)
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/order
+
+target:
+  database: silver_berka
+  table: standing_order
+
+columns:
+  - {name: order_id, type: int, nullable: false}
+  - {name: account_id, type: int, nullable: false}
+  - {name: bank_to, comment: "Ma ngan hang nhan (2 chu cai)"}
+  - {name: account_to, type: bigint}
+  - {name: amount, type: "decimal(12,2)", comment: "decimal(6,1) o nguon"}
+  - {name: k_symbol, transform: "nullif(trim({col}), '')", comment: "Ma muc dich goc"}
+  - name: purpose
+    expr: >-
+      CASE k_symbol WHEN 'SIPO' THEN 'HOUSEHOLD' WHEN 'POJISTNE' THEN 'INSURANCE'
+                    WHEN 'UVER' THEN 'LOAN_PAYMENT' WHEN 'LEASING' THEN 'LEASING' END
+
+technical:
+  keys: [order_id]
+  partition_date: ingest_date
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [order_id, account_id, bank_to, account_to, amount]
+  max_cast_error_ratio: 0.0
+  min_rows: 6471
+  duplicate_keys: fail

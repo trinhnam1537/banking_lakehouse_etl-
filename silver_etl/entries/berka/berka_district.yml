@@ -1,0 +1,50 @@
+# Silver Berka — tai lieu: docs/sourcing/berka.md (muc "Silver")
+# Nguon: entry sourcing `berka_district` -> landing/berka/district/ (manifest -> Lambda trigger -> entry nay)
+#
+# 77 quan/huyen. Sourcing CDC5 (anh chup day du), nguon tinh tu 1999 -> thay ca bang moi lan
+# (simple overwrite_table): chay lai bao nhieu lan cung ra mot bang. Lo rong bi tu choi.
+# Nguon dat ten cot A2..A16 (SELECT *) -> doi sang ten co nghia, cung ten voi silver_corebank.district.
+
+name: berka_district
+description: Danh muc quan/huyen va chi so kinh te - xa hoi (Berka goc)
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/district
+
+target:
+  database: silver_berka
+  table: district
+
+columns:
+  - {name: district_id, type: int, nullable: false}
+  - {name: district_name, path: A2}
+  - {name: region, path: A3}
+  - {name: inhabitants, path: A4, type: int}
+  - {name: munic_lt_500, path: A5, type: int, comment: "So xa < 500 dan"}
+  - {name: munic_500_1999, path: A6, type: int}
+  - {name: munic_2000_9999, path: A7, type: int}
+  - {name: munic_ge_10000, path: A8, type: int}
+  - {name: cities, path: A9, type: int}
+  - {name: urban_ratio, path: A10, type: "decimal(5,1)", comment: "Ty le dan thanh thi (%)"}
+  - {name: avg_salary, path: A11, type: int, comment: "Luong trung binh (CZK)"}
+  - {name: unemployment_95, path: A12, type: "decimal(5,2)", comment: "Ty le that nghiep 1995 (%), co NULL"}
+  - {name: unemployment_96, path: A13, type: "decimal(5,2)"}
+  - {name: entrepreneurs_per_1000, path: A14, type: int}
+  - {name: crimes_95, path: A15, type: int, comment: "So vu pham toi 1995, co NULL"}
+  - {name: crimes_96, path: A16, type: int}
+
+technical:
+  keys: [district_id]
+  partition_date: ingest_date
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [district_id, district_name, region]
+  max_cast_error_ratio: 0.0
+  min_rows: 77
+  duplicate_keys: fail

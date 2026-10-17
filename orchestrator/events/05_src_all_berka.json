@@ -1,5 +1,5 @@
 {
   "job_ids": ["src.berka_district", "src.berka_account", "src.berka_client", "src.berka_disp",
               "src.berka_card", "src.berka_loan", "src.berka_order", "src.berka_trans"],
-  "chain": false
+  "chain": true
 }
