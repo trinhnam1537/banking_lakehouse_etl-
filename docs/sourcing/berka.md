@@ -120,9 +120,14 @@ Bản Berka **có cột audit, dữ liệu mới mỗi ngày và PII giả lập
 ## Đường đi
 
 ```
-MariaDB CTU (public) ──internet──▶ Glue Python Shell (NGOÀI VPC, PyMySQL qua PyPI)
-                                      ├─ GetSecretValue fingraph/berka_ctu
+MariaDB CTU (public) ──internet──▶ Glue src-shell (Python Shell, NGOÀI VPC, PyMySQL qua PyPI)
+                                      ├─ GetSecretValue fingraph/src/berka_ctu
                                       └─▶ landing/berka/<bảng>/ingest_date=…/  + manifest
+                                             │ SFN "Job Run Succeeded" (chain = true, có manifest)
+                                             ▼
+                                   Lambda trigger: entry silver có source.dataset = berka/<bảng>
+                                             ▼
+                                   Glue slv-spark ──▶ Iceberg glue_catalog.silver_berka.<bảng>
 ```
 
 Glue sourcing hiện chạy ngoài VPC và có internet, nên đọc **thẳng** được server CTU. Chưa
@@ -130,13 +135,47 @@ cần RDS, Glue Connection hay VPC endpoint. Những thứ đó chỉ cần khi 
 riêng trong private subnet (bước sau: copy Berka về Postgres của mình, rồi cho simulator
 sinh giao dịch mới).
 
-**Chạy:** lịch đang tắt vì nguồn tĩnh. Kích tay bằng Lambda trigger:
+**Chạy:** lịch đang tắt vì nguồn tĩnh. Kích tay bằng Lambda trigger
+(`orchestrator/events/05_src_all_berka.json`), `chain: true` để chạy tiếp lên silver:
 
 ```json
 {"job_ids": ["src.berka_district", "src.berka_account", "src.berka_client", "src.berka_disp",
              "src.berka_card", "src.berka_loan", "src.berka_order", "src.berka_trans"],
- "chain": false}
+ "chain": true}
 ```
+
+Chạy lại sau lần đầu: 7 bảng CDC5 ra ảnh chụp mới → silver thay cả bảng (kết quả y hệt).
+`berka_trans` ra `NO_DATA`, không có manifest nên silver không chạy.
+
+## Silver (`silver_berka`)
+
+Entry ở `silver_etl/entries/berka/`, chạy trên Glue `slv-spark`. Bảng tạo tự động lần đầu
+(`CREATE NAMESPACE/TABLE IF NOT EXISTS`); chỉ `trans` có DDL viết tay (`silver_etl/ddl/silver_berka/trans.sql`).
+
+| Entry silver | Nguồn (dataset) | Bảng | Writer | Vì sao |
+|---|---|---|---|---|
+| `berka_district` | `berka/district` | `district` | simple `overwrite_table` | 7 bảng này là CDC5 (ảnh chụp đầy đủ) của nguồn **không đổi từ 1999**: thay cả bảng là idempotent, rẻ. SCD2 không có nghĩa khi dữ liệu không bao giờ đổi. `min_rows` = số dòng nguồn: lô thiếu bị từ chối thay vì xoá bớt bảng |
+| `berka_account` | `berka/account` | `account` | ″ | |
+| `berka_client` | `berka/client` | `client` | ″ | |
+| `berka_disp` | `berka/disp` | `disp` | ″ | |
+| `berka_card` | `berka/card` | `card` | ″ | |
+| `berka_loan` | `berka/loan` | `loan` | ″ | |
+| `berka_standing_order` | `berka/order` | `standing_order` | ″ | Tên bảng tránh từ khoá `order`, cùng tên với `silver_corebank` |
+| `berka_trans` | `berka/trans` | `trans` | simple `append` | Sự kiện, CDC1: mỗi manifest chỉ có dòng mới. Idempotent theo `ds_source`. Partition `months(ds_partition_date)` (ngày nghiệp vụ), 72 partition |
+
+Tên cột và phép chuẩn hoá giống `silver_corebank` (cùng gốc Berka), nên hai database so được với nhau.
+Chuẩn hoá ở `trans`: `VYBER` ở cột `type` → `DEBIT` + cờ `is_berka_type_error`; `k_symbol` `' '`/`''` → NULL;
+`account = 0` (21.881 dòng, chỉ ở rút tiền mặt/rút thẻ, `bank` NULL) → `counterparty_account` NULL.
+Phép này làm ở `expr` sau ép kiểu, không ở `transform`: bộ đếm lỗi ép kiểu so với giá trị **raw**, nên
+`transform` cố ý trả NULL bị tính là lỗi.
+
+**Kiểm chứng (17-10-2026, `python -m local.run_flow berka`, đọc thẳng CTU):** đủ 8 bảng, số dòng
+khớp nguồn: `trans` 1.056.320 dòng, `trans_id` không trùng, `VYBER` 16.666, số dư âm 2.999,
+`k_symbol` khác NULL 521.006 (= 1.056.320 − 481.881 − 53.433), có đối ứng 273.508, 1993-01-01 → 1998-12-31.
+
+**Reset `berka_trans`** (`reset_checkpoint`) để kéo lại từ đầu thì phải xoá dữ liệu
+`silver_berka.trans` trước (Athena: `DELETE FROM silver_berka.trans`), nếu không append sẽ nhân đôi
+dòng. `rebuild_from` không giúp được: chỉ writer SCD2 dùng tham số này.
 
 ## Ánh xạ sang ontology (định hướng)
 

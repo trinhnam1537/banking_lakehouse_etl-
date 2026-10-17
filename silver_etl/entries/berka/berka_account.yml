@@ -1,0 +1,43 @@
+# Silver Berka — tai lieu: docs/sourcing/berka.md (muc "Silver")
+# Nguon: entry sourcing `berka_account` -> landing/berka/account/ (manifest -> Lambda trigger -> entry nay)
+#
+# CDC5, nguon tinh -> simple overwrite_table (khong SCD2: du lieu khong bao gio doi,
+# lich su phien ban vo nghia). Berka goc KHONG co so du o bang account: so du nam o
+# trans.balance (so du sau moi giao dich).
+
+name: berka_account
+description: Tai khoan tien gui (Berka goc) - ky sao ke, chi nhanh, ngay mo
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/account
+
+target:
+  database: silver_berka
+  table: account
+
+columns:
+  - {name: account_id, type: int, nullable: false}
+  - {name: district_id, type: int, comment: "Chi nhanh mo tai khoan"}
+  - {name: frequency_code, path: frequency, comment: "Ma Sec goc cua ky sao ke"}
+  - {name: opened_date, path: date, type: date}
+  - name: statement_frequency
+    expr: >-
+      CASE frequency_code WHEN 'POPLATEK MESICNE' THEN 'MONTHLY'
+                          WHEN 'POPLATEK TYDNE' THEN 'WEEKLY'
+                          WHEN 'POPLATEK PO OBRATU' THEN 'AFTER_TRANSACTION' END
+
+technical:
+  keys: [account_id]
+  partition_date: ingest_date
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [account_id, district_id, frequency_code, opened_date, statement_frequency]
+  max_cast_error_ratio: 0.0
+  min_rows: 4500
+  duplicate_keys: fail

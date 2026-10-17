@@ -335,6 +335,32 @@ def test_dataset_khong_ai_doc(env: Env):
     assert env.trigger.handle(succeeded_event(manifest=m))["results"] == []
 
 
+# Luong THAT cua repo: moi entry sourcing Berka chay xong phai kich dung entry silver
+# doc dataset do. Nap bang slv-job-config bang chinh config_sync ma CI dung.
+BERKA_SRC_TO_SLV = {
+    "berka_district": "berka_district", "berka_account": "berka_account",
+    "berka_client": "berka_client", "berka_disp": "berka_disp", "berka_card": "berka_card",
+    "berka_loan": "berka_loan", "berka_order": "berka_standing_order", "berka_trans": "berka_trans",
+}
+
+
+@pytest.mark.parametrize("src_name,slv_name", sorted(BERKA_SRC_TO_SLV.items()))
+def test_berka_src_xong_kich_dung_silver_that(env: Env, src_name, slv_name):
+    from deploy import config_sync
+    from sourcing.config import load_config
+
+    table = env.ddb.Table(Env.SLV_CFG)
+    for name, item in config_sync.load_silver(os.path.join(ROOT, "silver_etl", "entries")).items():
+        table.put_item(Item={"job_name": name, **item})
+    dataset = load_config(os.path.join(ROOT, "sourcing_etl", "sources", "berka", f"{src_name}.yml")).dataset
+
+    m = f"landing/_manifests/{dataset}/ingest_date=2026-10-17/r1.json"
+    res = env.trigger.handle(succeeded_event(job_id=f"src.{src_name}", manifest=m))
+    assert res["status"] == "STARTED" and res["job_id"] == f"slv.{slv_name}", res
+    args = env.sfn.started[0]["input"]["glue_args"]
+    assert args["--MANIFEST"] == m and args["--DATA_DATE"] == "2026-10-17"
+
+
 # ---------- from_env ----------
 
 

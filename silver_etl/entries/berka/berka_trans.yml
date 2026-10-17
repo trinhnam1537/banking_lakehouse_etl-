@@ -1,0 +1,84 @@
+# Silver Berka — tai lieu: docs/sourcing/berka.md (muc "Silver")
+# Nguon: entry sourcing `berka_trans` -> landing/berka/trans/ (manifest -> Lambda trigger -> entry nay)
+#
+# Bang SU KIEN: sourcing CDC1 theo trans_id, moi manifest chi chua dong MOI -> simple append.
+# Idempotent theo ds_source: chay lai cung manifest xoa dong cua manifest do roi ghi lai.
+# ds_partition_date = NGAY NGHIEP VU (date 1993-1998), bang partition theo THANG (DDL viet
+# tay silver_etl/ddl/silver_berka/trans.sql): 1,06 trieu dong / ~2.190 ngay -> theo ngay chi
+# ~480 dong moi partition, qua nhieu file nho.
+#
+# Chuan hoa (docs/sourcing/berka.md muc "Chat luong du lieu"):
+#   type 'VYBER' (loi goc Berka, 16.666 dong) -> direction DEBIT, gan co is_berka_type_error
+#   k_symbol NULL / ' ' (53.433 dong, MOT dau cach) -> NULL
+#   account = 0 (21.881 dong, chi o VYBER / VYBER KARTOU, bank NULL) -> NULL: khong co doi ung
+#   ma Sec -> nhom tieng Anh (operation_type, purpose); giu cot ma goc
+#
+# Reset checkpoint `berka_trans` de keo lai tu dau thi PHAI xoa du lieu bang nay truoc
+# (Athena: DELETE FROM silver_berka.trans), neu khong append se nhan doi dong.
+# rebuild_from khong giup duoc: chi writer scd2 dung no.
+
+name: berka_trans
+description: So giao dich tai khoan (Berka goc) - su kien, append theo manifest
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/trans
+
+target:
+  database: silver_berka
+  table: trans
+  ddl: silver_berka/trans.sql
+
+columns:
+  - {name: trans_id, type: bigint, nullable: false}
+  - {name: account_id, type: int, nullable: false}
+  - {name: trans_date, path: date, type: date, comment: "Ngay nghiep vu"}
+  - {name: trans_type_code, path: type, comment: "PRIJEM | VYDAJ | VYBER (loi goc)"}
+  - {name: operation_code, path: operation, transform: "nullif(trim({col}), '')"}
+  - {name: amount, type: "decimal(18,2)", comment: "Luon duong; dau xem direction"}
+  - {name: balance_after, path: balance, type: "decimal(18,2)", comment: "So du sau giao dich, co the am"}
+  - {name: k_symbol, transform: "nullif(trim({col}), '')"}
+  - {name: counterparty_bank, path: bank, transform: "nullif(trim({col}), '')"}
+  # 0 -> NULL lam o `expr` (sau ep kieu), KHONG o `transform`: bo dem loi ep kieu so voi gia
+  # tri raw, nen transform chu dong tra NULL bi tinh la 21.881 loi cast.
+  - {name: counterparty_account_raw, path: account, type: bigint, keep: false}
+  - {name: counterparty_account, type: bigint, expr: "nullif(counterparty_account_raw, 0)",
+     comment: "0 o nguon = khong co doi ung (rut tien mat / rut the) -> NULL"}
+  - {name: direction, expr: "CASE WHEN trans_type_code = 'PRIJEM' THEN 'CREDIT' ELSE 'DEBIT' END"}
+  - {name: signed_amount, type: "decimal(18,2)",
+     expr: "CASE WHEN trans_type_code = 'PRIJEM' THEN amount ELSE -amount END"}
+  - name: operation_type
+    expr: >-
+      CASE operation_code WHEN 'VYBER' THEN 'CASH_WITHDRAWAL' WHEN 'VKLAD' THEN 'CASH_DEPOSIT'
+                          WHEN 'PREVOD NA UCET' THEN 'TRANSFER_OUT' WHEN 'PREVOD Z UCTU' THEN 'TRANSFER_IN'
+                          WHEN 'VYBER KARTOU' THEN 'CARD_WITHDRAWAL'
+                          ELSE CASE WHEN k_symbol IN ('UROK', 'SANKC. UROK', 'SLUZBY') THEN 'BANK_POSTING' END END
+  - name: purpose
+    expr: >-
+      CASE k_symbol WHEN 'UROK' THEN 'INTEREST' WHEN 'SANKC. UROK' THEN 'PENALTY_INTEREST'
+                    WHEN 'SLUZBY' THEN 'STATEMENT_FEE' WHEN 'SIPO' THEN 'HOUSEHOLD'
+                    WHEN 'DUCHOD' THEN 'PENSION' WHEN 'POJISTNE' THEN 'INSURANCE'
+                    WHEN 'UVER' THEN 'LOAN_PAYMENT' END
+  - {name: is_overdraft, type: boolean, expr: "balance_after < 0"}
+  - {name: is_berka_type_error, type: boolean, expr: "trans_type_code = 'VYBER'",
+     comment: "Loi goc Berka: rut tien ghi o cot type"}
+
+technical:
+  keys: [trans_id]
+  cdc_index: trans_id
+  partition_date: {source: column, column: trans_date}
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [trans_id, account_id, trans_date, trans_type_code, amount, balance_after]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+
+runtime:
+  worker_type: G.1X
+  number_of_workers: 2
+  timeout_minutes: 60

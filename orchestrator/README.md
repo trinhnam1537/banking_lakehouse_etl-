@@ -48,11 +48,16 @@ Event mẫu nằm trong [events/](events/). Có test canh để mọi `job_id` t
 | `02_src_dry_run_wait.json` | Đọc nguồn thật trên Glue, không ghi S3, đợi kết quả |
 | `03_src_run_wait.json` | Chạy thật `berka_order`, ghi landing/, không kích silver |
 | `04_src_override_test_dataset.json` | Ghi vào `landing/_test/...`, không đụng dataset thật |
-| `05_src_all_berka.json` | Cả 8 bảng Berka một lần |
+| `05_src_all_berka.json` | Cả 8 bảng Berka một lần, **chain sang silver** (`silver_berka.*`) |
 | `06_src_status.json` / `07_src_status_one_run.json` | Checkpoint + 5 lần chạy gần nhất / một run_id |
 | `08_schedule_tick.json` | Giả lập Scheduler. Gửi hai lần: lần hai trả `DUPLICATE` |
+| `09_src_chain_silver_wait.json` | Một bảng nhỏ nguồn → silver. `wait_seconds` chỉ đợi phần **sourcing**; silver chạy sau, xem bằng `{"job_id": "slv.berka_district", "action": "status"}` |
+| `10_slv_validate.json` | Xem Glue job (`slv-spark`), `--MANIFEST`/`--DATA_DATE` sẽ truyền cho silver, không chạy |
 
-Event silver (chain, chạy theo ngày, chạy lại manifest) thêm lại khi có entry silver cho Berka.
+Chuỗi nguồn → silver: Glue sourcing ghi manifest → SFN bắn `Job Run Succeeded` (chỉ khi
+`chain = true` **và** có manifest; `NO_DATA` không có manifest nên không kích gì) → Lambda tìm entry
+silver có `source.dataset` khớp → Glue `slv-spark`. Berka: `berka_order` → `slv.berka_standing_order`,
+các bảng khác cùng tên.
 
 **Trên console:** Lambda → `fingraph-dev-trigger` → tab *Test* → dán nội dung file → *Test*.
 

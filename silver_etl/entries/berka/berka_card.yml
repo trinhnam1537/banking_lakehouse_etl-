@@ -1,0 +1,36 @@
+# Silver Berka — tai lieu: docs/sourcing/berka.md (muc "Silver")
+# Nguon: entry sourcing `berka_card` -> landing/berka/card/ (manifest -> Lambda trigger -> entry nay)
+#
+# CDC5, nguon tinh -> simple overwrite_table. The gan voi QUYEN (disp), khong gan voi tai khoan.
+
+name: berka_card
+description: The thanh toan (Berka goc) - loai the, ngay phat hanh
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/card
+
+target:
+  database: silver_berka
+  table: card
+
+columns:
+  - {name: card_id, type: int, nullable: false}
+  - {name: disp_id, type: int, nullable: false}
+  - {name: card_type, path: type, comment: "classic | junior | gold"}
+  - {name: issued_date, path: issued, type: date}
+
+technical:
+  keys: [card_id]
+  partition_date: ingest_date
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [card_id, disp_id, card_type, issued_date]
+  max_cast_error_ratio: 0.0
+  min_rows: 892
+  duplicate_keys: fail

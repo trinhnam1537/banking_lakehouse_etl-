@@ -1,0 +1,37 @@
+# Silver Berka — tai lieu: docs/sourcing/berka.md (muc "Silver")
+# Nguon: entry sourcing `berka_client` -> landing/berka/client/ (manifest -> Lambda trigger -> entry nay)
+#
+# CDC5, nguon tinh -> simple overwrite_table. Ban CTU da giai ma birth_number goc thanh
+# gender + birth_date. PII (da an danh o nguon, van coi la PII).
+
+name: berka_client
+description: Khach hang ca nhan (Berka goc) - gioi tinh, ngay sinh, quan/huyen
+owner: namth
+enabled: true
+
+source:
+  dataset: berka/client
+
+target:
+  database: silver_berka
+  table: client
+
+columns:
+  - {name: client_id, type: int, nullable: false}
+  - {name: gender, comment: "F | M"}
+  - {name: birth_date, type: date, comment: "PII"}
+  - {name: district_id, type: int, comment: "Noi o"}
+
+technical:
+  keys: [client_id]
+  partition_date: ingest_date
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [client_id, gender, birth_date, district_id]
+  max_cast_error_ratio: 0.0
+  min_rows: 5369
+  duplicate_keys: fail
