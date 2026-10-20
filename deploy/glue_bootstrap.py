@@ -91,5 +91,17 @@ def main(argv=None, ssm_client=None, s3_client=None, tmp_dir="/tmp"):
     return module.main()
 
 
+def finish(rc):
+    """Kết thúc theo mã trả về của code ETL.
+
+    Glue Spark (slv-spark) chạy script này qua runpy.run_path và coi MỌI SystemExit,
+    kể cả SystemExit(0), là lỗi: job bị đánh FAILED dù ETL đã SUCCESS (lỗi thật trên
+    dev 10-15 → 10-20). Vì vậy thành công thì trả về bình thường, chỉ thoát khi rc khác 0.
+    Python Shell (src-shell) chạy được cả hai cách.
+    """
+    if rc:
+        sys.exit(rc)
+
+
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    finish(main())
