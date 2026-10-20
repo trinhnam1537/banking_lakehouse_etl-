@@ -118,6 +118,18 @@ def test_bootstrap_tai_zip_va_goi_module(tmp_path, isolated_sourcing):
     assert str(tmp_path / f"etl-{SHA}.zip") in sys.path
 
 
+@pytest.mark.parametrize("rc", [0, None])
+def test_bootstrap_thanh_cong_khong_raise_systemexit(rc):
+    # Glue Spark coi SystemExit(0) la loi -> thanh cong phai tra ve binh thuong
+    assert glue_bootstrap.finish(rc) is None
+
+
+def test_bootstrap_loi_thi_thoat_ma_khac_0():
+    with pytest.raises(SystemExit) as e:
+        glue_bootstrap.finish(1)
+    assert e.value.code == 1
+
+
 def test_bootstrap_chan_module_la():
     with pytest.raises(SystemExit, match="ETL_MODULE"):
         glue_bootstrap.main(["x", "--ETL_RELEASE", SHA, "--ARTIFACT_BUCKET", "b",
