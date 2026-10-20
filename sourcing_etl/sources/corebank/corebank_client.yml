@@ -37,7 +37,7 @@ target:
 
 schedule:
   # 01:00 gio VN — sau simulator tren may nguon (17:00 UTC). Silver tu chay theo (orchestrator).
-  enabled: true
+  enabled: false  # TAM TAT 10-20 (bat lai: true)
   expression: "cron(0 18 * * ? *)"
 
 runtime:
