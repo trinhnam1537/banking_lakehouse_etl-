@@ -1,0 +1,44 @@
+# File nguoi dung keo tha len thu muc OneDrive ca nhan -> raw, moi ngay mot lan.
+# Tai lieu (dang ky app Azure, dang nhap, chi phi): docs/sourcing/onedrive.md
+#
+# Moi thu muc / moi loai file mot entry: entry nay doc CSV. Excel thi chep entry,
+# doi file_format: xlsx + name_pattern: "*.xlsx" (+ sheet neu khong phai sheet dau).
+
+name: onedrive_uploads
+source_type: onedrive
+description: "File CSV upload len thu muc OneDrive chia se (theo folder_id) - nap file moi hang ngay"
+owner: namth
+# Bat 10-27: ha tang da apply, da dang nhap (onedrive_login.py), thu muc "banking source"
+enabled: true
+
+onedrive:
+  # Refresh token, KHONG phai mat khau. Tao bang scripts/onedrive_login.py
+  secret_name: fingraph/src/oauth/onedrive
+  # ID thu muc chia se (10-27): https://1drv.ms/f/c/afeecb8f63339f68/IgAhWByJ... -> resid=...
+  # Theo ID nen doi ten / di chuyen thu muc tren web van doc dung. Thu muc phai nam trong
+  # OneDrive CUA tai khoan da dang nhap (onedrive_login.py), khong phai thu muc nguoi khac chia se.
+  folder_id: "AFEECB8F63339F68!s891c5821359e4271b88e13a60880a460"
+  name_pattern: "*.csv"
+  file_format: csv
+  # File vua sua < 5 phut: de lan sau (nguoi dung co the dang upload)
+  min_age_seconds: 300
+  max_files_per_run: 100
+
+cdc:
+  mode: cdc1
+  # Moc = "<lastModifiedDateTime>|<duong dan>" cua file cuoi da nap.
+  # Upload DE file cung ten -> thoi diem sua moi -> nap lai.
+  watermark_column: _file_key
+  watermark_type: string
+
+target:
+  dataset: onedrive/uploads
+
+schedule:
+  # 01:00 UTC = 08:00 gio VN. Bat sau khi chay tay thanh cong it nhat mot lan.
+  enabled: false
+  expression: "cron(0 1 * * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 15

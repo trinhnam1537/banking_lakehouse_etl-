@@ -30,7 +30,7 @@ from ..config import SourceConfig
 from ..state import Checkpoint
 from .api import DEFAULT_UA
 from .base import Batch, Reader
-from .fileparse import is_gzip, iter_records
+from .fileparse import ARCHIVE_KINDS, hive_parts, is_gzip, iter_archive, iter_records
 
 
 class HttpFileReader(Reader):
@@ -125,20 +125,41 @@ class HttpFileReader(Reader):
             buf: List[Dict[str, Any]] = []
             total = 0
             with self._open(url) as resp:
-                gz = is_gzip(url.split("?", 1)[0], self.h.compression)
-                for row_no, rec in iter_records(
-                    resp, self.h.file_format, name=url, gzip_on=gz,
-                    encoding=self.h.encoding, csv_delimiter=self.h.csv_delimiter,
-                    repeated_header=self.h.csv_repeated_header,
-                ):
-                    rec["_src_file"] = key
-                    rec["_src_url"] = url
-                    rec["_src_row"] = row_no
-                    buf.append(self.stamp(rec))
-                    if len(buf) >= self.h.batch_size:
-                        total += len(buf)
-                        yield Batch(records=buf, watermark=None, meta={"file": key})
-                        buf = []
+                for src_file, member, stream in self._members(key, url, resp):
+                    if member:
+                        gz = is_gzip(member, "auto")
+                    else:
+                        gz = is_gzip(url.split("?", 1)[0], self.h.compression)
+                    parts = hive_parts(member) if member else {}
+                    for row_no, rec in iter_records(
+                        stream, self.h.file_format, name=src_file, gzip_on=gz,
+                        encoding=self.h.encoding, csv_delimiter=self.h.csv_delimiter,
+                        repeated_header=self.h.csv_repeated_header,
+                    ):
+                        for k, v in parts.items():
+                            rec.setdefault(k, v)  # cot partition Hive (MBD: fold)
+                        rec["_src_file"] = src_file
+                        rec["_src_url"] = url
+                        rec["_src_row"] = row_no
+                        buf.append(self.stamp(rec))
+                        if len(buf) >= self.h.batch_size:
+                            total += len(buf)
+                            yield Batch(records=buf, watermark=None, meta={"file": src_file})
+                            buf = []
             total += len(buf)
+            # Archive: moc chi tien khi doc HET moi member cua URL nay
             yield Batch(records=buf, watermark=None if self.is_full_snapshot else key,
                         meta={"file": key, "records": total})
+
+    def _members(self, key: str, url: str, resp):
+        """(khoá file, member, luồng). File thường: một phần tử, member = None."""
+        if self.h.compression not in ARCHIVE_KINDS:
+            yield key, None, resp
+            return
+        found = 0
+        for member, stream in iter_archive(resp, self.h.compression, self.h.archive_members, name=url):
+            found += 1
+            yield f"{key}/{member}", member, stream
+        if not found:
+            raise RuntimeError(f"[{self.cfg.name}] archive {url[:120]} khong co member nao khop "
+                               f"{self.h.archive_members}")

@@ -1,0 +1,36 @@
+# UCI Bank Marketing (Moro et al. 2014) — chien dich telemarketing cua mot ngan hang Bo Dao Nha,
+# nhan y = khach co dang ky tien gui co ky han khong. UC2: mo hinh "propensity" cho MOT san pham.
+# Nguon: https://archive.ics.uci.edu/dataset/222 — mot file zip CHUA hai zip con (bank.zip,
+# bank-additional.zip). Tai lieu: docs/sourcing/uc2-datasets.md
+#
+# bank-full.csv: 45.211 dong, 17 cot, 2008-05 -> 2010-11. Phan cach ';', moi gia tri trong "".
+
+name: bank_marketing_full
+source_type: httpfile
+description: "UCI Bank Marketing - bank-full.csv (45.211 dong, nhan y dang ky tien gui)"
+owner: namth
+enabled: true
+
+httpfile:
+  urls:
+    uci_222: "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip"
+  compression: zip
+  archive_members: ["bank.zip!bank-full.csv"]
+  file_format: csv
+  csv_delimiter: ";"
+  timeout_seconds: 120
+
+cdc:
+  # Nguon tinh, ban phat hanh 2014 -> chup lai toan bo, ghi de
+  mode: cdc5
+
+target:
+  dataset: bank_marketing/full
+
+schedule:
+  enabled: false
+  expression: "cron(0 2 1 * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 15

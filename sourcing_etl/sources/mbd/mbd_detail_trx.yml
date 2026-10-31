@@ -1,0 +1,33 @@
+# MBD-mini detail/trx — nam trong detail.tar.gz (1,97 GB, chung archive voi trx/geo/dialog).
+# TAT: qua lon cho Python Shell (1 GB RAM, ghi ~10 GB NDJSON). Huong xu ly sau: tai archive ve
+# landing/_inbox/mbd/ (mot lan), giai nen thanh parquet, roi entry s3file tren profile src-spark.
+# Tai lieu: docs/sourcing/uc2-datasets.md muc "MBD detail".
+
+name: mbd_detail_trx
+source_type: httpfile
+description: "MBD-mini detail/trx (TAT - cho luong Spark tu _inbox)"
+owner: namth
+enabled: false
+
+httpfile:
+  urls:
+    mbd_mini_detail: "https://huggingface.co/datasets/ai-lab/MBD-mini/resolve/main/detail.tar.gz"
+  compression: tar.gz
+  archive_members: ["detail/trx/*.parquet"]
+  file_format: parquet
+  timeout_seconds: 600
+  max_files_per_run: 1
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: mbd/detail_trx
+
+schedule:
+  enabled: false
+  expression: "cron(0 3 1 * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 120

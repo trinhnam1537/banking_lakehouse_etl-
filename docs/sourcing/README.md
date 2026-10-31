@@ -25,8 +25,9 @@ giả lập và chất lượng dữ liệu.
 | 5 | **Home Credit** | Hệ thống cho vay, lịch sử tín dụng (≈ CIC) | Postgres `lending` | `jdbc`, `s3file` | 8 `lending_*` | [lending.md](lending.md) |
 | 6 | **OpenSanctions** | Danh sách cấm vận cho sàng lọc AML | Tải file HTTP | `httpfile` | 3 `opensanctions_*` | [opensanctions.md](opensanctions.md) |
 | 7 | **Tỷ giá VCB + CNB** | Quy đổi về VND (VCB) và CZK (CNB) | REST JSON, file HTTP | `api`, `httpfile` | 2 | [fx-rates.md](fx-rates.md) |
+| 8 | **OneDrive cá nhân** | Người dùng (BA, đối tác) kéo thả file CSV/Excel, kéo về hằng ngày | Microsoft Graph (refresh token OAuth) | `onedrive` | 1 `onedrive_uploads` (tắt) | [onedrive.md](onedrive.md) |
 
-Tổng cộng **37 entry** trong `sourcing_etl/sources/`. GLEIF và FDIC (nguồn cũ) đã được gỡ ở
+Tổng cộng **38 entry** trong `sourcing_etl/sources/`. GLEIF và FDIC (nguồn cũ) đã được gỡ ở
 commit `4d70a79`. Muốn dùng lại thì lấy entry từ lịch sử git.
 
 ### Trạng thái từng entry

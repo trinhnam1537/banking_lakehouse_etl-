@@ -1,0 +1,38 @@
+# Santander Product Recommendation (Kaggle competition, 2016): 17 thang (2015-01 -> 2016-05),
+# ~13,6 trieu dong (khach x thang), 24 cot ho so + 24 co so huu san pham (ind_*_ult1).
+# UC2 dung nhat: du doan san pham khach SE THEM vao thang sau.
+#
+# KHONG tai tu dong duoc: Kaggle competition bat dang nhap + bam "I Understand and Accept"
+# luat thi tren web. Tai mot lan bang tay (docs/sourcing/uc2-datasets.md muc Santander):
+#   kaggle competitions download -c santander-product-recommendation -f train_ver2.csv.zip
+#   -> giai nen -> aws s3 cp train_ver2.csv s3://<RAW_BUCKET>/landing/_inbox/santander/train/
+# > 1 trieu dong -> profile src-spark: spark.read.csv doc song song ca prefix.
+
+name: santander_train
+source_type: s3file
+description: "Santander train_ver2.csv (13,6 trieu dong) tu _inbox, doc bang Spark"
+owner: namth
+# Bat sau khi da upload file vao landing/_inbox/santander/train/
+enabled: false
+
+s3file:
+  bucket: "${RAW_BUCKET}"
+  prefix: landing/_inbox/santander/train/
+  file_format: csv
+  encoding: latin-1
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: santander/train
+  max_records_per_file: 500000
+
+schedule:
+  enabled: false
+  expression: "cron(0 2 1 * ? *)"
+
+runtime:
+  engine: spark
+  profile: src-spark
+  timeout_minutes: 60

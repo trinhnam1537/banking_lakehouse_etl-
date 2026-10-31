@@ -1,0 +1,33 @@
+# UCI Bank Marketing — ban "additional": 41.188 dong, 21 cot, them 5 chi so kinh te vi mo
+# (emp.var.rate, cons.price.idx, cons.conf.idx, euribor3m, nr.employed). 2008-05 -> 2010-11.
+# Ten cot co dau cham ("emp.var.rate") — silver doi sang snake_case.
+# Tai lieu: docs/sourcing/uc2-datasets.md
+
+name: bank_marketing_additional
+source_type: httpfile
+description: "UCI Bank Marketing - bank-additional-full.csv (41.188 dong, + chi so vi mo)"
+owner: namth
+enabled: true
+
+httpfile:
+  urls:
+    uci_222: "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip"
+  compression: zip
+  archive_members: ["bank-additional.zip!bank-additional/bank-additional-full.csv"]
+  file_format: csv
+  csv_delimiter: ";"
+  timeout_seconds: 120
+
+cdc:
+  mode: cdc5
+
+target:
+  dataset: bank_marketing/additional
+
+schedule:
+  enabled: false
+  expression: "cron(0 2 1 * ? *)"
+
+runtime:
+  profile: src-shell
+  timeout_minutes: 15

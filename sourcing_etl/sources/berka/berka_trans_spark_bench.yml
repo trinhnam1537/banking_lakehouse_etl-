@@ -1,0 +1,66 @@
+# BENCHMARK (10-25): cung cau hinh berka_trans nhung checkpoint + dataset rieng, de do
+# Spark song song vs Python Shell (115 s) tren 1.056.320 dong. reset_checkpoint de do lai.
+# Berka (PKDD'99): du lieu THAT da an danh cua mot ngan hang Sec, 1993-1998.
+# Nguon: MariaDB cong khai cua CTU, relational.fel.cvut.cz:3306, database `financial`
+# (BAN GOC, khong phai Financial_std). Phan tich nguon: docs/sourcing/berka.md.
+#
+# Giao dich: 1.056.320 dong, khoa chinh trans_id (1..3.682.987, co khoang trong).
+#   type      PRIJEM = ghi CO (405.083) | VYDAJ = ghi NO (634.571)
+#             VYBER (16.666) = loi da biet cua Berka: rut tien ghi o cot type -> silver gop vao VYDAJ
+#   operation VYBER (rut tien mat) | PREVOD NA UCET (chuyen DI ngan hang khac)
+#             VKLAD (nop tien mat) | PREVOD Z UCTU (nhan TU ngan hang khac)
+#             VYBER KARTOU (rut bang the) | NULL (183.114 — dung bang so dong lai UROK)
+#   k_symbol  UROK lai | SLUZBY phi sao ke | SIPO ho gia dinh | DUCHOD luong huu
+#             POJISTNE bao hiem | UVER tra vay | SANKC. UROK lai phat khi am
+#             NULL (481.881) va ' ' (53.433, MOT dau cach) — silver gop ca hai thanh NULL
+#   bank, account  ngan hang + tai khoan doi ung (NULL khi khong phai chuyen khoan)
+#   amount, balance  so nguyen CZK. 2.999 dong co balance AM.
+#
+# CDC1 theo trans_id, KHONG theo date: trans_id KHONG tang theo ngay (105.300 cap
+# nguoc thu tu) nen date khong dung lam moc duoc. Nguon tinh nen lan dau keo het,
+# cac lan sau NO_DATA. Ly do chon CDC1 thay vi CDC5 cho bang nay: anh chup PARTIAL
+# sau moi 20 lo x 5.000 dong — job chet giua chung (mang Singapore <-> Praha) thi
+# lan sau chay TIEP tu trans_id da ghi, khong keo lai 1 trieu dong tu dau.
+# Muon keo lai toan bo: reset_checkpoint("berka_trans").
+
+name: berka_trans_spark_bench
+source_type: jdbc
+description: "BENCHMARK Spark JDBC song song: keo lai TOAN BO financial.trans vao dataset rieng (khong co silver)"
+owner: namth
+enabled: true
+
+jdbc:
+  secret_name: fingraph/src/berka_ctu
+  driver: mysql
+  # > 1 trieu dong -> Spark (profile src-spark) doc SONG SONG: 8 ket noi, moi ket noi mot
+  # khoang trans_id. Bound bo trong -> job tu SELECT MIN/MAX tren dung cau query (da loc
+  # :watermark), nen lan CDC1 sau chi chia phan moi. 8 = lich su voi server cong khai CTU.
+  # (Truoc 10-25: Python Shell chia khuc keyset 50.000 dong/truy van, 115 s cho 1,06 trieu dong.)
+  parallel:
+    column: trans_id
+    num_partitions: 8
+  fetch_size: 10000
+  query: |
+    SELECT trans_id, account_id, `date`, `type`, operation, amount, balance,
+           k_symbol, bank, `account`
+    FROM financial.trans
+    WHERE trans_id > :watermark
+
+cdc:
+  mode: cdc1
+  watermark_column: trans_id
+  watermark_type: int
+  initial_watermark: "0"
+
+target:
+  # Dataset rieng, KHONG co entry silver -> chain khong chay, silver_berka.trans khong bi nhan doi
+  dataset: berka/trans_spark_bench
+
+schedule:
+  enabled: false
+  expression: "cron(0 20 ? * SUN *)"
+
+runtime:
+  engine: spark
+  profile: src-spark
+  timeout_minutes: 30

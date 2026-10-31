@@ -1,6 +1,6 @@
 """Đóng gói code ETL thành MỘT etl.zip dùng cho cả Glue lẫn Lambda.
 
-Package nằm ở gốc zip (sourcing/, silver/, orchestrator/, simulators/) nên:
+Package nằm ở gốc zip (sourcing/, silver/, orchestrator/, simulators/, transforms/) nên:
   - Glue: bootstrap chèn zip vào sys.path rồi `import sourcing.main`
   - Lambda: handler khai thẳng `orchestrator.trigger.handler`,
     `orchestrator.schedule_sync.handler`
@@ -19,7 +19,7 @@ import zipfile
 from typing import Iterable, List
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-PACKAGES = ("sourcing", "silver", "orchestrator", "simulators")
+PACKAGES = ("sourcing", "silver", "orchestrator", "simulators", "transforms")
 # Ngoai *.py, dong goi them file du lieu cua package (vd simulators/corebank/schema.sql:
 # simulator tren may nguon AWS tu ap schema khi DB rong). Glue/Lambda khong dung toi.
 DATA_SUFFIXES = (".sql",)

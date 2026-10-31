@@ -107,3 +107,36 @@ def check_select(sql: str) -> Tuple[bool, str]:
     if first not in ("SELECT", "WITH"):
         return False, f"query phai bat dau bang SELECT hoac WITH, dang la {first!r}"
     return True, ""
+
+
+def sql_literal(value) -> str:
+    """Giá trị Python -> literal SQL. Số giữ nguyên, còn lại thành chuỗi '...' ('' thoát)."""
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    s = str(value)
+    # Moc int luu dang chuoi trong checkpoint ("1056320"): giu la so de DB dung index
+    if s.lstrip("-").isdigit():
+        return s
+    return "'" + s.replace("'", "''") + "'"
+
+
+def render_literal(sql: str, values: dict) -> str:
+    """`:ten` -> literal. Dành cho Spark JDBC: `dbtable=(<sql>) q` không bind được tham số.
+
+    Giá trị đến từ checkpoint/params của entry (không phải người dùng cuối) và đi
+    qua `sql_literal` (thoát dấu nháy). Chuỗi, comment, `::` được giữ nguyên như
+    `to_pyformat`. Tên không có trong `values` -> giữ nguyên để DB báo lỗi.
+    """
+    out: List[str] = []
+    pos = 0
+    for m in _TOKEN.finditer(sql):
+        out.append(sql[pos:m.start()])
+        name = m.group("name")
+        out.append(sql_literal(values[name]) if name and name in values else m.group(0))
+        pos = m.end()
+    out.append(sql[pos:])
+    return "".join(out)
