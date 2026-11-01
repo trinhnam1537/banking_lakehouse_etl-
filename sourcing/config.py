@@ -335,8 +335,14 @@ class ScheduleConfig:
 #   src-spark  Glue Spark (G.1X x N), có internet: nguồn > ~1 triệu dòng. jdbc đọc song
 #              song theo jdbc.parallel; s3file đọc cả prefix bằng spark.read (CDC5).
 #              Điểm vào sourcing.spark_main, cùng hợp đồng raw/manifest/job_log.
-PROFILES = ("src-shell", "src-vpc", "src-spark")
+#   edge       KHÔNG phải Glue: chạy trên chính máy nguồn EC2 (cạnh broker Redpanda), do
+#              systemd timer gọi `sourcing.main` (repo hạ tầng: modules/kafka, kafka-sink.sh).
+#              Glue ngoài VPC không tới được broker IP riêng; Glue trong VPC (src-vpc) cần NAT
+#              hoặc VPC endpoint (~7 USD/tháng mỗi endpoint). Máy nguồn đã chạy sẵn -> 0 USD thêm.
+#              Lambda trigger từ chối entry edge; lịch nằm ở systemd, không ở EventBridge.
+PROFILES = ("src-shell", "src-vpc", "src-spark", "edge")
 SPARK_PROFILES = ("src-spark",)
+EDGE_PROFILES = ("edge",)
 SPARK_SOURCE_TYPES = ("jdbc", "s3file")
 # Profile khai ở đây nhưng repo hạ tầng chưa tạo: entry đang BẬT mà dùng chúng bị
 # chặn trong pytest. Xoá tên khỏi tuple này sau khi apply xong ở repo hạ tầng.
@@ -660,6 +666,14 @@ def _validate(cfg: SourceConfig) -> None:
             f"[{n}] engine spark chua ho tro source_type {cfg.source_type.value!r} "
             f"(co: {', '.join(SPARK_SOURCE_TYPES)})."
         )
+    if cfg.runtime.profile in EDGE_PROFILES:
+        if cfg.source_type is not SourceType.KAFKA:
+            raise ConfigError(f"[{n}] profile edge hien chi cho source_type kafka.")
+        if cfg.schedule.enabled:
+            raise ConfigError(
+                f"[{n}] profile edge: lich chay la systemd timer tren may nguon (kafka-sink.sh), "
+                f"de schedule.enabled: false — EventBridge se goi Glue job khong ton tai."
+            )
     if is_spark and cfg.source_type is SourceType.S3FILE and cfg.cdc.mode is not CdcMode.CDC5:
         raise ConfigError(f"[{n}] s3file tren spark chi ho tro cdc5 (doc ca prefix moi lan).")
 

@@ -58,10 +58,55 @@ Cách sinh (theo tinh thần Sparkov):
 
 | Entry | Reader | Mốc | Ghi chú |
 |---|---|---|---|
-| `cards_authorizations` | `kafka` | offset từng partition | Micro-batch 15 phút (`rate(15 minutes)` khi bật). Glue Streaming tốn ~20 USD/ngày |
+| `cards_authorizations` | `kafka`, profile **`edge`** | offset từng partition | Micro-batch 5 phút trên **máy nguồn** (systemd), không qua Glue |
 | `cards_chargebacks` | `s3file` csv | khoá S3 | |
 
 Raw của Kafka giữ nguyên bản tin, `value` là chuỗi JSON (như [ibm-aml.md](ibm-aml.md#5-entry-sourcing)).
+
+### 3.1 Triển khai trên AWS: Kafka build dần (10-31)
+
+```
+máy nguồn EC2 (spot t3.medium, đã chạy sẵn Redpanda + Postgres core banking)
+  fingraph-cards-stream.service   simulators.cards.stream generate --live --rate 2  ─► topic card.authorizations (3 partition, giữ 7 ngày)
+        │ chủ thẻ = khách core banking (Postgres cùng máy); nhãn gian lận -> landing/_inbox/cards/labels/ sau 20 ngày
+        ▼
+  Redpanda :19092
+        ▼
+  fingraph-kafka-sink.timer (5 phút sau lần trước XONG)  ─► sourcing.main --JOB_NAME cards_authorizations
+        │ cấu hình từ job_config, mốc = offset từng partition trong job_log (CKPT#)
+        ▼
+  landing/cards/authorizations/ingest_date=.../*.ndjson.gz  +  landing/_manifests/cards/authorizations/...
+```
+
+**Vì sao consumer chạy trên máy nguồn (profile `edge`) mà không qua Glue:** broker chỉ có IP riêng trong VPC.
+Glue Python Shell chạy ngoài VPC nên không tới được. Đưa Glue vào VPC (`src-vpc`) thì cần NAT (~32 USD/tháng)
+hoặc VPC endpoint cho S3/DynamoDB/Secrets/SSM/Logs (~7 USD/tháng mỗi endpoint interface). Máy nguồn đã chạy sát
+broker nên **không tốn thêm đồng nào**. Framework vẫn y nguyên (`sourcing.main`, cùng job_log, manifest, layout
+raw), chỉ khác chỗ chạy.
+
+Ràng buộc của profile `edge` (`sourcing/config.py`): chỉ cho `source_type: kafka`, bắt buộc `schedule.enabled:
+false` (lịch nằm ở systemd), và Lambda trigger từ chối entry `edge`.
+
+Vận hành (qua SSM, không cần SSH):
+
+```bash
+aws ssm start-session --target <kafka_instance_id> --profile fingraph
+sudo journalctl -u fingraph-cards-stream -f                        # producer
+sudo systemctl start fingraph-kafka-sink && journalctl -u fingraph-kafka-sink -n 50   # consumer chạy ngay
+cd /opt/fingraph && sudo docker compose exec redpanda rpk topic describe card.authorizations
+sudo docker compose exec redpanda rpk group describe fingraph-src-cards   # lag consumer
+```
+
+Hoặc xem trên Redpanda Console: `.\scripts\console.ps1` (repo hạ tầng).
+
+Bật/tắt: `cards_stream_enabled`, `kafka_sink_jobs` trong `envs/dev/terraform.tfvars` (repo hạ tầng). Đổi
+user_data thì **EC2 được dựng lại** (spot one-time): EBS dữ liệu (Redpanda, Postgres) giữ nguyên, IP riêng đổi,
+và Terraform tự cập nhật `--KAFKA_BOOTSTRAP` của các Glue job.
+
+**Giai đoạn tiếp theo:**
+1. Entry silver `cards_authorizations`: tách `card_transaction` / `merchant` / `card_holder`, khử trùng theo `trans_num`.
+2. Streaming thật (Spark Structured Streaming / Glue Streaming A2, `enable_streaming`) để đo độ trễ so với micro-batch. Chỉ bật trong tuần benchmark (~20 USD/ngày).
+3. Thêm topic thứ hai: `aml.transfers` (IBM AML replay) dùng cùng consumer `edge`.
 
 ## 4. Chất lượng dữ liệu: việc của silver
 

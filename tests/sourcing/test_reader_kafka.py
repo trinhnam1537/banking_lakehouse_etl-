@@ -46,16 +46,21 @@ class _Msg:
 
 
 class _Consumer:
-    def __init__(self, conf, partitions, rounds):
+    def __init__(self, conf, partitions, rounds, high=None):
         self.conf = conf
         self.partitions = partitions
         self.rounds = list(rounds)
+        # high-watermark tung partition; mac dinh rat lon = "chua toi cuoi"
+        self.high = high or {}
         self.assigned = None
         self.closed = False
 
     def list_topics(self, topic, timeout=None):
         t = types.SimpleNamespace(error=None, partitions={p: None for p in self.partitions})
         return types.SimpleNamespace(topics={"trades": t})
+
+    def get_watermark_offsets(self, tp, timeout=None):
+        return 0, self.high.get(tp[1], 10**9)
 
     def assign(self, tps):
         self.assigned = tps
@@ -76,7 +81,7 @@ def fake_kafka(monkeypatch):
     holder = {}
 
     def _consumer(conf):
-        c = _Consumer(conf, holder["partitions"], holder["rounds"])
+        c = _Consumer(conf, holder["partitions"], holder["rounds"], holder.get("high"))
         holder["c"] = c
         return c
 
@@ -143,3 +148,24 @@ def test_kafka_topic_khong_ton_tai(fake_kafka):
     fake_kafka.update(partitions=[0], rounds=[])
     with pytest.raises(RuntimeError, match="khong thay topic 'khac'"):
         list(KafkaReader(_kafka_cfg(topic="khac")).read(None))
+
+
+def test_kafka_dung_o_high_watermark_chup_luc_bat_dau(fake_kafka):
+    """Producer chay lien tuc: consume khong bao gio rong. Lan chay phai dung o moc
+    chup luc bat dau (su co 10-31: consumer chay mai, khong ghi gi xuong S3)."""
+    from sourcing.readers.kafka import KafkaReader
+
+    # high = 3 (offset 0..2 co san luc bat dau); producer day tiep offset 3, 4... vo han
+    fake_kafka.update(partitions=[0], high={0: 3},
+                      rounds=[[_Msg(0, 0), _Msg(0, 1)], [_Msg(0, 2), _Msg(0, 3)]] + [[_Msg(0, 9)]] * 50)
+    batches = list(KafkaReader(_kafka_cfg()).read(None))
+    assert [r["_kafka_offset"] for b in batches for r in b.records] == [0, 1, 2]
+    assert batches[-1].watermark == "2"
+
+
+def test_kafka_khong_co_tin_moi_thi_khong_consume(fake_kafka):
+    from sourcing.readers.kafka import KafkaReader
+
+    fake_kafka.update(partitions=[0, 1], high={0: 42, 1: 0}, rounds=[[_Msg(0, 99)]])
+    batches = list(KafkaReader(_kafka_cfg()).read(Checkpoint("t_job", {"0": "41"})))
+    assert batches == []

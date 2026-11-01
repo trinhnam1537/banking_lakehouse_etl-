@@ -66,6 +66,12 @@ class KafkaReader(Reader):
         part_ids = sorted(md.topics[self.k.topic].partitions.keys())
 
         assignments: List[TopicPartition] = []
+        # Moc dung cua lan chay: high-watermark tung partition CHUP LUC BAT DAU. Producer chay
+        # lien tuc (simulators.cards.stream) thi `consume` khong bao gio tra rong -> khong co
+        # moc nay, mot "micro-batch" doc toi max_records_per_run (500k tin ~ 70 gio o 2 tin/s,
+        # su co 10-31). Tin den sau moc thuoc lan chay sau.
+        end: Dict[int, int] = {}
+        start_at: Dict[int, int] = {}
         for pid in part_ids:
             source = checkpoint or self._seed
             saved = source.get(str(pid)) if source else None
@@ -73,19 +79,32 @@ class KafkaReader(Reader):
                 # +1: offset đã lưu là bản tin CUỐI đã xử lý, không phải bản
                 # tin kế tiếp. Quên +1 là đọc lại một bản tin mỗi lần chạy.
                 assignments.append(TopicPartition(self.k.topic, pid, int(saved) + 1))
+                start_at[pid] = int(saved) + 1
             else:
                 from confluent_kafka import OFFSET_BEGINNING, OFFSET_END  # noqa: PLC0415
 
                 start = (OFFSET_BEGINNING if self.k.auto_offset_reset == "earliest"
                          else OFFSET_END)
                 assignments.append(TopicPartition(self.k.topic, pid, start))
+            # latest + chua co moc: khong chup (chup thi lan nao cung bat dau tu cuoi -> khong bao
+            # gio co tin, khong bao gio co moc). Giu hanh vi cu: doc toi khi het tin.
+            if saved is not None or self.k.auto_offset_reset == "earliest":
+                low, high = self._consumer.get_watermark_offsets(
+                    TopicPartition(self.k.topic, pid, 0), timeout=20)
+                end[pid] = high
+                start_at.setdefault(pid, low)
         self._consumer.assign(assignments)
+
+        done = {pid for pid in end if start_at[pid] >= end[pid]}
+        bounded_only = len(end) == len(part_ids)
+        if bounded_only and len(done) == len(part_ids):
+            return  # khong co tin moi o partition nao
 
         buffers: Dict[int, List[dict]] = {p: [] for p in part_ids}
         last_offset: Dict[int, int] = {}
         total = 0
 
-        while total < self.k.max_records_per_run:
+        while total < self.k.max_records_per_run and not (bounded_only and len(done) == len(part_ids)):
             msgs = self._consumer.consume(
                 num_messages=min(BATCH_SIZE, self.k.max_records_per_run - total),
                 timeout=self.k.poll_timeout_seconds,
@@ -100,6 +119,12 @@ class KafkaReader(Reader):
                     raise RuntimeError(f"[{self.cfg.name}] loi Kafka: {m.error()}")
 
                 pid = m.partition()
+                if pid in end:
+                    if m.offset() >= end[pid]:
+                        done.add(pid)  # vuot moc chup luc bat dau -> de lan sau
+                        continue
+                    if m.offset() >= end[pid] - 1:
+                        done.add(pid)
                 rec = {
                     "_kafka_topic": m.topic(),
                     "_kafka_partition": pid,
