@@ -1,0 +1,43 @@
+# Silver MBD-mini (Sber AI Lab) targets — docs/sourcing/uc2-datasets.md
+# Nguon: entry sourcing `mbd_targets` (httpfile tar.gz parquet, CDC5) -> landing/mbd/targets/
+# Mot dong = (khach doanh nghiep, thang bao cao). target_1..4 = khach mua san pham k trong
+# thang SAU (ten san pham bi an danh -> fin:AnonymousProduct_k tren ontology).
+# Bo tinh -> overwrite_table. ds_partition_date = thang bao cao (mon), ~12 gia tri.
+
+name: mbd_target_month
+description: MBD-mini - nhan mua 4 san pham an danh theo khach x thang
+owner: namth
+enabled: true
+
+source:
+  dataset: mbd/targets
+
+target:
+  database: silver_mbd
+  table: target_month
+  ddl: silver_mbd/target_month.sql
+
+columns:
+  - {name: client_id, nullable: false, comment: "Ma khach doanh nghiep (hash SHA-256 cua Sber)"}
+  - {name: report_month, path: mon, type: date, nullable: false, comment: "Ngay cuoi thang bao cao"}
+  - {name: target_1, type: boolean, comment: "Mua san pham an danh 1 trong thang sau"}
+  - {name: target_2, type: boolean, comment: "Mua san pham an danh 2 trong thang sau"}
+  - {name: target_3, type: boolean, comment: "Mua san pham an danh 3 trong thang sau"}
+  - {name: target_4, type: boolean, comment: "Mua san pham an danh 4 trong thang sau"}
+  - {name: trans_count, type: int, comment: "So giao dich cua khach trong thang"}
+  - {name: diff_trans_date, type: int, comment: "Khoang ngay giua giao dich dau va cuoi trong thang"}
+  - {name: fold, type: int, comment: "Fold 0..4 cua bo du lieu (chia train/test theo khach)"}
+
+technical:
+  keys: [client_id, report_month]
+  partition_date: {source: column, column: report_month}
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [client_id, report_month]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+  min_rows: 1000000

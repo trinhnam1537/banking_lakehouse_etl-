@@ -15,6 +15,7 @@ Hai nguyên tắc:
 
 from __future__ import annotations
 
+import re
 from typing import Dict, List
 
 from .config import ColumnSpec
@@ -86,6 +87,12 @@ def transform_sql(expr: str, col: ColumnSpec) -> str:
     return col.transform.replace("{col}", expr) if col.transform else expr
 
 
+def split_path(path: str) -> List[str]:
+    r"""Tách đường chấm; `\.` là dấu chấm THẬT trong tên khoá (Bank Marketing `emp.var.rate`):
+    `emp\.var\.rate` -> ["emp.var.rate"], `a.b` -> ["a", "b"]."""
+    return [part.replace("\\.", ".") for part in re.split(r"(?<!\\)\.", path)]
+
+
 def json_path(path: str, root: str = "$") -> str:
     """`a.b-c.d` -> `$['a']['b-c']['d']` cho get_json_object.
 
@@ -94,7 +101,7 @@ def json_path(path: str, root: str = "$") -> str:
     """
     if not path:
         return root
-    return root + "".join(f"[{_lit(p)}]" for p in path.split("."))
+    return root + "".join(f"[{_lit(p)}]" for p in split_path(path))
 
 
 # ---------- schema cho from_json: moi truong la mot la chuoi ----------
@@ -111,7 +118,7 @@ def path_tree(paths: List[str]) -> Dict:
     tree: Dict = {}
     for p in sorted(set(paths), key=lambda s: (s.count("."), s)):
         node = tree
-        parts = p.split(".")
+        parts = split_path(p)
         for i, part in enumerate(parts):
             last = i == len(parts) - 1
             if part in node and node[part] is None:

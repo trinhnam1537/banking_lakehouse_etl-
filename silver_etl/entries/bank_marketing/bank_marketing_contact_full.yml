@@ -1,0 +1,52 @@
+# Silver UCI Bank Marketing (bank-full.csv, 45.211 dong, 05/2008-11/2010) — docs/sourcing/uc2-datasets.md
+# Nguon: entry sourcing `bank_marketing_full` (httpfile, CDC5) -> landing/bank_marketing/full/
+# Mot dong = mot lan goi telemarketing toi mot khach (KHONG co ma khach). Nhan UC2: subscribed.
+# Bo tinh, chup lai toan bo moi lan -> simple overwrite_table. Khoa: (source_file, source_row).
+# Luu y: duration_sec chi biet SAU cuoc goi -> RO RI nhan neu dung lam dac trung du doan.
+
+name: bank_marketing_contact_full
+description: Bank Marketing (bank-full) - lan goi telemarketing va ket qua dang ky tien gui co ky han
+owner: namth
+enabled: true
+
+source:
+  dataset: bank_marketing/full
+
+target:
+  database: silver_bank_marketing
+  table: contact_full
+  ddl: silver_bank_marketing/contact_full.sql
+
+columns:
+  - {name: source_file, path: _src_file, nullable: false, comment: "File goc trong archive UCI"}
+  - {name: source_row, path: _src_row, type: bigint, nullable: false, comment: "So dong trong file goc (khoa cung source_file)"}
+  - {name: age, type: int, comment: "Tuoi khach"}
+  - {name: job, comment: "Nghe nghiep: admin., blue-collar, management, ... , unknown"}
+  - {name: marital, comment: "married | single | divorced (divorced gom ca goa)"}
+  - {name: education, comment: "primary | secondary | tertiary | unknown"}
+  - {name: credit_default, path: default, comment: "Co no xau: yes | no | unknown"}
+  - {name: balance_eur, path: balance, type: "decimal(18,2)", comment: "So du binh quan nam (EUR), co the am"}
+  - {name: housing_loan, path: housing, comment: "Co vay mua nha: yes | no | unknown"}
+  - {name: personal_loan, path: loan, comment: "Co vay tieu dung: yes | no | unknown"}
+  - {name: contact_channel, path: contact, comment: "cellular | telephone | unknown"}
+  - {name: last_contact_day, path: day, type: int, comment: "Ngay trong thang cua lan goi cuoi"}
+  - {name: last_contact_month, path: month, comment: "Thang lan goi cuoi: jan..dec"}
+  - {name: duration_sec, path: duration, type: int, comment: "Do dai cuoc goi (giay). CHI biet sau cuoc goi -> khong dung lam dac trung du doan"}
+  - {name: campaign_contacts, path: campaign, type: int, comment: "So lan goi trong dot nay (ke ca lan nay)"}
+  - {name: days_since_prev_contact, path: pdays, type: int, comment: "So ngay tu lan goi dot truoc; -1 = chua tung goi"}
+  - {name: prev_contacts, path: previous, type: int, comment: "So lan goi truoc dot nay"}
+  - {name: prev_outcome, path: poutcome, comment: "Ket qua dot truoc: success | failure | other | unknown"}
+  - {name: subscribed, path: y, type: boolean, nullable: false, comment: "NHAN UC2: khach dang ky tien gui co ky han (fin:TermDeposit)"}
+
+technical:
+  keys: [source_file, source_row]
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [source_file, source_row, subscribed]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: fail
+  min_rows: 40000

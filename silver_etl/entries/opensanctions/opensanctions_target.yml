@@ -1,0 +1,59 @@
+# Silver OpenSanctions targets (bo `sanctions`, targets.simple.csv ~72 nghin doi tuong) — docs/sourcing/opensanctions.md
+# Nguon: entry sourcing `opensanctions_targets` (httpfile, CDC5 hang tuan) -> landing/opensanctions/targets/
+# Moi lan la ANH CHUP DAY DU -> SCD2 snapshot: doi tuong bi go khoi danh sach thi dong ban cu (D).
+# last_seen doi moi lan crawl -> hash: false (khong sinh phien ban rac).
+# Cot nhieu gia tri trong CSV noi bang ';' -> silver tach thanh array<string>.
+# Dung cho: sang loc khach (khop ten + ngay sinh + quoc gia voi corebank.client), ontology SanctionedEntity.
+# Giay phep CC BY-NC 4.0 (phi thuong mai).
+
+name: opensanctions_target
+description: OpenSanctions - doi tuong bi cam van (nguoi, to chuc, tau...), lich su SCD2
+owner: namth
+enabled: true
+
+source:
+  dataset: opensanctions/targets
+
+target:
+  database: silver_opensanctions
+  table: target
+  ddl: silver_opensanctions/target.sql
+
+columns:
+  - {name: entity_id, path: id, nullable: false, comment: "Ma OpenSanctions (NK-...), on dinh giua cac lan chup"}
+  - {name: entity_schema, path: schema, nullable: false, comment: "Loai FtM: Person | Organization | Company | Vessel | Airplane | LegalEntity"}
+  - {name: name, nullable: false, comment: "Ten chinh"}
+  - {name: aliases_raw, path: aliases, keep: false}
+  - {name: birth_date, comment: "Ngay sinh/thanh lap (chuoi: co the chi co nam, nhieu gia tri noi ';')"}
+  - {name: countries_raw, path: countries, keep: false}
+  - {name: addresses_raw, path: addresses, keep: false}
+  - {name: identifiers_raw, path: identifiers, keep: false}
+  - {name: sanctions, comment: "Mo ta bien phap cam van (van ban tu do)"}
+  - {name: phones_raw, path: phones, keep: false}
+  - {name: emails_raw, path: emails, keep: false}
+  - {name: programs_raw, path: program_ids, keep: false}
+  - {name: datasets_raw, path: dataset, keep: false}
+  - {name: first_seen, type: timestamp, comment: "Lan dau OpenSanctions thay doi tuong"}
+  - {name: last_seen, type: timestamp, hash: false, comment: "Lan gan nhat thay (doi moi lan crawl)"}
+  - {name: last_change, type: timestamp, comment: "Lan gan nhat noi dung doi"}
+  - {name: aliases, type: "array<string>", expr: "filter(split(aliases_raw, ';'), x -> x <> '')", comment: "Ten khac"}
+  - {name: countries, type: "array<string>", expr: "filter(split(countries_raw, ';'), x -> x <> '')", comment: "Ma quoc gia ISO-2 (chu thuong)"}
+  - {name: addresses, type: "array<string>", expr: "filter(split(addresses_raw, ';'), x -> x <> '')", comment: "Dia chi"}
+  - {name: identifiers, type: "array<string>", expr: "filter(split(identifiers_raw, ';'), x -> x <> '')", comment: "Ma dinh danh: IMO, so ho chieu, ma so thue..."}
+  - {name: phones, type: "array<string>", expr: "filter(split(phones_raw, ';'), x -> x <> '')", comment: "PII: so dien thoai"}
+  - {name: emails, type: "array<string>", expr: "filter(split(emails_raw, ';'), x -> x <> '')", comment: "PII: email"}
+  - {name: program_ids, type: "array<string>", expr: "filter(split(programs_raw, ';'), x -> x <> '')", comment: "Chuong trinh cam van: US-GLOMAG, EU-RUS..."}
+  - {name: source_datasets, type: "array<string>", expr: "filter(split(datasets_raw, ';'), x -> x <> '')", comment: "Danh sach nguon (OFAC SDN, EU...)"}
+
+technical:
+  keys: [entity_id]
+
+writer:
+  type: scd2
+  snapshot: true
+
+quality:
+  not_null: [entity_id, entity_schema, name]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+  min_rows: 50000
