@@ -186,6 +186,12 @@ class SourcingType(JobType):
         except ConfigError as e:
             raise TriggerError(f"cau hinh khong hop le: {e}") from None
 
+        if cfg.runtime.profile == "edge":
+            raise TriggerError(
+                f"{name}: profile edge chay tren may nguon (systemd fingraph-kafka-sink), khong qua "
+                f"Glue. Chay tay: aws ssm start-session ... roi `sudo systemctl start fingraph-kafka-sink`."
+            )
+
         # Test voi override tren job CDC1 ma khong dry-run se TIEN CHECKPOINT
         # THAT bang du lieu cua lan chay "khac thuong" do (vd max_pages=1) —
         # lan chay theo lich sau do bo sot phan con lai ma khong bao loi gi.

@@ -42,4 +42,9 @@ def build_reader(cfg: SourceConfig, **kwargs) -> Reader:
 
         return HttpFileReader(cfg)
 
+    if cfg.source_type is SourceType.ONEDRIVE:
+        from .onedrive import OneDriveReader
+
+        return OneDriveReader(cfg, secrets_client=kwargs.get("secrets_client"))
+
     raise ValueError(f"[{cfg.name}] chua co reader cho '{cfg.source_type}'")

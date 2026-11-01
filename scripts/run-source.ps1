@@ -29,6 +29,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $repoRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path $python)) { $python = "python" }
+# Console Windows mac dinh cp1252: in duong dan tieng Viet (OneDrive "Tài liệu") lam Python chet UnicodeEncodeError
+$env:PYTHONUTF8 = "1"
 
 # Tìm file YAML theo tên job — tên file là duy nhất trên toàn cây (xem sourcing_etl/README.md)
 $yml = Get-ChildItem (Join-Path $repoRoot "sourcing_etl\sources") -Recurse -Filter "$Job.yml" |

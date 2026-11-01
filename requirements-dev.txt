@@ -1,5 +1,7 @@
 # Thu vien chi dung de test, KHONG dong goi vao Glue job.
 -r sourcing/requirements.txt
 pytest>=8.0
+# Test doc xlsx (fileparse); Glue cai qua profile src-shell
+openpyxl==3.1.5
 # moto gia lap DynamoDB/S3/SQS/Secrets Manager trong bo nho — test khong cham AWS that
 moto[dynamodb,s3,sqs,secretsmanager]>=5.0

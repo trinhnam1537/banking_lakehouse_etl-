@@ -30,17 +30,19 @@ enabled: true
 jdbc:
   secret_name: fingraph/src/berka_ctu
   driver: mysql
-  # Chia khuc theo keyset: moi khuc 50.000 dong la MOT truy van ngan
-  # (WHERE trans_id > :watermark ORDER BY trans_id LIMIT :chunk_size). Khong giu
-  # mot cursor mo hang chuc phut qua mang Singapore <-> Praha nhu ban SELECT * cu.
-  chunk_size: 50000
+  # > 1 trieu dong -> Spark (profile src-spark) doc SONG SONG: 8 ket noi, moi ket noi mot
+  # khoang trans_id. Bound bo trong -> job tu SELECT MIN/MAX tren dung cau query (da loc
+  # :watermark), nen lan CDC1 sau chi chia phan moi. 8 = lich su voi server cong khai CTU.
+  # (Truoc 10-25: Python Shell chia khuc keyset 50.000 dong/truy van, 115 s cho 1,06 trieu dong.)
+  parallel:
+    column: trans_id
+    num_partitions: 8
+  fetch_size: 10000
   query: |
     SELECT trans_id, account_id, `date`, `type`, operation, amount, balance,
            k_symbol, bank, `account`
     FROM financial.trans
     WHERE trans_id > :watermark
-    ORDER BY trans_id
-    LIMIT :chunk_size
 
 cdc:
   mode: cdc1
@@ -56,6 +58,6 @@ schedule:
   expression: "cron(0 20 ? * SUN *)"
 
 runtime:
-  engine: python_shell
-  # ~1 trieu dong qua internet Singapore -> Praha; PARTIAL giu tien do neu het gio
-  timeout_minutes: 60
+  engine: spark
+  profile: src-spark
+  timeout_minutes: 30

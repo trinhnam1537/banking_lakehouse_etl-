@@ -85,7 +85,8 @@ def main(argv=None, ssm_client=None, s3_client=None, tmp_dir="/tmp"):
     os.environ["ETL_RELEASE"] = release
 
     module_name = arg("ETL_MODULE", argv) or "sourcing.main"
-    if not re.match(r"^(sourcing|silver)\.[a-z_]+$", module_name):
+    # transforms.main: job gold-spark / pretrain-spark (PySpark tu viet, khong YAML)
+    if not re.match(r"^(sourcing|silver|transforms)\.[a-z_]+$", module_name):
         raise SystemExit("ETL_MODULE khong duoc phep: %r" % module_name)
     module = importlib.import_module(module_name)
     return module.main()

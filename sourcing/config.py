@@ -47,6 +47,7 @@ class SourceType(str, Enum):
     KAFKA = "kafka"
     S3FILE = "s3file"
     HTTPFILE = "httpfile"
+    ONEDRIVE = "onedrive"
 
 
 class Engine(str, Enum):
@@ -146,6 +147,14 @@ class JdbcSource:
     init_sql: List[str] = field(default_factory=list)
     # Mở phiên READ ONLY. SQL do entry tự viết -> đây là hàng rào ở phía DB.
     read_only: bool = True
+    # CHỈ engine spark (profile src-spark): Spark JDBC đọc SONG SONG, mỗi partition
+    # một kết nối, chia theo khoảng giá trị của một cột số:
+    #   column          cột chia (số nguyên/ngày, nên có index), vd trans_id
+    #   num_partitions  số kết nối song song (đừng vượt giới hạn kết nối của DB)
+    #   lower_bound / upper_bound  bỏ trống -> tự SELECT MIN/MAX trên đúng câu query
+    #                   (đã lọc :watermark). Bound chỉ để CHIA khoảng, không lọc dòng.
+    # Xem sourcing/spark_main.py.
+    parallel: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -201,9 +210,14 @@ class HttpFileSource:
     index_url: str = ""
     index_follow: List[str] = field(default_factory=list)
     files_path: str = ""
-    file_format: str = "csv"  # csv | ndjson | json
+    file_format: str = "csv"  # csv | ndjson | json | xlsx | parquet
     csv_delimiter: str = ","
-    compression: str = "auto"  # auto (theo đuôi .gz) | none | gzip
+    # auto (theo đuôi .gz) | none | gzip | zip | tar.gz
+    # zip / tar.gz: mỗi URL là MỘT archive, đọc các member khớp archive_members.
+    compression: str = "auto"
+    # fnmatch trên đường dẫn trong archive; zip lồng zip dùng "!":
+    #   "bank-additional.zip!bank-additional/bank-additional-full.csv"
+    archive_members: List[str] = field(default_factory=list)
     encoding: str = "utf-8-sig"
     csv_repeated_header: bool = False
     headers: Dict[str, str] = field(default_factory=dict)
@@ -214,6 +228,49 @@ class HttpFileSource:
     # phiên bản cũ nhất còn lại nghĩa là đã MẤT delta ở giữa -> báo lỗi thay vì
     # nạp tiếp và để silver thiếu thay đổi mà không ai biết.
     require_contiguous: bool = False
+
+
+@dataclass
+class OneDriveSource:
+    """File người dùng upload lên MỘT thư mục OneDrive cá nhân (Microsoft Graph).
+
+    Xác thực: refresh token OAuth của tài khoản Microsoft cá nhân, lưu trong
+    Secrets Manager (`secret_name`, JSON {client_id, refresh_token, tenant}).
+    KHÔNG dùng mật khẩu — Graph không cho đăng nhập bằng mật khẩu với tài khoản
+    cá nhân. Token sinh một lần bằng `scripts/onedrive_login.py` (device code);
+    mỗi lần chạy reader đổi lấy token mới và ghi lại vào secret.
+
+    CDC1: mốc = `<lastModifiedDateTime>|<đường dẫn>` của file cuối đã nạp
+    (`cdc.watermark_column: _file_key`, `watermark_type: string`). File bị
+    upload ĐÈ (cùng tên) có thời điểm sửa mới -> được nạp lại.
+    CDC5: nạp lại mọi file khớp mỗi lần chạy.
+    """
+
+    secret_name: str
+    # Đường dẫn thư mục tính từ gốc OneDrive, vd "Tài liệu/fingraph". So khớp tên
+    # theo Unicode NFC + không phân biệt hoa thường: OneDrive web lưu tên tiếng
+    # Việt ở dạng tổ hợp (NFD), gõ tay thường ra dạng dựng sẵn (NFC).
+    folder_path: str = ""
+    # HOẶC ID thư mục (ưu tiên): lấy từ link chia sẻ — tham số `resid=` sau khi mở
+    # https://1drv.ms/f/... (vd "AFEECB8F63339F68!s891c5821359e4271b88e13a60880a460").
+    # Không phụ thuộc tên: đổi tên/di chuyển thư mục trên web vẫn đọc đúng.
+    folder_id: str = ""
+    file_format: str = "csv"  # csv | ndjson | json | xlsx
+    # Mẫu tên file (fnmatch, không phân biệt hoa thường), vd "*.xlsx"
+    name_pattern: str = "*"
+    recursive: bool = False
+    csv_delimiter: str = ","
+    compression: str = "auto"  # auto (theo đuôi .gz) | none | gzip
+    encoding: str = "utf-8-sig"
+    csv_repeated_header: bool = False
+    sheet: str = ""  # xlsx: rỗng = sheet đầu tiên
+    header_row: int = 1  # xlsx: dòng chứa tên cột (đếm từ 1)
+    # Bỏ qua file vừa sửa trong N giây: người dùng còn đang upload/sửa trên web
+    # thì lần chạy sau mới nạp, không nạp nửa chừng.
+    min_age_seconds: int = 300
+    timeout_seconds: int = 120
+    batch_size: int = 10_000
+    max_files_per_run: int = 100
 
 
 @dataclass
@@ -275,7 +332,18 @@ class ScheduleConfig:
 #
 # Thêm profile = việc của repo hạ tầng TRƯỚC (var.profiles). Tên lạ bị chặn lúc
 # nạp entry thay vì lúc Lambda gọi một Glue job không tồn tại.
-PROFILES = ("src-shell", "src-vpc")
+#   src-spark  Glue Spark (G.1X x N), có internet: nguồn > ~1 triệu dòng. jdbc đọc song
+#              song theo jdbc.parallel; s3file đọc cả prefix bằng spark.read (CDC5).
+#              Điểm vào sourcing.spark_main, cùng hợp đồng raw/manifest/job_log.
+#   edge       KHÔNG phải Glue: chạy trên chính máy nguồn EC2 (cạnh broker Redpanda), do
+#              systemd timer gọi `sourcing.main` (repo hạ tầng: modules/kafka, kafka-sink.sh).
+#              Glue ngoài VPC không tới được broker IP riêng; Glue trong VPC (src-vpc) cần NAT
+#              hoặc VPC endpoint (~7 USD/tháng mỗi endpoint). Máy nguồn đã chạy sẵn -> 0 USD thêm.
+#              Lambda trigger từ chối entry edge; lịch nằm ở systemd, không ở EventBridge.
+PROFILES = ("src-shell", "src-vpc", "src-spark", "edge")
+SPARK_PROFILES = ("src-spark",)
+EDGE_PROFILES = ("edge",)
+SPARK_SOURCE_TYPES = ("jdbc", "s3file")
 # Profile khai ở đây nhưng repo hạ tầng chưa tạo: entry đang BẬT mà dùng chúng bị
 # chặn trong pytest. Xoá tên khỏi tuple này sau khi apply xong ở repo hạ tầng.
 PENDING_PROFILES = ("src-vpc",)
@@ -317,6 +385,7 @@ class SourceConfig:
     kafka: Optional[KafkaSource] = None
     s3file: Optional[S3FileSource] = None
     httpfile: Optional[HttpFileSource] = None
+    onedrive: Optional[OneDriveSource] = None
 
     @property
     def dataset(self) -> str:
@@ -355,6 +424,7 @@ def _build_source_block(raw: Dict[str, Any], stype: SourceType, name: str):
         SourceType.KAFKA: KafkaSource,
         SourceType.S3FILE: S3FileSource,
         SourceType.HTTPFILE: HttpFileSource,
+        SourceType.ONEDRIVE: OneDriveSource,
     }[stype]
     try:
         if stype is SourceType.API and block.get("date_window"):
@@ -455,7 +525,8 @@ def from_dict(raw: Dict[str, Any], default_name: str = "") -> SourceConfig:
     return cfg
 
 
-FILE_FORMATS = ("csv", "ndjson", "json")
+FILE_FORMATS = ("csv", "ndjson", "json", "xlsx", "parquet")
+ARCHIVES = ("zip", "tar.gz")
 
 
 def _validate_jdbc(cfg: SourceConfig) -> None:
@@ -512,6 +583,21 @@ def _validate_jdbc(cfg: SourceConfig) -> None:
     if j.fetch_size < 1:
         raise ConfigError(f"[{n}] jdbc.fetch_size phai >= 1.")
 
+    if j.parallel:
+        if cfg.runtime.engine is not Engine.SPARK:
+            raise ConfigError(f"[{n}] jdbc.parallel chi dung voi runtime.engine: spark (profile src-spark).")
+        unknown_keys = set(j.parallel) - {"column", "num_partitions", "lower_bound", "upper_bound"}
+        if unknown_keys:
+            raise ConfigError(f"[{n}] jdbc.parallel co khoa la: {sorted(unknown_keys)}")
+        if not j.parallel.get("column"):
+            raise ConfigError(f"[{n}] jdbc.parallel can 'column' (cot so de chia khoang).")
+        if int(j.parallel.get("num_partitions", 8)) < 1:
+            raise ConfigError(f"[{n}] jdbc.parallel.num_partitions phai >= 1.")
+        if ("lower_bound" in j.parallel) != ("upper_bound" in j.parallel):
+            raise ConfigError(f"[{n}] jdbc.parallel: khai CA lower_bound va upper_bound, hoac bo ca hai.")
+    if cfg.runtime.engine is Engine.SPARK and j.chunk_size > 0:
+        raise ConfigError(f"[{n}] engine spark khong dung jdbc.chunk_size: dung jdbc.parallel.")
+
 
 def _validate(cfg: SourceConfig) -> None:
     n = cfg.name
@@ -543,7 +629,7 @@ def _validate(cfg: SourceConfig) -> None:
             raise ConfigError(
                 f"[{n}] api.date_window can cdc.initial_watermark (ngay bat dau, YYYY-MM-DD)."
             )
-    for block in (cfg.s3file, cfg.httpfile):
+    for block in (cfg.s3file, cfg.httpfile, cfg.onedrive):
         if block is not None and block.file_format not in FILE_FORMATS:
             raise ConfigError(
                 f"[{n}] file_format = {block.file_format!r} khong ho tro. "
@@ -555,6 +641,41 @@ def _validate(cfg: SourceConfig) -> None:
             raise ConfigError(f"[{n}] httpfile: khai MOT trong hai: urls hoac index_url.")
         if h.index_url and not h.files_path:
             raise ConfigError(f"[{n}] httpfile.index_url can files_path (duong toi danh sach file).")
+        if h.compression not in ("auto", "none", "gzip") + ARCHIVES:
+            raise ConfigError(f"[{n}] httpfile.compression = {h.compression!r} khong ho tro.")
+        if (h.compression in ARCHIVES) != bool(h.archive_members):
+            raise ConfigError(f"[{n}] httpfile: compression zip/tar.gz <-> can archive_members (va nguoc lai).")
+    if cfg.onedrive is not None:
+        o = cfg.onedrive
+        if bool(o.folder_path.strip("/")) == bool(o.folder_id.strip()):
+            raise ConfigError(f"[{n}] onedrive: khai MOT trong hai folder_path hoac folder_id "
+                              f"(khong doc ca goc OneDrive).")
+        if o.header_row < 1 or o.min_age_seconds < 0:
+            raise ConfigError(f"[{n}] onedrive: header_row >= 1, min_age_seconds >= 0.")
+        if o.file_format == "xlsx" and o.compression == "gzip":
+            raise ConfigError(f"[{n}] onedrive: xlsx da la file nen, khong dung compression gzip.")
+
+    is_spark = cfg.runtime.engine is Engine.SPARK
+    if is_spark != (cfg.runtime.profile in SPARK_PROFILES):
+        raise ConfigError(
+            f"[{n}] runtime.engine = {cfg.runtime.engine.value} khong khop profile "
+            f"{cfg.runtime.profile!r}: engine spark <-> profile {'/'.join(SPARK_PROFILES)}."
+        )
+    if is_spark and cfg.source_type.value not in SPARK_SOURCE_TYPES:
+        raise ConfigError(
+            f"[{n}] engine spark chua ho tro source_type {cfg.source_type.value!r} "
+            f"(co: {', '.join(SPARK_SOURCE_TYPES)})."
+        )
+    if cfg.runtime.profile in EDGE_PROFILES:
+        if cfg.source_type is not SourceType.KAFKA:
+            raise ConfigError(f"[{n}] profile edge hien chi cho source_type kafka.")
+        if cfg.schedule.enabled:
+            raise ConfigError(
+                f"[{n}] profile edge: lich chay la systemd timer tren may nguon (kafka-sink.sh), "
+                f"de schedule.enabled: false — EventBridge se goi Glue job khong ton tai."
+            )
+    if is_spark and cfg.source_type is SourceType.S3FILE and cfg.cdc.mode is not CdcMode.CDC5:
+        raise ConfigError(f"[{n}] s3file tren spark chi ho tro cdc5 (doc ca prefix moi lan).")
 
     if cfg.runtime.profile not in PROFILES:
         raise ConfigError(
@@ -567,7 +688,8 @@ def _validate(cfg: SourceConfig) -> None:
             f"enabled: false cho toi khi apply xong (roi xoa ten khoi PENDING_PROFILES)."
         )
 
-    secret = (cfg.api and cfg.api.secret_name) or (cfg.jdbc and cfg.jdbc.secret_name)
+    secret = ((cfg.api and cfg.api.secret_name) or (cfg.jdbc and cfg.jdbc.secret_name)
+              or (cfg.onedrive and cfg.onedrive.secret_name))
     if secret and not secret.startswith(SECRET_PREFIX):
         raise ConfigError(
             f"[{n}] secret_name = {secret!r} nam ngoai '{SECRET_PREFIX}'. "
