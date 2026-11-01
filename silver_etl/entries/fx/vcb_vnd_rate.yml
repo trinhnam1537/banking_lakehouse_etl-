@@ -21,8 +21,8 @@ target:
 columns:
   - {name: rate_ts, from: response, path: Date, type: timestamp, keep: false}
   - {name: published_at, from: response, path: UpdatedDate, type: timestamp, hash: false, comment: "Thoi diem VCB cap nhat bang ty gia (UTC)"}
-  - {name: currency_code, nullable: false, comment: "Ma ISO 4217: USD, EUR, JPY, ..."}
-  - {name: currency_name, comment: "Ten dong tien theo VCB"}
+  - {name: currency_code, path: currencyCode, nullable: false, comment: "Ma ISO 4217: USD, EUR, JPY, ..."}
+  - {name: currency_name, path: currencyName, comment: "Ten dong tien theo VCB"}
   - {name: buy_cash, path: cash, type: "decimal(18,4)", comment: "VND/1 don vi: mua tien mat (NULL neu VCB khong mua)"}
   - {name: buy_transfer, path: transfer, type: "decimal(18,4)", comment: "VND/1 don vi: mua chuyen khoan"}
   - {name: sell, type: "decimal(18,4)", comment: "VND/1 don vi: ban ra"}
