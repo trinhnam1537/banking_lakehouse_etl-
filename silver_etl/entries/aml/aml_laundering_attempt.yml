@@ -1,0 +1,45 @@
+# Silver IBM AML: cac VU rua tien theo kieu hinh (landing/aml/patterns/, tu *_Patterns.txt).
+# Moi dong = mot giao dich thuoc mot vu. Ground truth cho tang do thi / ontology.
+# Thoi gian o day la thoi gian GOC cua IBM (09/2022), chua doi truc: lay event_ts tu
+# silver_aml.transfer qua txn_id.
+
+name: aml_laundering_attempt
+description: IBM AML - giao dich thuoc tung vu rua tien, kem kieu hinh (FAN-OUT, CYCLE...)
+owner: namth
+enabled: true
+
+source:
+  dataset: aml/patterns
+
+target:
+  database: silver_aml
+  table: laundering_attempt
+  ddl: silver_aml/laundering_attempt.sql
+
+columns:
+  - {name: attempt_id, nullable: false, comment: "Ma vu, vd HI-Medium-00042"}
+  - {name: typology, nullable: false, comment: "FAN-OUT | FAN-IN | CYCLE | SCATTER-GATHER | GATHER-SCATTER | BIPARTITE | STACK | RANDOM"}
+  - {name: typology_detail, comment: "Chi tiet kieu hinh, vd 'Max 16-degree Fan-Out'"}
+  - {name: txn_id, nullable: false, comment: "Khoa noi voi silver_aml.transfer / label"}
+  - {name: source_ts, path: timestamp, type: timestamp, format: "yyyy/MM/dd HH:mm", comment: "Thoi gian goc IBM, chua doi truc"}
+  - {name: from_bank}
+  - {name: from_account}
+  - {name: to_bank}
+  - {name: to_account}
+  - {name: amount_received, type: "decimal(28,8)"}
+  - {name: receiving_currency}
+  - {name: amount_paid, type: "decimal(28,8)"}
+  - {name: payment_currency}
+  - {name: payment_format}
+
+technical:
+  keys: [attempt_id, txn_id]
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [attempt_id, typology, txn_id]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn

@@ -273,9 +273,13 @@ class SilverType(JobType):
         raw = self._raw_config(name, item)
         runtime = raw.get("runtime") or {}
         timeout = int(runtime.get("timeout_minutes", 60))
+        capacity = None
         try:
             from silver.config import from_dict
-            timeout = from_dict(copy.deepcopy(raw), default_name=name).runtime.timeout_minutes
+            rt = from_dict(copy.deepcopy(raw), default_name=name).runtime
+            timeout = rt.timeout_minutes
+            # Co may theo entry (size hoac worker_type/number_of_workers), nhu sourcing
+            capacity = tuple(rt.glue_capacity())
         except ImportError:
             pass  # goi Lambda thieu silver/ -> bo qua kiem tra, Glue se kiem
         except (ValueError, TypeError) as e:
@@ -306,6 +310,7 @@ class SilverType(JobType):
             chain=req.chain,
             timeout_minutes=timeout,
             profile=profile,
+            capacity=capacity,
         )
 
     def claim(self, name, req, run_id):

@@ -1,0 +1,43 @@
+# Silver IBM AML: tai khoan -> phap nhan (landing/aml/accounts/). Tinh, nap mot lan theo bo du lieu.
+# Khoa (bank_id, account_number): ma tai khoan chi duy nhat trong mot ngan hang.
+# entity_id gom nhieu tai khoan (o nhieu ngan hang) ve cung mot chu the -> nut Party tren do thi.
+
+name: aml_account
+description: IBM AML - danh muc tai khoan va phap nhan so huu
+owner: namth
+enabled: true
+
+source:
+  dataset: aml/accounts
+
+target:
+  database: silver_aml
+  table: account
+  ddl: silver_aml/account.sql
+
+columns:
+  - {name: bank_id, nullable: false, comment: "Ma ngan hang, khop transfer.from_bank / to_bank"}
+  - {name: bank_name, comment: "Ten ngan hang tong hop"}
+  - {name: account_number, nullable: false, comment: "Ma tai khoan, khop transfer.from_account / to_account"}
+  - {name: entity_id, nullable: false, comment: "Ma phap nhan so huu; mot phap nhan co the co nhieu tai khoan"}
+  - {name: entity_name, comment: "Nhan tong hop, vd 'Corporation #33520' (khong phai ten that)"}
+  - {name: entity_type,
+     expr: "nullif(trim(regexp_extract(entity_name, '^([^#]*)#', 1)), '')",
+     comment: "Loai phap nhan tach tu entity_name: Corporation | Sole Proprietorship | Partnership | ..."}
+
+technical:
+  keys: [bank_id, account_number]
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [bank_id, account_number, entity_id]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+  min_rows: 1
+
+runtime:
+  size: S
+  timeout_minutes: 60

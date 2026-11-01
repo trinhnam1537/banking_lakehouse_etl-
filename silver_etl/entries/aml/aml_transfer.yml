@@ -1,0 +1,62 @@
+# Silver IBM AML — tai lieu: docs/sourcing/ibm-aml.md, docs/sourcing/spark-sourcing.md muc 3
+# Nguon: entry sourcing `aml_transfers_history` -> landing/aml/transfers_history/ (file lo, cot phang)
+# Phan Kafka (aml/transfers, ban tin boc trong `value`) se la entry thu hai ghi CUNG bang nay
+# (simple append, moi entry mot ds_source) khi aml_transfers duoc bat.
+#
+# Bang SU KIEN: giao dich chi INSERT -> simple append, idempotent theo manifest.
+# 32 trieu dong / ~16 ngay -> partition theo NGAY nghiep vu (~2 trieu dong/partition).
+# KHONG co nhan o day (xem silver_aml.label, den tre 14 ngay).
+
+name: aml_transfer
+description: IBM AML - giao dich chuyen tien lien ngan hang (khong nhan), append theo manifest
+owner: namth
+enabled: true
+
+source:
+  dataset: aml/transfers_history
+
+target:
+  database: silver_aml
+  table: transfer
+  ddl: silver_aml/transfer.sql
+
+columns:
+  - {name: txn_id, nullable: false, comment: "Ma giao dich tat dinh (sha1 noi dung + lan xuat hien), noi voi label/pattern"}
+  - {name: event_ts, type: timestamp, nullable: false, comment: "Thoi diem giao dich da doi ve truc chung (SIM_EPOCH), UTC, do phan giai phut"}
+  - {name: source_ts, hash: false, comment: "Thoi diem goc trong file IBM (yyyy/MM/dd HH:mm, 09/2022)"}
+  - {name: from_bank, nullable: false, comment: "Ma ngan hang gui (chuoi, giu so 0 dau)"}
+  - {name: from_account, nullable: false, comment: "Tai khoan gui, chi duy nhat khi di cung from_bank"}
+  - {name: to_bank, nullable: false, comment: "Ma ngan hang nhan"}
+  - {name: to_account, nullable: false, comment: "Tai khoan nhan"}
+  - {name: amount_received, type: "decimal(28,8)", comment: "So tien ben nhan nhan duoc, theo receiving_currency"}
+  - {name: receiving_currency, comment: "Tien nhan (15 loai, gom Bitcoin)"}
+  - {name: amount_paid, type: "decimal(28,8)", comment: "So tien ben gui tra, theo payment_currency"}
+  - {name: payment_currency, comment: "Tien tra"}
+  - {name: payment_format, comment: "ACH | Cheque | Credit Card | Wire | Cash | Bitcoin | Reinvestment"}
+  - {name: event_date, type: date, expr: "to_date(event_ts)", comment: "Ngay nghiep vu (UTC)"}
+  - {name: is_self_transfer, type: boolean,
+     expr: "from_bank = to_bank AND from_account = to_account",
+     comment: "Tu chuyen cho chinh minh (thuong Reinvestment) -> self-loop, loai khoi canh do thi"}
+  - {name: is_cross_currency, type: boolean, expr: "receiving_currency <> payment_currency"}
+  - {name: fx_rate_paid_per_received, type: "decimal(28,12)",
+     expr: "CASE WHEN amount_received > 0 THEN amount_paid / amount_received END",
+     comment: "Ty gia ngam: don vi tien tra cho 1 don vi tien nhan"}
+
+technical:
+  keys: [txn_id]
+  partition_date: {source: column, column: event_date}
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [txn_id, event_ts, from_bank, from_account, to_bank, to_account, amount_paid]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+  min_rows: 1
+
+runtime:
+  # 32 trieu dong: from_json + sha256 + khu trung (shuffle) + ghi Iceberg -> co M
+  size: M
+  timeout_minutes: 90
