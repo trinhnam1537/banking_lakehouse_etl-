@@ -9,10 +9,11 @@ vụ theo kiểu hình**. Đây là nguồn giá trị nhất cho tầng đồ t
 |---|---|
 | Loại | Luồng giao dịch (Kafka) + file tĩnh + nhãn trễ |
 | Giấy phép | CDLA-Sharing 1.0 (Kaggle `ealtman2019/ibm-transactions-for-anti-money-laundering-aml`) |
-| Entry | `aml_transfers` (kafka), `aml_accounts`, `aml_patterns`, `aml_labels` (s3file) |
-| Dataset raw | `landing/aml/{transfers, accounts, patterns, labels}/` |
-| Profile | `aml_transfers`: `src-vpc` (**tắt**, cần Kafka). Ba entry s3file: `src-shell` (bật) |
-| Code | `simulators/aml/replay.py` (`synth`, `static`, `stream`) |
+| Entry | `aml_transfers` (kafka), `aml_transfers_history`, `aml_accounts`, `aml_patterns`, `aml_labels` (s3file) |
+| Dataset raw | `landing/aml/{transfers, transfers_history, accounts, patterns, labels}/` |
+| Profile | `aml_transfers`: `src-vpc` (**tắt**, cần Kafka). `aml_transfers_history` (M), `aml_labels` (S), `aml_accounts` (S): `src-spark`. `aml_patterns`: `src-shell` |
+| Code | `simulators/aml/replay.py` (`synth`, `static`, `history`, `stream`) |
+| Bộ đang nhắm | **HI-Medium** (~32 triệu giao dịch). Runbook: [spark-sourcing.md mục 3](spark-sourcing.md#3-runbook-ibm-aml-hi-medium) |
 
 ## 1. Các biến thể
 
@@ -78,6 +79,8 @@ Generator tổng hợp sinh 5 kiểu đầu.
 |---|---|
 | `synth --transactions N [--entities --banks --days --laundering-ratio]` | Sinh bộ `SYN` (giao dịch thường theo phân phối Pareto, chèn các vụ rửa tiền) vào `data/ibm-aml-synthetic/` |
 | `static --dataset HI-Small` | `accounts.csv` (đổi tên cột sang snake_case) và `Patterns.txt` (chuyển thành NDJSON) đẩy vào `landing/_inbox/aml/{accounts,patterns}/dt=<SIM_EPOCH>/` |
+| `history --dataset HI-Medium [--days N] [--rows-per-file 1000000]` | Lịch sử dạng file lô: `_inbox/aml/transfers/dt=<ngày>/<bộ>_part-NNNNN.csv.gz` (cột giống bản tin Kafka, không nhãn) + `_inbox/aml/labels/dt=<ngày>/labels_<bộ>_part-NNNNN.csv.gz`. Chia nhiều file để Spark đọc song song |
+| `stream ... --start-day N` | Bỏ N ngày đầu (đã đi đường `history --days N`) |
 | `stream --dataset HI-Small [--speed S] [--label-delay-days 14] [--limit N]` | Phát giao dịch vào Kafka, nhãn ghi thành file trễ |
 
 Producer đóng vai "hệ thống chuyển tiền liên ngân hàng":

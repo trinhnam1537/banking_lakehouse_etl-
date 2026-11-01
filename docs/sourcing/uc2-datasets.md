@@ -30,8 +30,8 @@ Berka (nguồn ví dụ chính của tầng gold/pre-train, xem `docs/TRANSFORMS
 - **Vì sao `mbd_targets` > 1 triệu dòng mà không chạy Spark:** gzip của archive phải giải nén tuần tự từ đầu tới
   cuối, nên Spark không chia song song được. Phần parse đo trên máy chỉ mất 16 giây cho 1,2 triệu dòng.
 - `detail.tar.gz` (1,97 GB, khoảng 10 GB NDJSON khi ra raw) vượt sức Python Shell. Hướng xử lý sau: một job tải
-  archive về `landing/_inbox/mbd/` và giải nén thành parquet, rồi entry `s3file` đọc bằng `src-spark`. Hiện
-  `spark_main` chưa đọc parquet từ `s3file`, việc này cần thêm.
+  archive về `landing/_inbox/mbd/` và giải nén thành parquet, rồi entry `s3file` đọc bằng `src-spark`
+  (`spark_main` đọc được parquet từ 11-2026, xem [spark-sourcing.md](spark-sourcing.md)). Còn thiếu job giải nén.
 
 ## Santander Product Recommendation (Kaggle)
 

@@ -18,7 +18,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class CdcMode(str, Enum):
@@ -148,11 +148,18 @@ class JdbcSource:
     # Mở phiên READ ONLY. SQL do entry tự viết -> đây là hàng rào ở phía DB.
     read_only: bool = True
     # CHỈ engine spark (profile src-spark): Spark JDBC đọc SONG SONG, mỗi partition
-    # một kết nối, chia theo khoảng giá trị của một cột số:
-    #   column          cột chia (số nguyên/ngày, nên có index), vd trans_id
-    #   num_partitions  số kết nối song song (đừng vượt giới hạn kết nối của DB)
-    #   lower_bound / upper_bound  bỏ trống -> tự SELECT MIN/MAX trên đúng câu query
-    #                   (đã lọc :watermark). Bound chỉ để CHIA khoảng, không lọc dòng.
+    # một kết nối. Hai cách chia (khai MỘT):
+    #   column          chia theo khoảng giá trị của một cột số/ngày (nên có index), vd trans_id
+    #     num_partitions  số kết nối song song (đừng vượt giới hạn kết nối của DB), HOẶC
+    #     rows_per_partition  tự tính số partition = COUNT / rows_per_partition, chặn
+    #                     trên bởi max_partitions (mặc định 16). Có ích khi CDC1: lần đầu
+    #                     nhiều dòng thì nhiều kết nối, lần sau ít dòng thì 1-2 kết nối.
+    #     lower_bound / upper_bound  bỏ trống -> tự SELECT MIN/MAX trên đúng câu query
+    #                     (đã lọc :watermark). Bound chỉ để CHIA khoảng, không lọc dòng.
+    #   predicates      danh sách điều kiện WHERE, mỗi điều kiện một partition — cho cột
+    #                   không phải số (chuỗi, ngày lệch phân bố), vd theo tháng hoặc
+    #                   "MOD(account_id, 8) = 0" ... "= 7". Các điều kiện phải PHỦ HẾT và
+    #                   KHÔNG CHỒNG nhau, nếu không sẽ mất hoặc trùng dòng.
     # Xem sourcing/spark_main.py.
     parallel: Dict[str, Any] = field(default_factory=dict)
 
@@ -188,6 +195,9 @@ class S3FileSource:
     # Số bản ghi mỗi lô. File được đọc THEO LUỒNG, không nạp cả file vào RAM.
     batch_size: int = 10_000
     max_files_per_run: int = 500
+    # CHỈ engine spark, CSV: đặt tên cột THEO VỊ TRÍ, bỏ tên trong header. Dùng khi
+    # header có tên trùng (IBM AML gốc có hai cột "Account") hoặc tên khó dùng.
+    column_names: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -355,18 +365,76 @@ DEFAULT_PROFILE = "src-shell"
 SECRET_PREFIX = "fingraph/src/"
 
 
+# Cỡ máy cho engine spark. Vẫn MỘT Glue job dùng chung (src-spark): Step Functions
+# truyền WorkerType + NumberOfWorkers cho TỪNG lần chạy (StartJobRun cho phép), nên
+# thêm cỡ không cần thêm Glue job, IAM hay Terraform. G.1X = 4 vCPU/16 GB,
+# G.2X = 8 vCPU/32 GB; 1 worker là driver. Giá ~0,44 USD/DPU-giờ (G.1X = 1 DPU).
+#   S   nguồn ~1-5 triệu dòng, file vài trăm MB          ~0,9 USD/giờ
+#   M   ~5-50 triệu dòng, 1-5 GB đầu vào (IBM AML Medium)  ~2,2 USD/giờ
+#   L   ~50-200 triệu dòng, bảng rộng, có shuffle            ~8,8 USD/giờ
+#   XL  chỉ dùng khi đã đo L thiếu                          ~17,6 USD/giờ
+SPARK_SIZES: Dict[str, Tuple[str, int]] = {
+    "S": ("G.1X", 2),
+    "M": ("G.1X", 5),
+    "L": ("G.2X", 10),
+    "XL": ("G.2X", 20),
+}
+SPARK_WORKER_TYPES = ("G.1X", "G.2X", "G.4X", "G.8X")
+# Trần chống gõ nhầm (200 thay vì 20): vượt trần phải sửa ở đây, có review.
+MAX_SPARK_WORKERS = 20
+
+
 @dataclass
 class RuntimeConfig:
     engine: Engine = Engine.PYTHON_SHELL
     timeout_minutes: int = 30
     max_retries: int = 0
     profile: str = DEFAULT_PROFILE
-    # Chỉ có tác dụng với engine SPARK
-    worker_type: str = "G.1X"
-    number_of_workers: int = 2
+    # Chỉ có tác dụng với engine SPARK. `size` chọn một cỡ trong SPARK_SIZES;
+    # worker_type / number_of_workers khai tường minh thì đè lên cỡ. Không khai gì
+    # -> dùng cấu hình mặc định của Glue job src-spark (Terraform var.spark_workers).
+    size: Optional[str] = None
+    worker_type: Optional[str] = None
+    number_of_workers: Optional[int] = None
     # CŨ: thư viện theo entry, chỉ còn tác dụng với Glue job theo entry (đang
     # gỡ dần). Glue job profile cài thư viện theo profile, bỏ qua khoá này.
     additional_python_modules: List[str] = field(default_factory=list)
+
+    def glue_capacity(self) -> Optional[Tuple[str, int]]:
+        """(WorkerType, NumberOfWorkers) cho lần chạy, hoặc None = mặc định của job."""
+        if self.engine is not Engine.SPARK:
+            return None
+        wt, n = SPARK_SIZES[self.size] if self.size else (None, None)
+        wt = self.worker_type or wt
+        n = self.number_of_workers or n
+        if wt is None and n is None:
+            return None
+        return wt or "G.1X", n or 2
+
+
+@dataclass
+class SparkOptions:
+    """Tinh chỉnh đọc/ghi cho engine spark (khối `spark:` của entry). Mọi khoá tuỳ chọn.
+
+    Mặc định đã hợp lý cho đa số nguồn; chỉ khai khi đã đo và thấy cần.
+    """
+
+    # spark.sql.files.maxPartitionBytes: mỗi task đọc tối đa N MB của file KHÔNG nén.
+    # File .gz không chia được: một file = một task, bất kể giá trị này.
+    max_partition_mb: int = 128
+    # Số file đầu ra. 0 = tự tính ceil(số dòng / target.max_records_per_file), để
+    # không sinh hàng trăm file nhỏ (một partition một file) hay một file khổng lồ.
+    output_files: int = 0
+    # Lấy mẫu TẤT ĐỊNH theo khoá (docs/sourcing/ingest-progress.md mục 5.1): giữ dòng
+    # khi MỌI cột trong `keys` rơi vào keep_pct% giá trị đầu của xxhash64. Cùng khoá
+    # -> cùng quyết định ở mọi bảng, mọi lần chạy, nên bảng giao dịch và bảng tài
+    # khoản lọc cùng `keys` vẫn khớp nhau.
+    #   sample: {keys: [from_account, to_account], keep_pct: 25}
+    sample: Dict[str, Any] = field(default_factory=dict)
+    # Chỉ giữ các cột này (sau khi đặt tên). Rỗng = giữ hết.
+    select: List[str] = field(default_factory=list)
+    # spark.sql.* đặt lúc chạy, vd {"spark.sql.shuffle.partitions": "64"}.
+    conf: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -386,6 +454,7 @@ class SourceConfig:
     s3file: Optional[S3FileSource] = None
     httpfile: Optional[HttpFileSource] = None
     onedrive: Optional[OneDriveSource] = None
+    spark: SparkOptions = field(default_factory=SparkOptions)
 
     @property
     def dataset(self) -> str:
@@ -503,8 +572,10 @@ def from_dict(raw: Dict[str, Any], default_name: str = "") -> SourceConfig:
         timeout_minutes=int(runtime_raw.get("timeout_minutes", 30)),
         max_retries=int(runtime_raw.get("max_retries", 0)),
         profile=str(runtime_raw.get("profile", DEFAULT_PROFILE)),
-        worker_type=runtime_raw.get("worker_type", "G.1X"),
-        number_of_workers=int(runtime_raw.get("number_of_workers", 2)),
+        size=runtime_raw.get("size"),
+        worker_type=runtime_raw.get("worker_type"),
+        number_of_workers=(int(runtime_raw["number_of_workers"])
+                           if runtime_raw.get("number_of_workers") is not None else None),
         additional_python_modules=list(runtime_raw.get("additional_python_modules", [])),
     )
 
@@ -519,6 +590,10 @@ def from_dict(raw: Dict[str, Any], default_name: str = "") -> SourceConfig:
         schedule=ScheduleConfig(**(raw.get("schedule") or {})),
         runtime=runtime,
     )
+    try:
+        cfg.spark = SparkOptions(**(raw.get("spark") or {}))
+    except TypeError as e:
+        raise ConfigError(f"[{name}] khoi 'spark' sai: {e}") from None
     setattr(cfg, stype.value, _build_source_block(raw, stype, name))
 
     _validate(cfg)
@@ -586,17 +661,98 @@ def _validate_jdbc(cfg: SourceConfig) -> None:
     if j.parallel:
         if cfg.runtime.engine is not Engine.SPARK:
             raise ConfigError(f"[{n}] jdbc.parallel chi dung voi runtime.engine: spark (profile src-spark).")
-        unknown_keys = set(j.parallel) - {"column", "num_partitions", "lower_bound", "upper_bound"}
+        p = j.parallel
+        unknown_keys = set(p) - {"column", "num_partitions", "rows_per_partition", "max_partitions",
+                                 "lower_bound", "upper_bound", "predicates"}
         if unknown_keys:
             raise ConfigError(f"[{n}] jdbc.parallel co khoa la: {sorted(unknown_keys)}")
-        if not j.parallel.get("column"):
-            raise ConfigError(f"[{n}] jdbc.parallel can 'column' (cot so de chia khoang).")
-        if int(j.parallel.get("num_partitions", 8)) < 1:
+        if bool(p.get("column")) == bool(p.get("predicates")):
+            raise ConfigError(f"[{n}] jdbc.parallel: khai MOT trong hai: 'column' (chia khoang so) "
+                              f"hoac 'predicates' (danh sach dieu kien WHERE).")
+        if p.get("predicates"):
+            preds = p["predicates"]
+            if not isinstance(preds, list) or not all(isinstance(x, str) and x.strip() for x in preds):
+                raise ConfigError(f"[{n}] jdbc.parallel.predicates phai la danh sach chuoi khac rong.")
+            extra = set(p) & {"num_partitions", "rows_per_partition", "max_partitions",
+                              "lower_bound", "upper_bound"}
+            if extra:
+                raise ConfigError(f"[{n}] jdbc.parallel.predicates khong dung cung {sorted(extra)} "
+                                  f"(so partition = so dieu kien).")
+        if "num_partitions" in p and "rows_per_partition" in p:
+            raise ConfigError(f"[{n}] jdbc.parallel: khai num_partitions HOAC rows_per_partition.")
+        if int(p.get("num_partitions", 8)) < 1:
             raise ConfigError(f"[{n}] jdbc.parallel.num_partitions phai >= 1.")
-        if ("lower_bound" in j.parallel) != ("upper_bound" in j.parallel):
+        if "rows_per_partition" in p and int(p["rows_per_partition"]) < 1_000:
+            raise ConfigError(f"[{n}] jdbc.parallel.rows_per_partition qua nho (< 1000): moi partition "
+                              f"la mot ket noi + mot truy van toi DB nguon.")
+        if int(p.get("max_partitions", 16)) < 1:
+            raise ConfigError(f"[{n}] jdbc.parallel.max_partitions phai >= 1.")
+        if ("lower_bound" in p) != ("upper_bound" in p):
             raise ConfigError(f"[{n}] jdbc.parallel: khai CA lower_bound va upper_bound, hoac bo ca hai.")
+        if "rows_per_partition" in p and "lower_bound" in p:
+            raise ConfigError(f"[{n}] jdbc.parallel.rows_per_partition can dem dong tren query: "
+                              f"bo lower_bound/upper_bound.")
     if cfg.runtime.engine is Engine.SPARK and j.chunk_size > 0:
         raise ConfigError(f"[{n}] engine spark khong dung jdbc.chunk_size: dung jdbc.parallel.")
+
+
+SPARK_S3_FORMATS = ("csv", "ndjson", "json", "parquet")
+
+
+def _validate_spark(cfg: SourceConfig) -> None:
+    """Khối `spark:`, cỡ máy và những gì chỉ engine spark mới hiểu."""
+    n, rt, sp = cfg.name, cfg.runtime, cfg.spark
+    is_spark = rt.engine is Engine.SPARK
+
+    if not is_spark:
+        if rt.size or rt.worker_type or rt.number_of_workers:
+            raise ConfigError(f"[{n}] runtime.size/worker_type/number_of_workers chi dung voi engine spark "
+                              f"(Python Shell co dinh 0,0625 DPU).")
+        if sp != SparkOptions():
+            raise ConfigError(f"[{n}] khoi 'spark' chi dung voi runtime.engine: spark.")
+        if cfg.s3file is not None and cfg.s3file.column_names:
+            raise ConfigError(f"[{n}] s3file.column_names hien chi dung voi engine spark.")
+        return
+
+    if rt.size is not None and rt.size not in SPARK_SIZES:
+        raise ConfigError(f"[{n}] runtime.size = {rt.size!r} khong co. Cho phep: {', '.join(SPARK_SIZES)}")
+    if rt.worker_type is not None and rt.worker_type not in SPARK_WORKER_TYPES:
+        raise ConfigError(f"[{n}] runtime.worker_type = {rt.worker_type!r} khong ho tro "
+                          f"({', '.join(SPARK_WORKER_TYPES)}).")
+    cap = rt.glue_capacity()
+    if cap and not 2 <= cap[1] <= MAX_SPARK_WORKERS:
+        raise ConfigError(f"[{n}] so worker = {cap[1]} ngoai [2, {MAX_SPARK_WORKERS}] "
+                          f"(1 worker la driver; tran chong go nham, sua MAX_SPARK_WORKERS neu that can).")
+
+    if sp.max_partition_mb < 16:
+        raise ConfigError(f"[{n}] spark.max_partition_mb phai >= 16.")
+    if sp.output_files < 0:
+        raise ConfigError(f"[{n}] spark.output_files phai >= 0 (0 = tu tinh).")
+    if sp.sample:
+        if set(sp.sample) - {"keys", "keep_pct"}:
+            raise ConfigError(f"[{n}] spark.sample chi co 'keys' va 'keep_pct'.")
+        keys, pct = sp.sample.get("keys"), sp.sample.get("keep_pct")
+        if not isinstance(keys, list) or not keys:
+            raise ConfigError(f"[{n}] spark.sample.keys phai la danh sach cot khac rong.")
+        if not isinstance(pct, (int, float)) or not 0 < pct < 100:
+            raise ConfigError(f"[{n}] spark.sample.keep_pct phai trong (0, 100).")
+    bad_conf = [k for k in sp.conf if not str(k).startswith("spark.sql.")]
+    if bad_conf:
+        raise ConfigError(f"[{n}] spark.conf chi nhan khoa spark.sql.* (dat duoc luc chay): {bad_conf}. "
+                          f"Cau hinh cap executor thuoc ve Glue job (--conf o repo ha tang).")
+
+    if cfg.s3file is not None:
+        s = cfg.s3file
+        if s.file_format not in SPARK_S3_FORMATS:
+            raise ConfigError(f"[{n}] s3file tren spark chua ho tro {s.file_format!r} "
+                              f"(co: {', '.join(SPARK_S3_FORMATS)}).")
+        if s.column_names and s.file_format != "csv":
+            raise ConfigError(f"[{n}] s3file.column_names chi dung voi csv.")
+        if cfg.cdc.mode is CdcMode.CDC1 and cfg.cdc.watermark_column != "_s3_key":
+            raise ConfigError(f"[{n}] s3file tren spark, cdc1: moc la khoa S3 cua file cuoi "
+                              f"(cdc.watermark_column: _s3_key, watermark_type: string).")
+        if s.csv_repeated_header:
+            raise ConfigError(f"[{n}] csv_repeated_header chua ho tro tren spark: dung src-shell.")
 
 
 def _validate(cfg: SourceConfig) -> None:
@@ -674,8 +830,7 @@ def _validate(cfg: SourceConfig) -> None:
                 f"[{n}] profile edge: lich chay la systemd timer tren may nguon (kafka-sink.sh), "
                 f"de schedule.enabled: false — EventBridge se goi Glue job khong ton tai."
             )
-    if is_spark and cfg.source_type is SourceType.S3FILE and cfg.cdc.mode is not CdcMode.CDC5:
-        raise ConfigError(f"[{n}] s3file tren spark chi ho tro cdc5 (doc ca prefix moi lan).")
+    _validate_spark(cfg)
 
     if cfg.runtime.profile not in PROFILES:
         raise ConfigError(
@@ -710,6 +865,9 @@ def _validate(cfg: SourceConfig) -> None:
 # còn `runtime`/`schedule`/`enabled` do Terraform và lịch quyết định, sửa ở
 # đây không có tác dụng gì ngoài gây hiểu nhầm.
 OVERRIDE_FORBIDDEN = ("name", "source_type", "enabled", "runtime", "schedule")
+# Ngoại lệ trong `runtime`: cỡ máy chỉ đổi TỐC ĐỘ, không đổi dữ liệu, nên kích tay
+# một lần với cỡ lớn hơn (`{"runtime.size": "L"}`) không bị coi là override dữ liệu.
+CAPACITY_OVERRIDES = ("runtime.size", "runtime.worker_type", "runtime.number_of_workers")
 
 
 def apply_overrides(raw: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
@@ -726,7 +884,7 @@ def apply_overrides(raw: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str,
         parts = [p for p in str(path).split(".") if p]
         if not parts:
             raise ConfigError(f"override rong: {path!r}")
-        if parts[0] in OVERRIDE_FORBIDDEN:
+        if parts[0] in OVERRIDE_FORBIDDEN and ".".join(parts) not in CAPACITY_OVERRIDES:
             raise ConfigError(
                 f"khong override duoc '{path}'. Cam: {', '.join(OVERRIDE_FORBIDDEN)}"
             )

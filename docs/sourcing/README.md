@@ -8,6 +8,8 @@ giả lập và chất lượng dữ liệu.
 |---|---|
 | Kiến trúc tầng sourcing (orchestrator, Glue, checkpoint) | [../SOURCING-ARCHITECTURE.md](../SOURCING-ARCHITECTURE.md) |
 | Rà soát framework đọc/ghi: đã sửa gì, vì sao, còn gì | [framework-review.md](framework-review.md) |
+| Tiến độ ingest từng nguồn, ngân sách dung lượng raw | [ingest-progress.md](ingest-progress.md) |
+| Sourcing bằng Spark: cỡ máy S/M/L/XL, `jdbc.parallel`, lấy mẫu, đề xuất nâng cấp | [spark-sourcing.md](spark-sourcing.md) |
 | Cách viết một entry YAML | [../../sourcing_etl/README.md](../../sourcing_etl/README.md) |
 | Chi tiết một nguồn | bảng ngay dưới đây |
 
@@ -34,7 +36,8 @@ commit `4d70a79`. Muốn dùng lại thì lấy entry từ lịch sử git.
 
 | Trạng thái | Entry | Vì sao |
 |---|---|---|
-| **Bật, chạy được ngay trên AWS** (profile `src-shell`) | `berka_*`, `opensanctions_*`, `vcb_exchange_rates`, `cnb_czk_rates`, mọi entry `s3file` (`aml_accounts`, `aml_patterns`, `aml_labels`, `paysim_*`, `cards_chargebacks`, `lending_default_labels`) | Nguồn công khai trên internet hoặc file trong S3 của mình |
+| **Bật, chạy được ngay trên AWS** (profile `src-shell`) | `berka_*`, `opensanctions_*`, `vcb_exchange_rates`, `cnb_czk_rates`, các entry `s3file` (`aml_patterns`, `paysim_*`, `cards_chargebacks`, `lending_default_labels`) | Nguồn công khai trên internet hoặc file trong S3 của mình |
+| **Bật, Spark** (profile `src-spark`, cỡ máy theo entry) | `berka_trans`, `aml_transfers_history` (M), `aml_labels` (S), `aml_accounts` (S) | Nguồn > 1 triệu dòng, xem [spark-sourcing.md](spark-sourcing.md) |
 | **Bật, có lịch hằng ngày** (profile `src-shell`) | `corebank_*` | Postgres core banking trên máy EC2 nguồn, mở 5432 **chỉ SSL**. Chạy được sau khi apply PR hạ tầng (mục 7) |
 | **Tắt, chờ hạ tầng** (profile `src-vpc`) | `lending_*` (JDBC), `aml_transfers`, `cards_authorizations` | Chưa dựng trên AWS, xem [mục 7](#7-hạ-tầng) |
 

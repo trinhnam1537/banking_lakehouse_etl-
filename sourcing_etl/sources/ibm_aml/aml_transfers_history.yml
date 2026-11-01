@@ -1,0 +1,58 @@
+# IBM AML HI-Medium (~32 trieu giao dich, ~16 ngay): phan LICH SU di duong file lo.
+# Phat 32 trieu ban tin qua Kafka mat ~2 thang o toc do that, nen simulator ghi file:
+#   python -m simulators.aml.replay history --dataset HI-Medium --days 14
+#   -> landing/_inbox/aml/transfers/dt=<ngay>/HI-Medium_part-NNNNN.csv.gz (1 trieu dong/file)
+# Phan sau ngay 14 di Kafka (aml_transfers, `stream --start-day 14`).
+#
+# Cot giong het ban tin Kafka (txn_id, event_ts, source_ts, from_*, to_*, amount_*,
+# *_currency, payment_format), KHONG co nhan (xem aml_labels). Dataset raw RIENG
+# (aml/transfers_history): ban ghi Kafka boc `value` la chuoi JSON, ban ghi nay la cot
+# phang -> silver hop nhat hai duong theo txn_id.
+#
+# Vi sao Spark co M (5 x G.1X = 4 executor x 4 core = 16 task song song):
+#   - file .gz khong chia duoc: 1 file = 1 task. ~32 file -> 2 dot task.
+#   - 32 trieu dong persist MEMORY_AND_DISK ~ vai GB, tran sang dia G.1X (64 GB) neu thieu.
+#   - Raw uoc tinh ~1,5-2 GB ndjson.gz (< 5 GB, docs/sourcing/ingest-progress.md muc 1).
+# Muon dung HI-Large (~180 trieu): them `spark.sample` theo ca hai dau giao dich va doi
+# runtime.size: L. Giu p% tai khoan -> ~p^2 giao dich (keep_pct 50 -> ~25%).
+# Doc docs/sourcing/spark-sourcing.md.
+
+name: aml_transfers_history
+source_type: s3file
+description: "IBM AML: giao dich lien ngan hang lich su (file lo, khong nhan), doc bang Spark"
+owner: namth
+enabled: true
+
+s3file:
+  bucket: "${RAW_BUCKET}"
+  prefix: landing/_inbox/aml/transfers/
+  file_format: csv
+  compression: gzip
+  max_files_per_run: 200
+
+cdc:
+  mode: cdc1
+  # Moc = khoa S3 cua file cuoi da nap; dt=YYYY-MM-DD giu thu tu tu dien
+  watermark_column: _s3_key
+  watermark_type: string
+
+target:
+  dataset: aml/transfers_history
+  # 32 trieu / 500 nghin = 64 file, moi file ~25-30 MB nen
+  max_records_per_file: 500000
+
+spark:
+  # Vi du cat bot (tat dinh theo tai khoan, giu ca hai dau de do thi khong cut canh):
+  # sample: {keys: [from_account, to_account], keep_pct: 50}   # ~25% giao dich
+  conf:
+    spark.sql.shuffle.partitions: "64"
+
+schedule:
+  enabled: false
+  expression: "cron(30 1 * * ? *)"
+
+runtime:
+  engine: spark
+  profile: src-spark
+  size: M
+  timeout_minutes: 60

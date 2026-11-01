@@ -14,7 +14,6 @@ s3file:
   prefix: landing/_inbox/aml/labels/
   file_format: csv
   compression: gzip
-  batch_size: 20000
 
 cdc:
   mode: cdc1
@@ -30,6 +29,10 @@ schedule:
   enabled: false
   expression: "cron(0 1 * * ? *)"
 
+# HI-Medium: lich su ~32 trieu nhan (replay history) -> Spark co S. Luong song hang
+# ngay chi vai file nho: ton toi thieu 1 phut x 2 G.1X (~0,015 USD/lan).
 runtime:
-  profile: src-shell
+  engine: spark
+  profile: src-spark
+  size: S
   timeout_minutes: 30
