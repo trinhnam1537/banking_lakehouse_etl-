@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sourcing.state import JobConfigStore, JobLogStore
 
@@ -63,6 +63,8 @@ class Prepared:
     timeout_minutes: int = 60
     # Ten profile neu chay tren Glue job DUNG CHUNG; None = job rieng theo entry (cu)
     profile: Optional[str] = None
+    # (WorkerType, NumberOfWorkers) cho RIENG lan chay nay; None = mac dinh cua Glue job
+    capacity: Optional[Tuple[str, int]] = None
 
 
 class JobType:
@@ -169,6 +171,7 @@ class SourcingType(JobType):
 
     def prepare(self, name, item, req, run_id):
         from sourcing.config import (
+            CAPACITY_OVERRIDES,
             CdcMode,
             ConfigError,
             apply_overrides,
@@ -192,10 +195,14 @@ class SourcingType(JobType):
                 f"Glue. Chay tay: aws ssm start-session ... roi `sudo systemctl start fingraph-kafka-sink`."
             )
 
+        # Override co may (runtime.size...) chi doi toc do, khong doi du lieu: khong
+        # tinh la override cho hai hang rao duoi (checkpoint, chain).
+        data_overrides = {k: v for k, v in (req.overrides or {}).items() if k not in CAPACITY_OVERRIDES}
+
         # Test voi override tren job CDC1 ma khong dry-run se TIEN CHECKPOINT
         # THAT bang du lieu cua lan chay "khac thuong" do (vd max_pages=1) —
         # lan chay theo lich sau do bo sot phan con lai ma khong bao loi gi.
-        if (req.overrides and cfg.cdc.mode is CdcMode.CDC1 and not req.dry_run
+        if (data_overrides and cfg.cdc.mode is CdcMode.CDC1 and not req.dry_run
                 and not req.allow_checkpoint_advance):
             raise TriggerError(
                 "override tren job cdc1 se tien checkpoint THAT. Dung \"dry_run\": true, "
@@ -203,7 +210,7 @@ class SourcingType(JobType):
             )
 
         chain = req.chain and not req.dry_run
-        if req.overrides and chain:
+        if data_overrides and chain:
             # Du lieu cua lan chay co override khong phai du lieu that — khong
             # duoc chay xuong silver.
             chain = False
@@ -225,9 +232,12 @@ class SourcingType(JobType):
             notes.append("snapshot qua lon -> Glue tu doc job_config")
 
         glue_job, profile = self.glue_job_for(name, cfg.runtime.profile)
+        capacity = cfg.runtime.glue_capacity()
+        if capacity:
+            notes.append(f"co may: {capacity[1]} x {capacity[0]}")
         return Prepared(glue_job=glue_job, glue_args=args, config=raw, chain=chain,
                         notes=notes, timeout_minutes=cfg.runtime.timeout_minutes,
-                        profile=profile)
+                        profile=profile, capacity=capacity)
 
     def status(self, name):
         ck = self.log.read_checkpoint(name)

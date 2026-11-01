@@ -12,7 +12,6 @@ s3file:
   prefix: landing/_inbox/aml/accounts/
   file_format: csv
   compression: gzip
-  batch_size: 20000
 
 cdc:
   mode: cdc1
@@ -28,6 +27,9 @@ schedule:
   enabled: false
   expression: "cron(0 1 * * ? *)"
 
+# HI-Medium ~2 trieu tai khoan -> Spark co S.
 runtime:
-  profile: src-shell
+  engine: spark
+  profile: src-spark
+  size: S
   timeout_minutes: 30

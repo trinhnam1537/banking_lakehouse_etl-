@@ -1,7 +1,8 @@
 # Tầng Ontology và Knowledge Graph — thiết kế, xây dựng, phục vụ model và AI agent
 
-> **Trạng thái (10-30):** tài liệu **thiết kế**. Đã có trên hạ tầng: database `track_a_onto`, bảng `triple`
-> (lược đồ ở mục 4.2), job khung `jobs/glue/onto_closure.py` (bao đóng sở hữu, chưa chạy), các tầng nguồn
+> **Trạng thái (10-30, kiểm lại 10-31):** tài liệu **thiết kế**. Đã có trên hạ tầng: database `track_a_onto`
+> (**rỗng**: bảng `triple` CHƯA được tạo; lược đồ 6 cột mới chỉ nằm trong job khung `jobs/glue/onto_closure.py`,
+> job này đọc bảng đó nhưng chưa chạy bao giờ; mục 4.2 là thiết kế), các tầng nguồn
 > nó dựa vào (`silver_berka`, `silver_corebank`, `track_a_gold.berka_*`, `track_a_pretrain.uc2_*`), cùng
 > phân quyền persona + Lake Formation (`docs/` repo hạ tầng). Mọi thứ còn lại là việc cần làm, theo lộ trình ở mục 11.
 

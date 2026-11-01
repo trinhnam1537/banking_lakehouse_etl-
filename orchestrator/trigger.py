@@ -306,6 +306,10 @@ class Trigger:
             "timeout_minutes": prep.timeout_minutes,
             **self.lease_fields(prep.timeout_minutes, self.clock()),
         }
+        if prep.capacity:
+            # Co mat 2 truong nay -> state machine re sang RunGlueJobSized (WorkerType +
+            # NumberOfWorkers cho rieng lan chay). Vang mat -> co may mac dinh cua job.
+            sfn_input["worker_type"], sfn_input["number_of_workers"] = prep.capacity
         try:
             resp = self.sfn.start_execution(stateMachineArn=self.runner_arn, name=exec_name,
                                             input=json.dumps(sfn_input, ensure_ascii=False))
