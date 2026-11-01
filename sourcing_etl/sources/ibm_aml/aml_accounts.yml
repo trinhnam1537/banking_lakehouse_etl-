@@ -21,6 +21,8 @@ cdc:
 
 target:
   dataset: aml/accounts
+  # ~2 trieu tai khoan / 500 nghin = 5 file
+  max_records_per_file: 500000
 
 schedule:
   # Bat sau khi chay tay thanh cong it nhat mot lan.

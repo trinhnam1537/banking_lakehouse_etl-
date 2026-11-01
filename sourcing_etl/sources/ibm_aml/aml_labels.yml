@@ -23,6 +23,8 @@ cdc:
 
 target:
   dataset: aml/labels
+  # 32 trieu nhan / 500 nghin = 64 file (mac dinh 50 nghin -> 638 file nho, do 11-02)
+  max_records_per_file: 500000
 
 schedule:
   # Bat sau khi chay tay thanh cong it nhat mot lan.

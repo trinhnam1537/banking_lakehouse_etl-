@@ -1,4 +1,4 @@
--- silver_fx.cnb_czk_rate — ty gia CNB, CZK cho 1 don vi ngoai te, moi ngay lam viec tu 1993 (~8 nghin dong).
+-- silver_fx.cnb_czk_rate — ty gia CNB, CZK cho 1 don vi ngoai te, moi ngay lam viec (16 file nam, ~4 nghin dong).
 -- Sinh tu entry `cnb_czk_rate` (simple overwrite_table: CNB chup lai toan bo moi lan). Khong partition (bang nho).
 -- Khoa: rate_date. Dong tien chua ton tai o nam do -> NULL.
 CREATE TABLE IF NOT EXISTS glue_catalog.silver_fx.cnb_czk_rate (
