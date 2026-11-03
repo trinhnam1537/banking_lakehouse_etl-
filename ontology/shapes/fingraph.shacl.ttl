@@ -1,0 +1,59 @@
+# SHACL — rang buoc du lieu do thi (ABox), buoc O4 docs/ONTOLOGY-BUILD.md.
+# pytest chay tren do thi mau tests/ontology/fixtures/sample_abox.ttl; job build_graph (O7)
+# kiem cac bat bien tuong duong bang Spark tren bang triple that.
+
+@prefix fin:  <https://fingraph.hust.edu.vn/ontology#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+fin:ProductHoldingShape a sh:NodeShape ;
+    sh:targetClass fin:ProductHolding ;
+    sh:property [ sh:path fin:ofProduct ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:message "ProductHolding phai co dung mot ofProduct" ] ;
+    sh:property [ sh:path fin:validFrom ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:date ;
+                  sh:message "ProductHolding phai co validFrom (ngay)" ] ;
+    sh:property [ sh:path fin:validTo ; sh:maxCount 1 ; sh:datatype xsd:date ] ;
+    # valid_to khong duoc truoc valid_from
+    sh:property [ sh:path fin:validFrom ; sh:lessThanOrEquals fin:validTo ;
+                  sh:message "validTo < validFrom" ] .
+
+# ofProduct tro vao mot LOP con cua fin:Product (punning)
+fin:OfProductShape a sh:NodeShape ;
+    sh:targetObjectsOf fin:ofProduct ;
+    sh:property [ sh:path ( rdfs:subClassOf [ sh:zeroOrMorePath rdfs:subClassOf ] ) ;
+                  sh:hasValue fin:Product ;
+                  sh:message "ofProduct phai tro vao lop thuoc cay fin:Product" ] .
+
+fin:HoldsAccountShape a sh:NodeShape ;
+    sh:targetSubjectsOf fin:holdsAccount ;
+    sh:class fin:Customer ;
+    sh:property [ sh:path fin:holdsAccount ; sh:class fin:Account ;
+                  sh:message "holdsAccount phai noi Customer voi Account" ] .
+
+fin:AuthorizedShape a sh:NodeShape ;
+    sh:targetSubjectsOf fin:isAuthorizedOn ;
+    sh:class fin:Customer ;
+    sh:property [ sh:path fin:isAuthorizedOn ; sh:class fin:Account ] .
+
+fin:TransferShape a sh:NodeShape ;
+    sh:targetSubjectsOf fin:transfersTo ;
+    sh:class fin:Account ;
+    sh:property [ sh:path fin:transfersTo ; sh:class fin:Account ] .
+
+fin:AttemptShape a sh:NodeShape ;
+    sh:targetClass fin:LaunderingAttempt ;
+    sh:property [ sh:path fin:hasTypology ; sh:minCount 1 ; sh:maxCount 1 ; sh:class fin:Typology ;
+                  sh:message "Vu rua tien phai co dung mot kieu hinh" ] .
+
+fin:SameAsShape a sh:NodeShape ;
+    sh:targetSubjectsOf fin:sameAs ;
+    sh:class fin:Party ;
+    sh:property [ sh:path fin:sameAs ; sh:class fin:Party ] .
+
+fin:RecommendationShape a sh:NodeShape ;
+    sh:targetClass fin:Recommendation ;
+    sh:property [ sh:path fin:forCustomer ; sh:minCount 1 ; sh:maxCount 1 ; sh:class fin:Customer ] ;
+    sh:property [ sh:path fin:recommends ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path fin:modelVersion ; sh:minCount 1 ] ;
+    sh:property [ sh:path fin:score ; sh:minCount 1 ; sh:datatype xsd:double ] .

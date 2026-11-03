@@ -5,6 +5,10 @@
 > job này đọc bảng đó nhưng chưa chạy bao giờ; mục 4.2 là thiết kế), các tầng nguồn
 > nó dựa vào (`silver_berka`, `silver_corebank`, `track_a_gold.berka_*`, `track_a_pretrain.uc2_*`), cùng
 > phân quyền persona + Lake Formation (`docs/` repo hạ tầng). Mọi thứ còn lại là việc cần làm, theo lộ trình ở mục 11.
+>
+> **Các bước xây dựng, checklist và giải thích từng bước:** [ONTOLOGY-BUILD.md](ONTOLOGY-BUILD.md) (11-2026). Từ
+> 02-11 silver đã có thêm `silver_aml`, `silver_opensanctions`, `silver_cards`, `silver_bank_marketing`, `silver_mbd`,
+> `silver_paysim`, `silver_fx`.
 
 ## Mục lục
 

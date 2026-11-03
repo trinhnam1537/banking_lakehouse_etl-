@@ -22,7 +22,10 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 PACKAGES = ("sourcing", "silver", "orchestrator", "simulators", "transforms")
 # Ngoai *.py, dong goi them file du lieu cua package (vd simulators/corebank/schema.sql:
 # simulator tren may nguon AWS tu ap schema khi DB rong). Glue/Lambda khong dung toi.
-DATA_SUFFIXES = (".sql",)
+DATA_SUFFIXES = (".sql", ".yml")
+# File du lieu dong goi DICH DANH (khong mo cho moi .json: orchestrator/events/*.json la
+# payload mau, khong phai code). tbox.json: TBox bien dich tu ontology/*.ttl cho Glue.
+DATA_FILES = ("transforms/onto/tbox.json",)
 _FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 
 
@@ -33,7 +36,8 @@ def package_files(root: pathlib.Path = REPO, packages: Iterable[str] = PACKAGES)
         if not (base / "__init__.py").is_file():
             raise SystemExit(f"Thieu package {pkg}/ trong {root}")
         files.extend(p for p in base.rglob("*") if p.is_file() and "__pycache__" not in p.parts
-                     and (p.suffix == ".py" or p.suffix in DATA_SUFFIXES))
+                     and (p.suffix == ".py" or p.suffix in DATA_SUFFIXES
+                          or p.relative_to(root).as_posix() in DATA_FILES))
     return sorted(files, key=lambda p: p.relative_to(root).as_posix())
 
 

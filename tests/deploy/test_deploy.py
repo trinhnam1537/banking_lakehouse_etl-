@@ -36,8 +36,14 @@ def test_zip_chi_co_package_va_tat_dinh(tmp_path):
     names = zipfile.ZipFile(a).namelist()
     assert {"sourcing/main.py", "silver/main.py", "orchestrator/trigger.py",
             "orchestrator/schedule_sync.py"} <= set(names)
+    # File du lieu: .sql (DDL, schema simulator), .yml CHI trong silver/streams/ (entry stream),
+    # va dung tbox.json (TBox bien dich). Khong .json nao khac (orchestrator/events la payload mau).
+    data_ok = lambda n: (n.endswith(".sql") or (n.endswith(".yml") and n.startswith("silver/streams/"))  # noqa: E731
+                         or n == "transforms/onto/tbox.json")
     assert not [n for n in names if n.startswith("tests/") or "__pycache__" in n
-                or not n.endswith((".py", ".sql"))]
+                or not (n.endswith(".py") or data_ok(n))]
+    assert "transforms/onto/tbox.json" in names
+    assert not [n for n in names if n.startswith("orchestrator/events/")]
     # May nguon AWS chay simulator tu chinh zip nay, ke ca schema.sql
     assert {"simulators/corebank/seed.py", "simulators/corebank/schema.sql"} <= set(names)
     assert not [n for n in names if n.startswith("local/")]   # stack local khong len AWS

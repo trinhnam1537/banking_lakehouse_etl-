@@ -1,0 +1,22 @@
+# Can chinh FinGraph -> FIBO (EDM Council). CHI can chinh, KHONG nhap FIBO (hang nghin lop).
+# skos:closeMatch: nghia gan nhu nhau; skos:broadMatch: lop FIBO rong hon lop cua minh.
+# docs/ONTOLOGY.md muc 3.1-3.2.
+
+@prefix fin:  <https://fingraph.hust.edu.vn/ontology#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+fin:Party            skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FND/Parties/Parties/Party> .
+fin:Person           skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FND/AgentsAndPeople/People/Person> .
+fin:Organization     skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/BE/LegalEntities/LegalPersons/LegalPerson> .
+fin:Customer         skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/FinancialProductsAndServices/Customer> .
+fin:Bank             skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FBC/FunctionalEntities/FinancialServicesEntities/Bank> .
+fin:Account          skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/ClientsAndAccounts/Account> .
+fin:Product          skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/FinancialProductsAndServices/FinancialProduct> .
+fin:Loan             skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/LOAN/LoansGeneral/Loans/Loan> .
+fin:Mortgage         skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/LOAN/RealEstateLoans/MortgageLoans/MortgageLoan> .
+fin:CreditCard       skos:broadMatch <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/FinancialProductsAndServices/FinancialProduct> .
+fin:CurrentAccount   skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/ClientsAndAccounts/DemandDepositAccount> .
+fin:TermDeposit      skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/ClientsAndAccounts/TimeDepositAccount> .
+fin:Location         skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FND/Places/Locations/PhysicalLocation> .
+fin:Country          skos:closeMatch <https://www.omg.org/spec/LCC/Countries/CountryRepresentation/Country> .
+fin:isDirectlyOwnedBy skos:closeMatch <https://spec.edmcouncil.org/fibo/ontology/FND/OwnershipAndControl/Ownership/isOwnedBy> .

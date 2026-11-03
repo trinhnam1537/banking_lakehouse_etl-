@@ -1,0 +1,451 @@
+# FinGraph ontology (TBox) — tu vung chung cua lakehouse ngan hang gia lap.
+# Thiet ke: docs/ONTOLOGY.md muc 3. Cac buoc xay dung: docs/ONTOLOGY-BUILD.md (O3).
+#
+# Quy uoc:
+#   - Lop UpperCamelCase, quan he lowerCamelCase dang dong tu.
+#   - Moi lop / quan he co rdfs:label @vi va @en + skos:definition @vi: semantic catalog cho
+#     AI agent (O11) SINH TU file nay — thieu nhan la agent thieu tu vung.
+#   - Moi la cua taxonomy san pham co skos:notation "<nguon>:<ma goc>" -> tu ma nguon tim ra lop
+#     chung bang dung mot phep tra.
+#   - fin:competencyQuestion tro ve ontology/competency_questions.yml — truy vet pham vi.
+# Kiem tra: tests/ontology (cu phap, OWL 2 DL + reasoner, taxonomy, SHACL, mapping).
+# Phien ban: ontology/CHANGELOG.md (ghi vao cot ontology_version cua moi dong do thi).
+
+@prefix fin:  <https://fingraph.hust.edu.vn/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+<https://fingraph.hust.edu.vn/ontology> a owl:Ontology ;
+    rdfs:label "FinGraph ontology"@en , "Ontology FinGraph"@vi ;
+    owl:versionInfo "1.0.0" ;
+    dcterms:description "Tu vung chung cho lakehouse ngan hang gia lap: ben tham gia, tai khoan, san pham, vi tri, AML, nguon goc du lieu."@vi .
+
+# ---------- annotation cua du an ----------
+
+fin:competencyQuestion a owl:AnnotationProperty ;
+    rdfs:label "câu hỏi năng lực"@vi , "competency question"@en ;
+    skos:definition "Ma cau hoi trong ontology/competency_questions.yml ma khai niem nay phuc vu."@vi .
+
+fin:sourceDataset a owl:AnnotationProperty ;
+    rdfs:label "bộ dữ liệu nguồn"@vi , "source dataset"@en ;
+    skos:definition "Bang silver co ma goc cua khai niem."@vi .
+
+fin:materializedIn a owl:AnnotationProperty ;
+    rdfs:label "vật chất hoá tại"@vi , "materialized in"@en ;
+    skos:definition "Bang lakehouse chua du lieu cua khai niem (Athena doc duoc)."@vi .
+
+# ---------- ben tham gia ----------
+
+fin:Party a owl:Class ;
+    rdfs:label "Bên tham gia"@vi , "Party"@en ;
+    skos:definition "Nguoi hoac to chuc co vai tro trong mot quan he tai chinh."@vi ;
+    fin:competencyQuestion "CQ10" .
+
+fin:Person a owl:Class ; rdfs:subClassOf fin:Party ;
+    rdfs:label "Cá nhân"@vi , "Person"@en ;
+    skos:definition "Con nguoi tu nhien."@vi ;
+    fin:competencyQuestion "CQ1" .
+
+fin:Organization a owl:Class ; rdfs:subClassOf fin:Party ;
+    rdfs:label "Tổ chức"@vi , "Organization"@en ;
+    skos:definition "Phap nhan: doanh nghiep, ho kinh doanh, to chuc."@vi ;
+    fin:competencyQuestion "CQ10" .
+
+fin:Customer a owl:Class ; rdfs:subClassOf fin:Party ;
+    rdfs:label "Khách hàng"@vi , "Customer"@en ;
+    skos:definition "Ben tham gia co quan he dich vu voi ngan hang (co tai khoan, san pham, hoac duoc tiep thi)."@vi ;
+    fin:competencyQuestion "CQ1" ;
+    fin:sourceDataset "silver_corebank.client" , "silver_berka.client" , "silver_bank_marketing.contact_full" , "silver_mbd.target_month" .
+
+fin:SanctionedEntity a owl:Class ; rdfs:subClassOf fin:Party ;
+    rdfs:label "Đối tượng bị cấm vận"@vi , "Sanctioned entity"@en ;
+    skos:definition "Thuc the co trong danh sach cam van / theo doi (OpenSanctions)."@vi ;
+    fin:competencyQuestion "CQ8" ;
+    fin:sourceDataset "silver_opensanctions.target" .
+
+fin:Bank a owl:Class ; rdfs:subClassOf fin:Organization ;
+    rdfs:label "Ngân hàng"@vi , "Bank"@en ;
+    skos:definition "To chuc tin dung giu tai khoan (ngan hang doi ung trong chuyen tien lien ngan hang)."@vi ;
+    fin:competencyQuestion "CQ10" ;
+    fin:sourceDataset "silver_aml.account" .
+
+# ---------- tai khoan, san pham, su kien giu san pham ----------
+
+fin:Account a owl:Class ;
+    rdfs:label "Tài khoản"@vi , "Account"@en ;
+    skos:definition "Tai khoan tien gui / thanh toan o mot ngan hang."@vi ;
+    fin:competencyQuestion "CQ1" , "CQ6" , "CQ10" ;
+    fin:sourceDataset "silver_corebank.account" , "silver_aml.account" .
+
+fin:Product a owl:Class ;
+    rdfs:label "Sản phẩm"@vi , "Product"@en ;
+    skos:definition "Goc cua taxonomy san pham tai chinh dung chung cho moi bo du lieu."@vi ;
+    fin:competencyQuestion "CQ1" , "CQ2" , "CQ5" .
+
+fin:ProductHolding a owl:Class ;
+    rdfs:label "Việc giữ sản phẩm"@vi , "Product holding"@en ;
+    skos:definition "Su kien mot khach giu mot san pham trong mot khoang thoi gian (n-ary: ngay bat dau, ket thuc, tai khoan, so tien, trang thai)."@vi ;
+    fin:competencyQuestion "CQ1" , "CQ3" ;
+    fin:materializedIn "track_a_onto.triple" , "track_a_gold.berka_product_event" .
+
+fin:DepositProduct a owl:Class ; rdfs:subClassOf fin:Product ;
+    rdfs:label "Sản phẩm tiền gửi"@vi , "Deposit product"@en ;
+    skos:definition "San pham ngan hang nhan tien cua khach."@vi .
+
+fin:CurrentAccount a owl:Class ; rdfs:subClassOf fin:DepositProduct ;
+    rdfs:label "Tài khoản thanh toán"@vi , "Current account"@en ;
+    skos:definition "Tai khoan giao dich hang ngay."@vi ;
+    skos:notation "santander:ind_cco_fin_ult1" , "santander:ind_ctop_fin_ult1" , "santander:ind_ctpp_fin_ult1" ,
+                  "santander:ind_ctma_fin_ult1" , "berka:account" , "corebank:account" .
+
+fin:PayrollAccount a owl:Class ; rdfs:subClassOf fin:DepositProduct ;
+    rdfs:label "Tài khoản nhận lương"@vi , "Payroll account"@en ;
+    skos:definition "Tai khoan nhan luong."@vi ;
+    skos:notation "santander:ind_cno_fin_ult1" .
+
+fin:JuniorAccount a owl:Class ; rdfs:subClassOf fin:DepositProduct ;
+    rdfs:label "Tài khoản trẻ em"@vi , "Junior account"@en ;
+    skos:definition "Tai khoan cho nguoi chua thanh nien."@vi ;
+    skos:notation "santander:ind_ctju_fin_ult1" .
+
+fin:SavingsAccount a owl:Class ; rdfs:subClassOf fin:DepositProduct ;
+    rdfs:label "Tài khoản tiết kiệm"@vi , "Savings account"@en ;
+    skos:definition "Tai khoan tiet kiem khong ky han."@vi ;
+    skos:notation "santander:ind_ahor_fin_ult1" , "santander:ind_viv_fin_ult1" .
+
+fin:EAccount a owl:Class ; rdfs:subClassOf fin:DepositProduct ;
+    rdfs:label "Tài khoản điện tử"@vi , "e-account"@en ;
+    skos:definition "Tai khoan chi giao dich tren kenh so."@vi ;
+    skos:notation "santander:ind_ecue_fin_ult1" .
+
+fin:TermDeposit a owl:Class ; rdfs:subClassOf fin:DepositProduct ;
+    rdfs:label "Tiền gửi có kỳ hạn"@vi , "Term deposit"@en ;
+    skos:definition "Tien gui co ky han, lai suat co dinh."@vi ;
+    skos:notation "bank_marketing:y" ;
+    fin:competencyQuestion "CQ5" , "CQ12" .
+
+fin:ShortTermDeposit a owl:Class ; rdfs:subClassOf fin:TermDeposit ;
+    rdfs:label "Tiền gửi ngắn hạn"@vi , "Short-term deposit"@en ;
+    skos:definition "Tien gui co ky han ngan."@vi ;
+    skos:notation "santander:ind_deco_fin_ult1" .
+
+fin:MediumTermDeposit a owl:Class ; rdfs:subClassOf fin:TermDeposit ;
+    rdfs:label "Tiền gửi trung hạn"@vi , "Medium-term deposit"@en ;
+    skos:definition "Tien gui co ky han trung binh."@vi ;
+    skos:notation "santander:ind_deme_fin_ult1" .
+
+fin:LongTermDeposit a owl:Class ; rdfs:subClassOf fin:TermDeposit ;
+    rdfs:label "Tiền gửi dài hạn"@vi , "Long-term deposit"@en ;
+    skos:definition "Tien gui co ky han dai."@vi ;
+    skos:notation "santander:ind_dela_fin_ult1" .
+
+fin:CreditProduct a owl:Class ; rdfs:subClassOf fin:Product ;
+    rdfs:label "Sản phẩm tín dụng"@vi , "Credit product"@en ;
+    skos:definition "San pham ngan hang cap von / han muc cho khach."@vi ;
+    fin:competencyQuestion "CQ2" .
+
+fin:Loan a owl:Class ; rdfs:subClassOf fin:CreditProduct ;
+    rdfs:label "Khoản vay"@vi , "Loan"@en ;
+    skos:definition "Khoan vay tra gop."@vi ;
+    skos:notation "berka:loan" , "corebank:loan" , "santander:ind_pres_fin_ult1" ;
+    fin:competencyQuestion "CQ3" , "CQ4" .
+
+fin:Mortgage a owl:Class ; rdfs:subClassOf fin:Loan ;
+    rdfs:label "Vay thế chấp"@vi , "Mortgage"@en ;
+    skos:definition "Khoan vay co the chap bat dong san."@vi ;
+    skos:notation "santander:ind_hip_fin_ult1" .
+
+fin:CreditCard a owl:Class ; rdfs:subClassOf fin:CreditProduct ;
+    rdfs:label "Thẻ tín dụng"@vi , "Credit card"@en ;
+    skos:definition "The co han muc chi tieu."@vi ;
+    skos:notation "santander:ind_tjcr_fin_ult1" ;
+    fin:competencyQuestion "CQ2" .
+
+fin:ClassicCard a owl:Class ; rdfs:subClassOf fin:CreditCard ;
+    rdfs:label "Thẻ classic"@vi , "Classic card"@en ;
+    skos:definition "The hang co ban."@vi ;
+    skos:notation "berka:card_type=classic" , "corebank:card_type=classic" ;
+    fin:competencyQuestion "CQ3" .
+
+fin:JuniorCard a owl:Class ; rdfs:subClassOf fin:CreditCard ;
+    rdfs:label "Thẻ junior"@vi , "Junior card"@en ;
+    skos:definition "The cho khach tre."@vi ;
+    skos:notation "berka:card_type=junior" , "corebank:card_type=junior" .
+
+fin:GoldCard a owl:Class ; rdfs:subClassOf fin:CreditCard ;
+    rdfs:label "Thẻ vàng"@vi , "Gold card"@en ;
+    skos:definition "The hang cao."@vi ;
+    skos:notation "berka:card_type=gold" , "corebank:card_type=gold" .
+
+fin:Guarantee a owl:Class ; rdfs:subClassOf fin:CreditProduct ;
+    rdfs:label "Bảo lãnh"@vi , "Guarantee"@en ;
+    skos:definition "Cam ket thanh toan thay khach."@vi ;
+    skos:notation "santander:ind_aval_fin_ult1" .
+
+fin:InvestmentProduct a owl:Class ; rdfs:subClassOf fin:Product ;
+    rdfs:label "Sản phẩm đầu tư"@vi , "Investment product"@en ;
+    skos:definition "San pham dau tu cua khach qua ngan hang."@vi .
+
+fin:Fund a owl:Class ; rdfs:subClassOf fin:InvestmentProduct ;
+    rdfs:label "Quỹ đầu tư"@vi , "Fund"@en ;
+    skos:definition "Chung chi quy."@vi ;
+    skos:notation "santander:ind_fond_fin_ult1" .
+
+fin:Securities a owl:Class ; rdfs:subClassOf fin:InvestmentProduct ;
+    rdfs:label "Chứng khoán"@vi , "Securities"@en ;
+    skos:definition "Co phieu, trai phieu luu ky qua ngan hang."@vi ;
+    skos:notation "santander:ind_valo_fin_ult1" .
+
+fin:Derivative a owl:Class ; rdfs:subClassOf fin:InvestmentProduct ;
+    rdfs:label "Phái sinh"@vi , "Derivative"@en ;
+    skos:definition "Hop dong phai sinh."@vi ;
+    skos:notation "santander:ind_cder_fin_ult1" .
+
+fin:PensionPlan a owl:Class ; rdfs:subClassOf fin:InvestmentProduct ;
+    rdfs:label "Kế hoạch hưu trí"@vi , "Pension plan"@en ;
+    skos:definition "Quy huu tri tu nguyen."@vi ;
+    skos:notation "santander:ind_plan_fin_ult1" .
+
+fin:InsuranceProduct a owl:Class ; rdfs:subClassOf fin:Product ;
+    rdfs:label "Bảo hiểm"@vi , "Insurance product"@en ;
+    skos:definition "Bao hiem ban qua ngan hang (suy tu khoan tru dinh ky)."@vi ;
+    skos:notation "berka:k_symbol=POJISTNE" , "corebank:k_symbol=POJISTNE" .
+
+fin:PaymentService a owl:Class ; rdfs:subClassOf fin:Product ;
+    rdfs:label "Dịch vụ thanh toán"@vi , "Payment service"@en ;
+    skos:definition "Dich vu chuyen / thu tien dinh ky."@vi .
+
+fin:RecurringPayment a owl:Class ; rdfs:subClassOf fin:PaymentService ;
+    rdfs:label "Thanh toán định kỳ"@vi , "Recurring payment"@en ;
+    skos:definition "Thanh toan hoa don ho gia dinh dinh ky."@vi ;
+    skos:notation "berka:k_symbol=SIPO" , "corebank:k_symbol=SIPO" , "santander:ind_recibo_ult1" .
+
+fin:PayrollService a owl:Class ; rdfs:subClassOf fin:PaymentService ;
+    rdfs:label "Dịch vụ chi lương"@vi , "Payroll service"@en ;
+    skos:definition "Nhan luong qua ngan hang."@vi ;
+    skos:notation "santander:ind_nomina_ult1" .
+
+fin:PensionReceipt a owl:Class ; rdfs:subClassOf fin:PaymentService ;
+    rdfs:label "Nhận lương hưu"@vi , "Pension receipt"@en ;
+    skos:definition "Nhan luong huu qua ngan hang."@vi ;
+    skos:notation "santander:ind_nom_pens_ult1" , "berka:k_symbol=DUCHOD" .
+
+fin:TaxPayment a owl:Class ; rdfs:subClassOf fin:PaymentService ;
+    rdfs:label "Nộp thuế"@vi , "Tax payment"@en ;
+    skos:definition "Nop thue qua ngan hang."@vi ;
+    skos:notation "santander:ind_reca_fin_ult1" .
+
+fin:AnonymousProduct a owl:Class ; rdfs:subClassOf fin:Product ;
+    rdfs:label "Sản phẩm ẩn danh"@vi , "Anonymous product"@en ;
+    skos:definition "San pham bi an ten trong bo du lieu (MBD). Hoc duoc trong bo do, KHONG chuyen giao theo lop sang nguon khac."@vi .
+
+fin:AnonymousProduct_1 a owl:Class ; rdfs:subClassOf fin:AnonymousProduct ;
+    rdfs:label "Sản phẩm ẩn danh 1"@vi , "Anonymous product 1"@en ;
+    skos:definition "MBD target_1."@vi ; skos:notation "mbd:target_1" .
+fin:AnonymousProduct_2 a owl:Class ; rdfs:subClassOf fin:AnonymousProduct ;
+    rdfs:label "Sản phẩm ẩn danh 2"@vi , "Anonymous product 2"@en ;
+    skos:definition "MBD target_2."@vi ; skos:notation "mbd:target_2" .
+fin:AnonymousProduct_3 a owl:Class ; rdfs:subClassOf fin:AnonymousProduct ;
+    rdfs:label "Sản phẩm ẩn danh 3"@vi , "Anonymous product 3"@en ;
+    skos:definition "MBD target_3."@vi ; skos:notation "mbd:target_3" .
+fin:AnonymousProduct_4 a owl:Class ; rdfs:subClassOf fin:AnonymousProduct ;
+    rdfs:label "Sản phẩm ẩn danh 4"@vi , "Anonymous product 4"@en ;
+    skos:definition "MBD target_4."@vi ; skos:notation "mbd:target_4" .
+
+# ---------- vi tri, chi tieu ----------
+
+fin:Location a owl:Class ;
+    rdfs:label "Vị trí"@vi , "Location"@en ;
+    skos:definition "Don vi dia ly."@vi ; fin:competencyQuestion "CQ2" .
+fin:Country a owl:Class ; rdfs:subClassOf fin:Location ;
+    rdfs:label "Quốc gia"@vi , "Country"@en ; skos:definition "Quoc gia (ISO 3166)."@vi .
+fin:Region a owl:Class ; rdfs:subClassOf fin:Location ;
+    rdfs:label "Vùng"@vi , "Region"@en ; skos:definition "Vung / tinh."@vi .
+fin:District a owl:Class ; rdfs:subClassOf fin:Location ;
+    rdfs:label "Quận huyện"@vi , "District"@en ; skos:definition "Quan / huyen (Berka district)."@vi ;
+    fin:sourceDataset "silver_corebank.district" .
+fin:GeoCell a owl:Class ; rdfs:subClassOf fin:Location ;
+    rdfs:label "Ô địa lý"@vi , "Geo cell"@en ; skos:definition "O geohash (MBD)."@vi .
+
+fin:MerchantCategory a owl:Class ;
+    rdfs:label "Nhóm merchant"@vi , "Merchant category"@en ;
+    skos:definition "Nhom nganh cua don vi chap nhan the (grocery_pos, shopping_net, ...)."@vi ;
+    fin:competencyQuestion "CQ7" ; fin:sourceDataset "silver_cards.card_authorization" .
+
+# ---------- AML ----------
+
+fin:LaunderingAttempt a owl:Class ;
+    rdfs:label "Vụ rửa tiền"@vi , "Laundering attempt"@en ;
+    skos:definition "Mot vu rua tien gom nhieu giao dich theo mot kieu hinh (ground truth IBM AML)."@vi ;
+    fin:competencyQuestion "CQ9" ; fin:sourceDataset "silver_aml.laundering_attempt" .
+
+fin:Typology a owl:Class ; rdfs:subClassOf skos:Concept ;
+    rdfs:label "Kiểu hình rửa tiền"@vi , "Laundering typology"@en ;
+    skos:definition "Mau cau truc chuyen tien rua tien: FAN-OUT, FAN-IN, CYCLE, SCATTER-GATHER, GATHER-SCATTER, BIPARTITE, STACK, RANDOM."@vi ;
+    fin:competencyQuestion "CQ9" .
+
+fin:typologyScheme a skos:ConceptScheme ; rdfs:label "Kiểu hình rửa tiền IBM AML"@vi .
+fin:FanOut a fin:Typology ; skos:inScheme fin:typologyScheme ; skos:prefLabel "FAN-OUT"@en ; skos:notation "FAN-OUT" .
+fin:FanIn a fin:Typology ; skos:inScheme fin:typologyScheme ; skos:prefLabel "FAN-IN"@en ; skos:notation "FAN-IN" .
+fin:Cycle a fin:Typology ; skos:inScheme fin:typologyScheme ; skos:prefLabel "CYCLE"@en ; skos:notation "CYCLE" .
+fin:ScatterGather a fin:Typology ; skos:inScheme fin:typologyScheme ; skos:prefLabel "SCATTER-GATHER"@en ; skos:notation "SCATTER-GATHER" .
+fin:GatherScatter a fin:Typology ; skos:inScheme fin:typologyScheme ; skos:prefLabel "GATHER-SCATTER"@en ; skos:notation "GATHER-SCATTER" .
+fin:Bipartite a fin:Typology ; skos:inScheme fin:typologyScheme ; skos:prefLabel "BIPARTITE"@en ; skos:notation "BIPARTITE" .
+fin:Stack a fin:Typology ; skos:inScheme fin:typologyScheme ; skos:prefLabel "STACK"@en ; skos:notation "STACK" .
+fin:RandomTypology a fin:Typology ; skos:inScheme fin:typologyScheme ; skos:prefLabel "RANDOM"@en ; skos:notation "RANDOM" .
+
+# ---------- nguon goc, ket qua model ----------
+
+fin:Dataset a owl:Class ;
+    rdfs:label "Bộ dữ liệu"@vi , "Dataset"@en ;
+    skos:definition "Bang lakehouse sinh ra node / canh (nguon goc, kiem toan)."@vi ;
+    fin:competencyQuestion "CQ11" .
+
+fin:Recommendation a owl:Class ;
+    rdfs:label "Gợi ý sản phẩm"@vi , "Recommendation"@en ;
+    skos:definition "Diem model goi y mot san pham cho mot khach, kem phien ban model va thoi diem cham."@vi ;
+    fin:competencyQuestion "CQ4" .
+
+# ---------- quan he ----------
+
+fin:holdsAccount a owl:ObjectProperty ;
+    rdfs:domain fin:Customer ; rdfs:range fin:Account ;
+    rdfs:label "là chủ tài khoản"@vi , "holds account"@en ;
+    skos:definition "Khach la chu so huu tai khoan (Berka disp OWNER)."@vi ;
+    fin:competencyQuestion "CQ1" , "CQ6" .
+
+fin:isAuthorizedOn a owl:ObjectProperty ;
+    rdfs:domain fin:Customer ; rdfs:range fin:Account ;
+    rdfs:label "được uỷ quyền trên"@vi , "is authorized on"@en ;
+    skos:definition "Khach duoc uy quyen giao dich tren tai khoan (Berka disp DISPONENT)."@vi ;
+    fin:competencyQuestion "CQ6" .
+
+fin:hasHolding a owl:ObjectProperty ;
+    rdfs:domain fin:Customer ; rdfs:range fin:ProductHolding ;
+    rdfs:label "có việc giữ sản phẩm"@vi , "has holding"@en ;
+    skos:definition "Khach co mot su kien giu san pham."@vi ;
+    fin:competencyQuestion "CQ1" .
+
+fin:ofProduct a owl:ObjectProperty ;
+    rdfs:domain fin:ProductHolding ;
+    rdfs:label "thuộc sản phẩm"@vi , "of product"@en ;
+    skos:definition "San pham (LOP trong taxonomy, punning OWL 2) cua su kien giu san pham."@vi ;
+    fin:competencyQuestion "CQ1" , "CQ2" .
+
+fin:viaAccount a owl:ObjectProperty ;
+    rdfs:domain fin:ProductHolding ; rdfs:range fin:Account ;
+    rdfs:label "qua tài khoản"@vi , "via account"@en ;
+    skos:definition "Tai khoan gan voi su kien giu san pham (khoan vay, bao hiem tru tu tai khoan nao)."@vi .
+
+fin:locatedIn a owl:ObjectProperty ;
+    rdfs:range fin:Location ;
+    rdfs:label "ở tại"@vi , "located in"@en ;
+    skos:definition "Ben tham gia / tai khoan thuoc mot don vi dia ly."@vi ;
+    fin:competencyQuestion "CQ2" .
+
+fin:partOf a owl:ObjectProperty , owl:TransitiveProperty ;
+    rdfs:domain fin:Location ; rdfs:range fin:Location ;
+    rdfs:label "thuộc"@vi , "part of"@en ;
+    skos:definition "Don vi dia ly nam trong don vi lon hon (bac cau: District -> Region -> Country)."@vi ;
+    fin:competencyQuestion "CQ2" .
+
+fin:transfersTo a owl:ObjectProperty ;
+    rdfs:domain fin:Account ; rdfs:range fin:Account ;
+    rdfs:label "chuyển tiền tới"@vi , "transfers to"@en ;
+    skos:definition "Canh TONG HOP: tai khoan chuyen tien toi tai khoan khac trong mot ky (weight = tong tien). Tung giao dich o silver."@vi ;
+    fin:competencyQuestion "CQ9" , "CQ10" .
+
+fin:isHeldBy a owl:ObjectProperty ;
+    rdfs:domain fin:Account ; rdfs:range fin:Party ;
+    rdfs:label "thuộc về bên"@vi , "is held by"@en ;
+    skos:definition "Tai khoan thuoc mot ben tham gia (IBM AML account -> entity_id)."@vi ;
+    fin:competencyQuestion "CQ10" .
+
+fin:atBank a owl:ObjectProperty ;
+    rdfs:domain fin:Account ; rdfs:range fin:Bank ;
+    rdfs:label "mở tại ngân hàng"@vi , "at bank"@en ;
+    skos:definition "Ngan hang giu tai khoan."@vi ;
+    fin:competencyQuestion "CQ10" .
+
+fin:isDirectlyOwnedBy a owl:ObjectProperty ;
+    rdfs:domain fin:Party ; rdfs:range fin:Party ;
+    rdfs:label "được sở hữu trực tiếp bởi"@vi , "is directly owned by"@en ;
+    skos:definition "So huu phap nhan truc tiep (weight = ty le so huu). Bac cau tinh san o track_a_onto.closure."@vi ;
+    fin:competencyQuestion "CQ8" .
+
+fin:sameAs a owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:domain fin:Party ; rdfs:range fin:Party ;
+    rdfs:label "cùng là"@vi , "same as"@en ;
+    skos:definition "Hai node la cung mot thuc the o hai nguon, KEM do tin cay. Khong dung owl:sameAs: gop cung sai thi khong go duoc."@vi ;
+    fin:competencyQuestion "CQ8" .
+
+fin:involvedIn a owl:ObjectProperty ;
+    rdfs:domain fin:Account ; rdfs:range fin:LaunderingAttempt ;
+    rdfs:label "tham gia vụ"@vi , "involved in"@en ;
+    skos:definition "Tai khoan gui hoac nhan tien trong mot vu rua tien."@vi ;
+    fin:competencyQuestion "CQ9" .
+
+fin:hasTypology a owl:ObjectProperty ;
+    rdfs:domain fin:LaunderingAttempt ; rdfs:range fin:Typology ;
+    rdfs:label "có kiểu hình"@vi , "has typology"@en ;
+    skos:definition "Kieu hinh cua vu rua tien."@vi ;
+    fin:competencyQuestion "CQ9" .
+
+fin:spendsAt a owl:ObjectProperty ;
+    rdfs:domain fin:Customer ; rdfs:range fin:MerchantCategory ;
+    rdfs:label "chi tiêu ở nhóm"@vi , "spends at"@en ;
+    skos:definition "Canh TONG HOP theo thang: khach chi tieu bang the o nhom merchant (weight = tong tien)."@vi ;
+    fin:competencyQuestion "CQ7" .
+
+fin:frequentlyFollowedBy a owl:ObjectProperty ;
+    rdfs:label "thường được mua sau bởi"@vi , "frequently followed by"@en ;
+    skos:definition "Canh SUY DIEN giua hai lop san pham: khach giu A hay mua B trong H thang (weight = lift, tinh tren tap train)."@vi ;
+    fin:competencyQuestion "CQ3" , "CQ4" .
+
+fin:recommends a owl:ObjectProperty ;
+    rdfs:domain fin:Recommendation ;
+    rdfs:label "gợi ý sản phẩm"@vi , "recommends"@en ;
+    skos:definition "Lop san pham duoc goi y."@vi ;
+    fin:competencyQuestion "CQ4" .
+
+fin:forCustomer a owl:ObjectProperty ;
+    rdfs:domain fin:Recommendation ; rdfs:range fin:Customer ;
+    rdfs:label "cho khách"@vi , "for customer"@en ;
+    skos:definition "Khach nhan goi y."@vi ;
+    fin:competencyQuestion "CQ4" .
+
+fin:derivedFrom a owl:ObjectProperty ;
+    rdfs:range fin:Dataset ;
+    rdfs:label "lấy từ"@vi , "derived from"@en ;
+    skos:definition "Node / canh sinh tu bo du lieu nao (khop prov:wasDerivedFrom)."@vi ;
+    fin:competencyQuestion "CQ11" .
+
+# ---------- thuoc tinh gia tri ----------
+
+fin:gender a owl:DatatypeProperty ; rdfs:domain fin:Person ; rdfs:range xsd:string ;
+    rdfs:label "giới tính"@vi , "gender"@en ; skos:definition "F | M."@vi .
+fin:birthYear a owl:DatatypeProperty ; rdfs:domain fin:Person ; rdfs:range xsd:integer ;
+    rdfs:label "năm sinh"@vi , "birth year"@en ; skos:definition "Nam sinh (khong luu ngay sinh day du tren do thi)."@vi .
+fin:segment a owl:DatatypeProperty ; rdfs:domain fin:Customer ; rdfs:range xsd:string ;
+    rdfs:label "phân khúc"@vi , "segment"@en ; skos:definition "Phan khuc khach hang theo nguon."@vi .
+fin:occupation a owl:DatatypeProperty ; rdfs:domain fin:Person ; rdfs:range xsd:string ;
+    rdfs:label "nghề nghiệp"@vi , "occupation"@en ; skos:definition "Nghe nghiep."@vi ; fin:competencyQuestion "CQ12" .
+fin:holdingStatus a owl:DatatypeProperty ; rdfs:domain fin:ProductHolding ; rdfs:range xsd:string ;
+    rdfs:label "trạng thái"@vi , "holding status"@en ; skos:definition "Trang thai su kien giu san pham (vd khoan vay RUNNING_OVERDUE)."@vi .
+fin:amount a owl:DatatypeProperty ; rdfs:range xsd:decimal ;
+    rdfs:label "số tiền"@vi , "amount"@en ; skos:definition "So tien goc cua san pham / canh."@vi .
+fin:score a owl:DatatypeProperty ; rdfs:domain fin:Recommendation ; rdfs:range xsd:double ;
+    rdfs:label "điểm"@vi , "score"@en ; skos:definition "Diem model (xac suat mua)."@vi .
+fin:modelVersion a owl:DatatypeProperty ; rdfs:domain fin:Recommendation ; rdfs:range xsd:string ;
+    rdfs:label "phiên bản model"@vi , "model version"@en ; skos:definition "Phien ban model sinh diem."@vi .
+fin:validFrom a owl:DatatypeProperty ; rdfs:range xsd:date ;
+    rdfs:label "hiệu lực từ"@vi , "valid from"@en ;
+    skos:definition "Ngay nghiep vu bat dau hieu luc (cot valid_from cua triple/entity). Moc chong ro ri tuong lai."@vi ;
+    fin:competencyQuestion "CQ1" .
+fin:validTo a owl:DatatypeProperty ; rdfs:range xsd:date ;
+    rdfs:label "hiệu lực đến"@vi , "valid to"@en ;
+    skos:definition "Ngay nghiep vu het hieu luc; khong co = con hieu luc (cot valid_to)."@vi .
