@@ -14,6 +14,14 @@ Tầng ontology phục vụ **hai mục đích**, và mọi quyết định tron
 
 Ký hiệu ở cột "Phục vụ": **M** model, **A** agent, **M+A** cả hai.
 
+**Trạng thái (04-11-2026):** giai đoạn 1 (O0–O4 + `onto.load_schema`) **xong**:
+- `ontology/fingraph.ttl` có 53 lớp, 29 quan hệ, 8 kiểu hình rửa tiền; kèm 20 câu hỏi năng lực.
+- 17 test trong `tests/ontology` đều qua.
+- Job `fingraph-dev-onto-spark` chạy SUCCEEDED trên dev và tạo 4 bảng `track_a_onto.class/property/subclass/concept`.
+
+Còn chờ: quyền SELECT `track_a_onto` cho persona analyst (cần duyệt cấp quyền). Bước tiếp theo: O5–O7 (mapping
+corebank/Berka, Bank Marketing, MBD → `entity`, `triple`).
+
 ---
 
 ## 0. Bức tranh tổng thể
