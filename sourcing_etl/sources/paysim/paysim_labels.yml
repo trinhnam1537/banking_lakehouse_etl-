@@ -32,4 +32,6 @@ schedule:
 
 runtime:
   profile: src-shell
-  timeout_minutes: 30
+  # Ban Kaggle day du 6,36 trieu dong: Python Shell doc theo luong ~10-20 phut (0,0625 DPU,
+  # re hon Spark). Tran 60 phut de du phong.
+  timeout_minutes: 60

@@ -1,0 +1,49 @@
+# Silver OpenSanctions entities (FollowTheMoney, bo `sanctions`, ~305 nghin thuc the) — docs/sourcing/opensanctions.md
+# Nguon: entry sourcing `opensanctions_entities` (httpfile NDJSON, CDC5 hang tuan) -> landing/opensanctions/entities/
+# Khac bang target: gom CA thuc the lien quan (khong chi doi tuong bi cam van: target=false la
+# cong ty con, nguoi lien quan, dia chi...), va giu nguyen `properties` dang map<string, array<string>>
+# -> nguon cho quan he so huu / lien doi (ownership, directorship) tren do thi.
+# SCD2 snapshot: thuc the bien mat khoi anh chup -> D. last_seen doi moi lan crawl -> hash: false.
+
+name: opensanctions_entity
+description: OpenSanctions - thuc the FtM day du (thuoc tinh dang map), lich su SCD2
+owner: namth
+enabled: true
+
+source:
+  dataset: opensanctions/entities
+
+target:
+  database: silver_opensanctions
+  table: entity
+  ddl: silver_opensanctions/entity.sql
+
+columns:
+  - {name: entity_id, path: id, nullable: false, comment: "Ma OpenSanctions (NK-... hoac ma nguon)"}
+  - {name: entity_schema, path: schema, nullable: false, comment: "Loai FtM: Person, Company, Ownership, Directorship, Address, ..."}
+  - {name: caption, comment: "Nhan hien thi"}
+  - {name: is_target, path: target, type: boolean, comment: "true = doi tuong bi cam van; false = thuc the lien quan"}
+  - {name: referents, type: "array<string>", comment: "Ma goc o cac nguon da hop nhat"}
+  - {name: source_datasets, path: datasets, type: "array<string>", comment: "Nguon chua thuc the"}
+  - {name: origin, type: "array<string>", hash: false, comment: "Cach OpenSanctions suy ra (metadata, inferred, patch)"}
+  - {name: properties, type: "map<string,array<string>>", comment: "Thuoc tinh FtM: name, birthDate, country, ownerId/assetId (Ownership)..."}
+  - {name: first_seen, type: timestamp, comment: "Lan dau thay"}
+  - {name: last_seen, type: timestamp, hash: false, comment: "Lan gan nhat thay (doi moi lan crawl)"}
+  - {name: last_change, type: timestamp, comment: "Lan gan nhat noi dung doi"}
+
+technical:
+  keys: [entity_id]
+
+writer:
+  type: scd2
+  snapshot: true
+
+quality:
+  not_null: [entity_id, entity_schema]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+  min_rows: 100000
+
+runtime:
+  size: S
+  timeout_minutes: 60

@@ -1,0 +1,43 @@
+# Silver ty gia Vietcombank — docs/sourcing/fx-rates.md
+# Nguon: entry sourcing `vcb_exchange_rates` (api, raw_mode response, CDC1 theo ngay) -> landing/fx/vcb_rates/
+# Moi dong raw = mot response (mot ngay), ban ghi trong `_response.Data` (~20 dong tien).
+# Bang dang DAI: (ngay, dong tien). Append theo manifest; khoa (rate_date, currency_code).
+# Quy doi moi nguon ve VND (UC chung cua lakehouse). VCB khong niem yet MXN, BRL, ILS, BTC.
+
+name: vcb_vnd_rate
+description: Ty gia Vietcombank - VND cho 1 don vi ngoai te (mua tien mat, mua chuyen khoan, ban)
+owner: namth
+enabled: true
+
+source:
+  dataset: fx/vcb_rates
+  records_path: Data
+
+target:
+  database: silver_fx
+  table: vcb_vnd_rate
+  ddl: silver_fx/vcb_vnd_rate.sql
+
+columns:
+  - {name: rate_ts, from: response, path: Date, type: timestamp, keep: false}
+  - {name: published_at, from: response, path: UpdatedDate, type: timestamp, hash: false, comment: "Thoi diem VCB cap nhat bang ty gia (UTC)"}
+  - {name: currency_code, path: currencyCode, nullable: false, comment: "Ma ISO 4217: USD, EUR, JPY, ..."}
+  - {name: currency_name, path: currencyName, comment: "Ten dong tien theo VCB"}
+  - {name: buy_cash, path: cash, type: "decimal(18,4)", comment: "VND/1 don vi: mua tien mat (NULL neu VCB khong mua)"}
+  - {name: buy_transfer, path: transfer, type: "decimal(18,4)", comment: "VND/1 don vi: mua chuyen khoan"}
+  - {name: sell, type: "decimal(18,4)", comment: "VND/1 don vi: ban ra"}
+  - {name: rate_date, type: date, expr: "to_date(rate_ts)", comment: "Ngay ap dung ty gia"}
+
+technical:
+  keys: [rate_date, currency_code]
+  partition_date: {source: column, column: rate_date}
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [rate_date, currency_code]
+  # VCB tra "-" cho dong tien khong mua tien mat -> cho phep mot it loi ep kieu
+  max_cast_error_ratio: 0.2
+  duplicate_keys: warn

@@ -41,3 +41,32 @@ def test_override_size_sai_bi_chan(env: Env):
     env.seed_src("big", runtime={"engine": "spark", "profile": "src-spark"}, **_SPARK)
     res = env.trigger.handle({"job_id": "src.big", "overrides": {"runtime.size": "HUGE"}})
     assert res["ok"] is False and "runtime.size" in res["error"]
+
+
+# ---------- silver: cùng cơ chế cỡ máy ----------
+
+
+def test_silver_entry_that_aml_transfer_chay_co_M(env: Env):
+    name = env.seed_slv_from_repo("silver_etl/entries/aml/aml_transfer.yml")
+    res = env.trigger.handle({"job_id": f"slv.{name}", "data_date": "2026-11-02"})
+    assert res["status"] == "STARTED"
+    inp = env.sfn.started[0]["input"]
+    assert inp["worker_type"] == "G.1X" and inp["number_of_workers"] == 5
+
+
+def test_silver_khong_size_dung_worker_khai_trong_entry(env: Env):
+    name = env.seed_slv_from_repo()
+    env.trigger.handle({"job_id": f"slv.{name}", "data_date": "2026-11-02"})
+    inp = env.sfn.started[0]["input"]
+    assert (inp["worker_type"], inp["number_of_workers"]) == ("G.1X", 2)
+
+
+def test_silver_size_sai_bi_chan():
+    import pytest
+
+    from silver.config import ConfigError, RuntimeSpec
+
+    with pytest.raises(ConfigError, match="runtime.size"):
+        RuntimeSpec(size="HUGE").validate("x")
+    with pytest.raises(ConfigError, match="co may"):
+        RuntimeSpec(number_of_workers=99).validate("x")

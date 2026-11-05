@@ -135,3 +135,13 @@ def test_split_statements_khong_cat_trong_chuoi():
     """Bug that 09-28: COMMENT chua ';' bi cat doi."""
     sql = "CREATE TABLE a (x int COMMENT 'mot; hai -- ba'); -- ghi chu; khong phai lenh\nDROP TABLE b;"
     assert split_statements(sql) == ["CREATE TABLE a (x int COMMENT 'mot; hai -- ba')", "DROP TABLE b"]
+
+
+def test_path_dau_cham_that_trong_ten_khoa():
+    # Bank Marketing additional: cot `emp.var.rate` — `\.` la dau cham THAT, khong phai long nhau
+    from silver.types import json_path, path_tree, split_path, tree_to_ddl
+
+    assert split_path(r"emp\.var\.rate") == ["emp.var.rate"]
+    assert split_path("a.b-c.d") == ["a", "b-c", "d"]
+    assert json_path(r"emp\.var\.rate") == "$['emp.var.rate']"
+    assert tree_to_ddl(path_tree([r"emp\.var\.rate", "x.y"])) == "struct<`x`:struct<`y`:string>,`emp.var.rate`:string>"

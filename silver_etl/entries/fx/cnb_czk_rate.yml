@@ -1,0 +1,55 @@
+# Silver ty gia CNB (Ngan hang Quoc gia Sec) — docs/sourcing/fx-rates.md
+# Nguon: entry sourcing `cnb_czk_rates` (httpfile, file nam 1993..nay, CDC5) -> landing/fx/cnb_rates/
+# Raw dang RONG: moi dong mot ngay, moi dong tien mot cot, ten cot kem DON VI ("1 USD", "100 JPY").
+# Silver giu dang rong nhung chuan hoa ve CZK cho 1 DON VI tien, chi cac dong tien pipeline dung:
+#   15 dong tien IBM AML (tru Bitcoin, Saudi Riyal: CNB khong niem yet) + CZK cua Berka/corebank.
+# Dong tien chua ton tai o nam do (EUR truoc 1999) -> NULL. Dang dai (ngay, tien, ty gia) lam o gold.
+# Chup lai toan bo moi lan -> overwrite_table. Khoa: rate_date.
+
+name: cnb_czk_rate
+description: Ty gia CNB - CZK cho 1 don vi ngoai te, moi ngay lam viec tu 1993
+owner: namth
+enabled: true
+
+source:
+  dataset: fx/cnb_rates
+
+target:
+  database: silver_fx
+  table: cnb_czk_rate
+  ddl: silver_fx/cnb_czk_rate.sql
+
+columns:
+  - {name: rate_date, path: Date, type: date, format: "dd.MM.yyyy", nullable: false, comment: "Ngay cong bo ty gia (ngay lam viec)"}
+  - {name: usd_czk, path: 1 USD, type: "decimal(18,6)", comment: "CZK cho 1 USD"}
+  - {name: eur_czk, path: 1 EUR, type: "decimal(18,6)", comment: "CZK cho 1 EUR (tu 1999)"}
+  - {name: gbp_czk, path: 1 GBP, type: "decimal(18,6)", comment: "CZK cho 1 GBP"}
+  - {name: chf_czk, path: 1 CHF, type: "decimal(18,6)", comment: "CZK cho 1 CHF"}
+  - {name: cad_czk, path: 1 CAD, type: "decimal(18,6)", comment: "CZK cho 1 CAD"}
+  - {name: aud_czk, path: 1 AUD, type: "decimal(18,6)", comment: "CZK cho 1 AUD"}
+  - {name: cny_czk, path: 1 CNY, type: "decimal(18,6)", comment: "CZK cho 1 CNY"}
+  - {name: mxn_czk, path: 1 MXN, type: "decimal(18,6)", comment: "CZK cho 1 MXN"}
+  - {name: brl_czk, path: 1 BRL, type: "decimal(18,6)", comment: "CZK cho 1 BRL"}
+  - {name: ils_czk, path: 1 ILS, type: "decimal(18,6)", comment: "CZK cho 1 ILS"}
+  - {name: xdr_czk, path: 1 XDR, type: "decimal(18,6)", comment: "CZK cho 1 SDR (IMF)"}
+  - {name: jpy_100, path: 100 JPY, type: "decimal(18,6)", keep: false}
+  - {name: inr_100, path: 100 INR, type: "decimal(18,6)", keep: false}
+  - {name: rub_100, path: 100 RUB, type: "decimal(18,6)", keep: false}
+  - {name: jpy_czk, type: "decimal(18,8)", expr: "jpy_100 / 100", comment: "CZK cho 1 JPY (CNB niem yet theo 100 JPY)"}
+  - {name: inr_czk, type: "decimal(18,8)", expr: "inr_100 / 100", comment: "CZK cho 1 INR (niem yet theo 100 INR)"}
+  - {name: rub_czk, type: "decimal(18,8)", expr: "rub_100 / 100", comment: "CZK cho 1 RUB (niem yet theo 100 RUB; ngung tu 03/2022)"}
+  - {name: source_year_file, path: _src_file, hash: false, comment: "File nam goc cua CNB"}
+
+technical:
+  keys: [rate_date]
+  partition_date: {source: column, column: rate_date}
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [rate_date]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: fail
+  min_rows: 3000

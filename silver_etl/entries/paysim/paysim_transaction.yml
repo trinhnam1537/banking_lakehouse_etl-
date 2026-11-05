@@ -1,0 +1,57 @@
+# Silver PaySim — tai lieu: docs/sourcing/paysim.md
+# Nguon: entry sourcing `paysim_eod` -> landing/paysim/eod/ (file doi soat cuoi ngay cua doi tac vi dien tu)
+# 6,36 trieu giao dich / 31 ngay -> partition theo NGAY nghiep vu (~205 nghin dong/ngay).
+# KHONG co nhan (xem silver_paysim.fraud_label, den tre 30 ngay).
+#
+# Chat luong nguon da biet cua PaySim (giu nguyen, chi gan co):
+#   - so du ben nhan (dest) cua merchant (M...) luon 0 -> khong dung duoc
+#   - nhieu dong old - amount <> new o ben gui -> co balance_mismatch_orig
+
+name: paysim_transaction
+description: PaySim - giao dich vi dien tu tu file doi soat cuoi ngay (khong nhan)
+owner: namth
+enabled: true
+
+source:
+  dataset: paysim/eod
+
+target:
+  database: silver_paysim
+  table: transaction
+  ddl: silver_paysim/transaction.sql
+
+columns:
+  - {name: txn_ref, nullable: false, comment: "Ma doi soat do doi tac cap (PS + so dong goc)"}
+  - {name: txn_ts, type: timestamp, nullable: false, comment: "Thoi diem giao dich tren truc chung, UTC"}
+  - {name: step, type: int, comment: "Gio mo phong goc 1..744"}
+  - {name: txn_type, path: type, nullable: false, comment: "CASH_IN | CASH_OUT | DEBIT | PAYMENT | TRANSFER"}
+  - {name: amount, type: "decimal(18,2)", nullable: false}
+  - {name: orig_account, path: name_orig, nullable: false, comment: "Vi gui (C... = khach)"}
+  - {name: orig_balance_before, path: old_balance_orig, type: "decimal(18,2)"}
+  - {name: orig_balance_after, path: new_balance_orig, type: "decimal(18,2)"}
+  - {name: dest_account, path: name_dest, nullable: false, comment: "Vi nhan: C... = khach, M... = merchant"}
+  - {name: dest_balance_before, path: old_balance_dest, type: "decimal(18,2)", comment: "Merchant luon 0 (gioi han cua PaySim)"}
+  - {name: dest_balance_after, path: new_balance_dest, type: "decimal(18,2)"}
+  - {name: txn_date, type: date, expr: "to_date(txn_ts)"}
+  - {name: dest_type, expr: "CASE substr(dest_account, 1, 1) WHEN 'M' THEN 'MERCHANT' WHEN 'C' THEN 'CUSTOMER' END"}
+  - {name: balance_mismatch_orig, type: boolean,
+     expr: "txn_type IN ('CASH_OUT','DEBIT','PAYMENT','TRANSFER') AND orig_balance_before - amount <> orig_balance_after",
+     comment: "So du ben gui khong khop (orig_before - amount <> orig_after) — loi da biet cua PaySim, dac trung huu ich"}
+
+technical:
+  keys: [txn_ref]
+  partition_date: {source: column, column: txn_date}
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [txn_ref, txn_ts, txn_type, amount, orig_account, dest_account]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+  min_rows: 1
+
+runtime:
+  size: S
+  timeout_minutes: 60

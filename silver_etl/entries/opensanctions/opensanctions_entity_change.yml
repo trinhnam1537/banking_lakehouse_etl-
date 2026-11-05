@@ -1,0 +1,44 @@
+# Silver OpenSanctions delta: thay doi thuc the giua cac phien ban (ADD / MOD / DEL).
+# Nguon: entry sourcing `opensanctions_delta` (httpfile, CDC1 theo ma phien ban, 6 gio) -> landing/opensanctions/delta/
+# Bang SU KIEN: append, khoa (delta_version, entity_id). delta_version sap xep duoc theo thoi gian.
+# Dung de bao canh bao "khach vua bi them vao danh sach cam van" ma khong phai so hai anh chup.
+
+name: opensanctions_entity_change
+description: OpenSanctions - su kien thay doi thuc the theo phien ban delta
+owner: namth
+enabled: true
+
+source:
+  dataset: opensanctions/delta
+
+target:
+  database: silver_opensanctions
+  table: entity_change
+  ddl: silver_opensanctions/entity_change.sql
+
+columns:
+  - {name: delta_version, path: _src_file, nullable: false, comment: "Phien ban delta, vd 20261008075007-crk (thu tu thoi gian)"}
+  - {name: op, nullable: false, comment: "ADD | MOD | DEL"}
+  - {name: entity_id, path: entity.id, nullable: false, comment: "Ma thuc the"}
+  - {name: entity_schema, path: entity.schema, comment: "Loai FtM"}
+  - {name: caption, path: entity.caption, comment: "Nhan hien thi"}
+  - {name: is_target, path: entity.target, type: boolean, comment: "Doi tuong bi cam van"}
+  - {name: source_datasets, path: entity.datasets, type: "array<string>", comment: "Nguon chua thuc the"}
+  - {name: properties, path: entity.properties, type: "map<string,array<string>>", comment: "Thuoc tinh FtM sau thay doi (rong voi DEL)"}
+  - {name: last_change, path: entity.last_change, type: timestamp, comment: "Thoi diem noi dung doi"}
+  - {name: version_ts, type: timestamp,
+     expr: "try_to_timestamp(substr(delta_version, 1, 14), 'yyyyMMddHHmmss')",
+     comment: "Thoi diem phat hanh phien ban (tu delta_version)"}
+
+technical:
+  keys: [delta_version, entity_id]
+  partition_date: {source: expr, expr: "to_date(version_ts)"}
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [delta_version, op, entity_id]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn

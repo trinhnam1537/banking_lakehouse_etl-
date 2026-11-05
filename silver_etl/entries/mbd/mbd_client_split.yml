@@ -1,0 +1,32 @@
+# Silver MBD-mini client_split: khach -> fold 0..4 (chia train/validation theo khach, khong theo dong).
+# Nguon: entry sourcing `mbd_client_split` -> landing/mbd/client_split/. Bo tinh -> overwrite_table.
+
+name: mbd_client_split
+description: MBD-mini - phan khach vao fold 0..4
+owner: namth
+enabled: true
+
+source:
+  dataset: mbd/client_split
+
+target:
+  database: silver_mbd
+  table: client_split
+  ddl: silver_mbd/client_split.sql
+
+columns:
+  - {name: client_id, nullable: false, comment: "Ma khach doanh nghiep (hash), khop target_month.client_id"}
+  - {name: fold, type: int, nullable: false, comment: "Fold 0..4"}
+
+technical:
+  keys: [client_id]
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [client_id, fold]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: fail
+  min_rows: 100000

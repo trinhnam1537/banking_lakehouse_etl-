@@ -1,0 +1,37 @@
+# Silver PaySim: nhan gian lan den tre 30 ngay (landing/paysim/labels/).
+# Noi: silver_paysim.transaction.txn_ref = fraud_label.txn_ref. Chi dung huan luyen / danh gia.
+
+name: paysim_fraud_label
+description: PaySim - nhan gian lan tung giao dich (den tre 30 ngay)
+owner: namth
+enabled: true
+
+source:
+  dataset: paysim/labels
+
+target:
+  database: silver_paysim
+  table: fraud_label
+  ddl: silver_paysim/fraud_label.sql
+
+columns:
+  - {name: txn_ref, nullable: false, comment: "Khoa noi voi silver_paysim.transaction"}
+  - {name: is_fraud, type: boolean, nullable: false, comment: "Gian lan that (isFraud)"}
+  - {name: is_flagged_fraud, type: boolean, comment: "He thong cu da gan co (isFlaggedFraud: TRANSFER > 200.000)"}
+  - {name: label_file, path: _src_file, hash: false, comment: "File nhan goc trong _inbox"}
+
+technical:
+  keys: [txn_ref]
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [txn_ref, is_fraud]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+
+runtime:
+  size: S
+  timeout_minutes: 60

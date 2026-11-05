@@ -206,6 +206,26 @@ class RuntimeSpec:
     worker_type: str = "G.1X"
     number_of_workers: int = 2
     timeout_minutes: int = 60
+    # Co may dung chung bang SPARK_SIZES cua sourcing (S/M/L/XL). Khai thi de len
+    # worker_type/number_of_workers; Lambda truyen cho RIENG lan chay (StartJobRun).
+    size: Optional[str] = None
+
+    def glue_capacity(self):
+        from sourcing.config import SPARK_SIZES
+
+        if self.size:
+            return SPARK_SIZES[self.size]
+        return self.worker_type, int(self.number_of_workers)
+
+    def validate(self, name: str) -> None:
+        from sourcing.config import MAX_SPARK_WORKERS, SPARK_SIZES, SPARK_WORKER_TYPES
+
+        if self.size is not None and self.size not in SPARK_SIZES:
+            raise ConfigError(f"[{name}] runtime.size = {self.size!r} khong co. Cho phep: {', '.join(SPARK_SIZES)}")
+        wt, n = self.glue_capacity()
+        if wt not in SPARK_WORKER_TYPES or not 2 <= n <= MAX_SPARK_WORKERS:
+            raise ConfigError(f"[{name}] co may {n} x {wt} khong hop le "
+                              f"({'/'.join(SPARK_WORKER_TYPES)}, 2..{MAX_SPARK_WORKERS} worker).")
 
 
 @dataclass
@@ -301,6 +321,7 @@ def from_dict(raw: Dict[str, Any], default_name: str = "") -> SilverConfig:
 
 def _validate(cfg: SilverConfig) -> None:
     n = cfg.name
+    cfg.runtime.validate(n)
     names = [c.name for c in cfg.columns]
     dup = {x for x in names if names.count(x) > 1}
     if dup:

@@ -1,0 +1,56 @@
+# Silver UCI Bank Marketing (bank-additional-full.csv, 41.188 dong, 05/2008-11/2010)
+# Nguon: entry sourcing `bank_marketing_additional` -> landing/bank_marketing/additional/
+# Khac bang full: KHONG co balance/day, CO day_of_week va 5 chi so kinh te vi mo theo quy.
+# Ten cot goc co dau cham (emp.var.rate) -> path dung `\.` (dau cham that trong ten khoa).
+# pdays = 999 nghia la chua tung goi (bang full dung -1).
+
+name: bank_marketing_contact_additional
+description: Bank Marketing (bank-additional-full) - lan goi + chi so kinh te vi mo
+owner: namth
+enabled: true
+
+source:
+  dataset: bank_marketing/additional
+
+target:
+  database: silver_bank_marketing
+  table: contact_additional
+  ddl: silver_bank_marketing/contact_additional.sql
+
+columns:
+  - {name: source_file, path: _src_file, nullable: false, comment: "File goc trong archive UCI"}
+  - {name: source_row, path: _src_row, type: bigint, nullable: false, comment: "So dong trong file goc"}
+  - {name: age, type: int, comment: "Tuoi khach"}
+  - {name: job, comment: "Nghe nghiep"}
+  - {name: marital, comment: "married | single | divorced | unknown"}
+  - {name: education, comment: "basic.4y | basic.6y | basic.9y | high.school | professional.course | university.degree | illiterate | unknown"}
+  - {name: credit_default, path: default, comment: "Co no xau: yes | no | unknown"}
+  - {name: housing_loan, path: housing, comment: "Co vay mua nha"}
+  - {name: personal_loan, path: loan, comment: "Co vay tieu dung"}
+  - {name: contact_channel, path: contact, comment: "cellular | telephone"}
+  - {name: last_contact_month, path: month, comment: "Thang lan goi cuoi"}
+  - {name: last_contact_dow, path: day_of_week, comment: "Thu trong tuan: mon..fri"}
+  - {name: duration_sec, path: duration, type: int, comment: "Do dai cuoc goi (giay), ro ri nhan"}
+  - {name: campaign_contacts, path: campaign, type: int, comment: "So lan goi trong dot nay"}
+  - {name: days_since_prev_contact, path: pdays, type: int, comment: "So ngay tu lan goi truoc; 999 = chua tung goi"}
+  - {name: prev_contacts, path: previous, type: int, comment: "So lan goi truoc dot nay"}
+  - {name: prev_outcome, path: poutcome, comment: "success | failure | nonexistent"}
+  - {name: emp_var_rate, path: 'emp\.var\.rate', type: double, comment: "Ty le bien dong viec lam (quy)"}
+  - {name: cons_price_idx, path: 'cons\.price\.idx', type: double, comment: "Chi so gia tieu dung (thang)"}
+  - {name: cons_conf_idx, path: 'cons\.conf\.idx', type: double, comment: "Chi so niem tin tieu dung (thang)"}
+  - {name: euribor_3m, path: euribor3m, type: double, comment: "Lai suat Euribor 3 thang (ngay)"}
+  - {name: nr_employed, path: 'nr\.employed', type: double, comment: "So nguoi co viec (nghin, quy)"}
+  - {name: subscribed, path: y, type: boolean, nullable: false, comment: "NHAN UC2: dang ky tien gui co ky han"}
+
+technical:
+  keys: [source_file, source_row]
+
+writer:
+  type: simple
+  mode: overwrite_table
+
+quality:
+  not_null: [source_file, source_row, subscribed]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: fail
+  min_rows: 40000

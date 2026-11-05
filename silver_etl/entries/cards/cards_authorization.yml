@@ -1,0 +1,60 @@
+# Silver giao dich the (kieu Sparkov) — docs/sourcing/cards.md
+# Nguon: entry sourcing `cards_authorizations` (Kafka card.authorizations, profile edge, micro-batch 5 phut)
+#   -> landing/cards/authorizations/. Ban tin JSON nam trong `value` (shape kafka_message).
+# Bang SU KIEN: append theo manifest (moi micro-batch mot manifest). Khoa trans_num; at-least-once
+# cua Kafka -> khu trung theo trans_num trong lo.
+# Noi voi core banking: card_token = md5(so the) = silver_corebank.card.card_token.
+# PII: ho ten, dia chi, ngay sinh, nghe nghiep cua chu the -> phan quyen LF (cot) khi mo cho DA/BA.
+# Nhan gian lan KHONG o day: den tre 20 ngay qua cards_chargebacks.
+
+name: cards_authorization
+description: Giao dich the (authorization) tu Kafka, append theo micro-batch
+owner: namth
+enabled: true
+
+source:
+  dataset: cards/authorizations
+  shape: kafka_message
+
+target:
+  database: silver_cards
+  table: card_authorization
+  ddl: silver_cards/card_authorization.sql
+
+columns:
+  - {name: trans_num, nullable: false, comment: "Ma giao dich (khoa)"}
+  - {name: trans_ts, path: trans_date_trans_time, type: timestamp, format: "yyyy-MM-dd HH:mm:ss", nullable: false, comment: "Thoi diem giao dich (gio dia phuong may phat)"}
+  - {name: unix_time, type: bigint, hash: false, comment: "Thoi diem dang epoch giay"}
+  - {name: card_token, nullable: false, comment: "md5(so the) — noi silver_corebank.card"}
+  - {name: cc_num_masked, path: cc_num, comment: "So the da che (6 dau + 4 cuoi)"}
+  - {name: merchant, comment: "Ten don vi chap nhan the"}
+  - {name: category, comment: "Nhom nganh merchant: grocery_pos, shopping_net, kids_pets, ..."}
+  - {name: amount, path: amt, type: "decimal(18,2)", nullable: false, comment: "So tien (CZK)"}
+  - {name: first_name, path: first, comment: "PII: ten chu the"}
+  - {name: last_name, path: last, comment: "PII: ho chu the"}
+  - {name: gender, comment: "M | F"}
+  - {name: street, comment: "PII: dia chi"}
+  - {name: city, comment: "Thanh pho chu the"}
+  - {name: state, comment: "Ma quoc gia/vung (CZ)"}
+  - {name: zip, comment: "Ma buu chinh"}
+  - {name: lat, type: double, comment: "Vi do chu the"}
+  - {name: lon, path: long, type: double, comment: "Kinh do chu the"}
+  - {name: city_pop, type: int, comment: "Dan so thanh pho chu the"}
+  - {name: job, comment: "PII: nghe nghiep chu the"}
+  - {name: dob, type: date, comment: "PII: ngay sinh chu the"}
+  - {name: merch_lat, type: double, comment: "Vi do merchant"}
+  - {name: merch_lon, path: merch_long, type: double, comment: "Kinh do merchant"}
+  - {name: txn_date, type: date, expr: "to_date(trans_ts)", comment: "Ngay giao dich"}
+
+technical:
+  keys: [trans_num]
+  partition_date: {source: column, column: txn_date}
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [trans_num, trans_ts, card_token, amount]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn

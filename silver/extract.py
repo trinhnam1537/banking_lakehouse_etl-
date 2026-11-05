@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from .config import ColumnFrom, Shape, SilverConfig
-from .types import json_path, path_tree, split_conflicts, tree_to_ddl
+from .types import json_path, path_tree, split_conflicts, split_path, tree_to_ddl
 
 # Cot noi bo, tien to `_x_` de khong dung ten cot nghiep vu
 LINE = "_x_line"
@@ -101,7 +101,7 @@ def select_record_columns(df, cfg: SilverConfig):
     for c in rec_cols:
         if c.source_path in ok:
             node = F.col("_x_parsed")
-            for part in c.source_path.split("."):
+            for part in split_path(c.source_path):
                 node = node.getField(part)
             df = df.withColumn(c.name, node)
         else:
