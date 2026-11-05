@@ -1,0 +1,63 @@
+# Mapping UCI Bank Marketing (silver_bank_marketing) -> FinGraph. Buoc O5; thiet ke: docs/ONTOLOGY.md muc 5.4.
+#
+# Nguon KHONG co ma khach: moi lan goi la mot fin:Customer an danh, khoa (source_file, source_row).
+# Hai bang (bank-full 45.211 dong, bank-additional-full 41.188 dong) la HAI tap khach khac nhau
+# -> khac source_file -> khac uid, khong same_as.
+#
+# Gia tri chinh cua nguon nay o TAXONOMY: subscribed = fin:TermDeposit, cung lop voi Santander
+# ind_deco/deme/dela (CQ5). Khong co mang quan he.
+#
+# Thoi gian: nguon chi co THANG goi, khong co NAM -> valid_from = NULL (quy tac O6: canh khong xac
+# dinh duoc thoi diem thi ghi ro). He qua: nguon nay khong dung cho dac trung point-in-time; model
+# UC2 dung no nhu bai toan cat ngang (cross-sectional).
+
+source_system: bank_marketing
+database: silver_bank_marketing
+reviewed_by: "namth (cho duyet)"
+
+entities:
+  - id: customer
+    class: fin:Customer
+    also: [fin:Person]
+    sql: |
+      SELECT source_file, source_row, age, job, marital, education, credit_default,
+             CAST(balance_eur AS string) AS balance_eur
+      FROM {silver_bank_marketing.contact_full}
+      UNION ALL
+      SELECT source_file, source_row, age, job, marital, education, credit_default,
+             CAST(NULL AS string) AS balance_eur
+      FROM {silver_bank_marketing.contact_additional}
+    key: {file: source_file, row: source_row}
+    label: "concat('Khách BM ', source_row)"
+    attributes:
+      age: age
+      occupation: job
+      marital: marital
+      education: education
+      credit_default: credit_default
+      balance_eur: balance_eur
+
+edges:
+  # CQ12 "ty le dang ky tien gui co ky han theo nghe nghiep": nghe nghiep thanh canh literal
+  # fin:occupation de truy van theo quan he chuan, khong phai doc map thuoc tinh.
+  - id: occupation
+    predicate: fin:occupation
+    sql: |
+      SELECT source_file, source_row, job FROM {silver_bank_marketing.contact_full}
+      UNION ALL
+      SELECT source_file, source_row, job FROM {silver_bank_marketing.contact_additional}
+    subject: {entity: customer, key: [source_file, source_row]}
+    object_literal: {expr: "nullif(job, 'unknown')", datatype: "xsd:string"}
+
+holdings:
+  - id: term_deposit
+    product: fin:TermDeposit
+    sql: |
+      SELECT source_file, source_row FROM {silver_bank_marketing.contact_full} WHERE subscribed
+      UNION ALL
+      SELECT source_file, source_row FROM {silver_bank_marketing.contact_additional} WHERE subscribed
+    key: {file: source_file, row: source_row}
+    customer: {entity: customer, key: [source_file, source_row]}
+    expect_rows: |
+      SELECT (SELECT count(*) FROM {silver_bank_marketing.contact_full} WHERE subscribed)
+           + (SELECT count(*) FROM {silver_bank_marketing.contact_additional} WHERE subscribed)

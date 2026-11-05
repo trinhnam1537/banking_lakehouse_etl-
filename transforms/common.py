@@ -27,11 +27,13 @@ def current(df, key: str):
     return df.drop(*[c for c in df.columns if c.startswith("ds_")])
 
 
-def write_table(df, db: str, name: str, partition_by: Optional[Iterable[str]] = None,
+def write_table(df, db: str, name: str, partition_by: Optional[Iterable] = None,
                 comment: str = "") -> int:
     """Ghi đè TOÀN BỘ bảng Iceberg (createOrReplace): tầng gold/pre-train tính lại từ
     silver mỗi lần, idempotent — chạy lại bao nhiêu lần cũng ra cùng kết quả, và Iceberg
-    giữ snapshot cũ để time travel / so sánh hai phiên bản bộ dữ liệu."""
+    giữ snapshot cũ để time travel / so sánh hai phiên bản bộ dữ liệu.
+
+    partition_by: tên cột, hoặc Column biến đổi phân vùng Iceberg (vd F.bucket(16, col))."""
     from pyspark.sql import functions as F
 
     full = f"{CATALOG}.{db}.{name}"
@@ -41,7 +43,7 @@ def write_table(df, db: str, name: str, partition_by: Optional[Iterable[str]] = 
     if comment:
         w = w.tableProperty("comment", comment)
     if partition_by:
-        w = w.partitionedBy(*[F.col(c) for c in partition_by])
+        w = w.partitionedBy(*[F.col(c) if isinstance(c, str) else c for c in partition_by])
     w.createOrReplace()
     n = df.sparkSession.table(full).count()
     print(f"  ghi {full}: {n} dong")

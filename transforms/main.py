@@ -22,6 +22,7 @@ REGISTRY = {
     "pretrain.uc2_next_product": "transforms.pretrain.uc2_next_product",
     # Tang ontology (docs/ONTOLOGY-BUILD.md): job onto-spark, --LAYER onto
     "onto.load_schema": "transforms.onto.load_schema",
+    "onto.build_graph": "transforms.onto.build_graph",
 }
 
 
