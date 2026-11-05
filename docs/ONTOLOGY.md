@@ -9,6 +9,9 @@
 > **Các bước xây dựng, checklist và giải thích từng bước:** [ONTOLOGY-BUILD.md](ONTOLOGY-BUILD.md) (11-2026). Từ
 > 02-11 silver đã có thêm `silver_aml`, `silver_opensanctions`, `silver_cards`, `silver_bank_marketing`, `silver_mbd`,
 > `silver_paysim`, `silver_fx`.
+>
+> **Amazon Neptune** (lý thuyết, vai trò, thiết kế, chi phí): [NEPTUNE.md](NEPTUNE.md). **AI agent** (bắt đầu xây):
+> [agent/README.md](../agent/README.md).
 
 ## Mục lục
 

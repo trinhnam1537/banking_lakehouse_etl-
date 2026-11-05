@@ -234,3 +234,25 @@ def test_doi_soat_lech_lam_job_that_bai(graph):
     exp = [{"id": "berka.loan", "sql": "SELECT count(*) + 1 FROM {silver_berka.loan}"}]
     with pytest.raises(B.InvariantError, match="doi soat berka.loan"):
         B.check_invariants(spark, entity, triple, exp, T.load())
+
+
+def test_chieu_sang_neptune_nhan_theo_cay_lop_va_khong_lo_khoa_goc(graph):
+    """docs/NEPTUNE.md mục 4: nhãn gồm lớp tổ tiên, literal thành thuộc tính, không xuất natural_key."""
+    from transforms.onto import export_neptune as X
+
+    spark, entity, triple, _ = graph
+    sub = spark.table("subclass").select("class_iri", "ancestor_iri")
+    v, e = X.frames(entity, triple, sub)
+    assert v.count() == entity.count()
+    assert e.count() == triple.where("object_uid IS NOT NULL").count()
+    assert not [c for c in v.columns if "natural_key" in c]
+    lab = {r[0]: r[1] for r in v.select(":ID", ":LABEL").collect()}
+    assert lab[ids.product_uid("fin:ClassicCard")] == "ClassicCard;CreditCard;CreditProduct;Product"
+    assert lab[ids.make_uid("fin:Customer", "berka", "client_id=1")] == "Customer;Party;Person"
+    bm = ids.make_uid("fin:Customer", "bank_marketing", "file=bank-full.csv|row=1")
+    assert v.where(f"`:ID` = '{bm}'").first()["occupation:String"] == "management"
+    assert {r[0] for r in e.select(":TYPE").distinct().collect()} >= {"holdsAccount", "hasHolding", "transfersTo"}
+    # Ban point-in-time: truoc 1996 chua co the (1996-05-01) va vay (1996-06-01)
+    _, e95 = X.frames(entity, triple, sub, as_of="1996-01-01")
+    assert e95.where("`valid_from:Date` >= '1996-01-01'").count() == 0
+    assert e95.where("`:TYPE` = 'transfersTo'").count() == 2

@@ -19,8 +19,30 @@ Ký hiệu ở cột "Phục vụ": **M** model, **A** agent, **M+A** cả hai.
 - 17 test trong `tests/ontology` đều qua.
 - Job `fingraph-dev-onto-spark` chạy SUCCEEDED trên dev và tạo 4 bảng `track_a_onto.class/property/subclass/concept`.
 
-Còn chờ: quyền SELECT `track_a_onto` cho persona analyst (cần duyệt cấp quyền). Bước tiếp theo: O5–O7 (mapping
-corebank/Berka, Bank Marketing, MBD → `entity`, `triple`).
+Còn chờ: quyền SELECT `track_a_onto` cho persona analyst (cần duyệt cấp quyền).
+
+**Trạng thái (06-11-2026):** giai đoạn 2 (O5 lượt 1, O6, O7) **xong code, đang chạy trên dev**. Mapping nằm ở
+`transforms/onto/mappings/{berka,corebank,bank_marketing,mbd}.yml`.
+
+Code:
+- `transforms/onto/mappings/` nằm trong package nên vào `etl.zip`, và được biên dịch thành `mappings.json` vì Glue Spark không có PyYAML.
+- Job `onto.build_graph` dựng `entity`/`triple`.
+- 37 test ontology.
+
+Ba lần chạy đầu trên dev đều bị **bất biến O7 chặn**, không ghi bảng nào, và cả ba lỗi đã sửa:
+1. Thiếu PyYAML trên Glue.
+2. Biên dịch JSON với `sort_keys` làm đảo thứ tự cột khoá, gây 565 nghìn cạnh mồ côi.
+3. `mapping_id` trùng giữa Berka và corebank, làm đối soát lệch 4.500 / 4.534.
+
+Số liệu thật từ lần chạy bị chặn: ~550 nghìn cạnh `transfersTo` gộp theo tháng, 4.500 (Berka) / 4.534 (corebank)
+cạnh `holdsAccount`.
+
+Việc tiếp:
+- chạy lại `onto.build_graph` trên dev (credential hết hạn giữa chừng), ghi số node/cạnh vào đây;
+- O8 `same_as`;
+- O9 closure / `product_transition`.
+
+AI agent: [agent/README.md](../agent/README.md). Neptune: [NEPTUNE.md](NEPTUNE.md).
 
 ---
 
@@ -214,7 +236,7 @@ Thư viện chỉ cho test, không đóng gói vào Glue: `rdflib`, `pyshacl`, `
 gia đọc YAML được, không đọc PySpark). Một job đọc mọi mapping, nên thêm nguồn không thêm code. LLM có thể **gợi ý**
 mapping ([ONTOLOGY.md mục 7.3](ONTOLOGY.md)), người duyệt từng dòng, pytest (O4) chặn chỗ sai.
 
-**Làm gì:** mỗi nguồn một file `ontology/mappings/<nguồn>.yml`, mỗi mục sinh node hoặc cạnh từ một bảng silver:
+**Làm gì:** mỗi nguồn một file `transforms/onto/mappings/<nguồn>.yml` (trong package nên vào etl.zip; biên dịch thành `mappings.json` bằng `python -m transforms.onto.mapping` vì Glue Spark không có PyYAML), mỗi mục sinh node hoặc cạnh từ một bảng silver:
 
 ```yaml
 # ontology/mappings/corebank.yml (minh hoạ)
