@@ -89,7 +89,6 @@ def graph(silver):
     tb = T.load()
     ms = M.load_all(["berka", "mbd", "bank_marketing"])
     entity, triple, exp = B.build(silver, ms, tb)
-    entity, triple = entity.cache(), triple.cache()
     report = B.check_invariants(silver, entity, triple, exp, tb)
     entity.createOrReplaceTempView("entity")
     triple.createOrReplaceTempView("triple")
@@ -99,6 +98,31 @@ def graph(silver):
 
 def _count(spark, sql):
     return spark.sql(sql).first()[0]
+
+
+def test_berka_va_corebank_cung_luc_doi_soat_rieng_tung_nguon(silver):
+    """Hai nguồn cùng id mục (holds_account...) nhưng số dòng khác nhau: corebank có thêm chủ tài khoản
+    do simulator mở. Lỗi gặp trên dev (04-11): đối soát gộp theo id mục -> lệch 4.500 / 4.534."""
+    spark = silver
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS glue_catalog.silver_corebank")
+    for t in ("district", "account", "disp", "card", "loan", "trans"):
+        src = spark.table(f"glue_catalog.silver_berka.{t}")
+        cols = ", ".join(f"`{f.name}` {f.dataType.simpleString()}" for f in src.schema.fields)
+        spark.sql(f"CREATE TABLE IF NOT EXISTS glue_catalog.silver_corebank.{t} ({cols}) USING iceberg")
+        spark.sql(f"INSERT OVERWRITE glue_catalog.silver_corebank.{t} SELECT * FROM glue_catalog.silver_berka.{t}")
+    _table(spark, "silver_corebank.client", [
+        (1, "F", D(1970, 5, 1), 1, "ACTIVE"), (2, "M", D(1965, 1, 1), 2, "ACTIVE"),
+        (3, "F", D(1990, 2, 2), 1, "CLOSED"), (4, "M", D(1980, 3, 3), 2, "ACTIVE"),
+    ], "client_id int, gender string, birth_date date, district_id int, status string")
+    spark.sql("INSERT INTO glue_catalog.silver_corebank.account VALUES (30, 2, DATE'2023-01-05', 'MONTHLY')")
+    spark.sql("INSERT INTO glue_catalog.silver_corebank.disp VALUES (300, 4, 30, 'OWNER', true)")
+    tb = T.load()
+    entity, triple, exp = B.build(spark, M.load_all(["berka", "corebank"]), tb)
+    report = B.check_invariants(spark, entity, triple, exp, tb)
+    recon = {r["mapping_id"]: (r["expected"], r["got"]) for r in report["reconciliation"]}
+    assert recon["berka.holds_account"] == (2, 2) and recon["corebank.holds_account"] == (3, 3)
+    # cung khach 1 o hai nguon = hai uid (same_as o buoc O8), khong gop
+    assert entity.where("natural_key = 'client_id=1' AND class_iri = 'fin:Customer'").count() == 2
 
 
 def test_so_node_va_canh_dung_dap_an(graph):
@@ -117,13 +141,14 @@ def test_so_node_va_canh_dung_dap_an(graph):
     assert by_pred["fin:occupation"] == 2           # 'unknown' -> NULL -> khong co canh
     assert by_pred["fin:partOf"] == 4               # 2 quan -> vung, 2 vung -> nuoc
     assert all(r["expected"] == r["got"] for r in report["reconciliation"])
-    assert {r["mapping_id"] for r in report["reconciliation"]} >= {"holds_account", "loan", "card", "term_deposit"}
+    assert {r["mapping_id"] for r in report["reconciliation"]} >= {"berka.holds_account", "berka.loan", "berka.card",
+                                                                      "bank_marketing.term_deposit"}
 
 
 def test_canh_gop_giu_tong_tien_va_khoang_thang(graph):
     spark = graph[0]
     rows = spark.sql("""SELECT t.valid_from, t.valid_to, t.weight FROM triple t
-                        WHERE predicate_iri = 'fin:transfersTo' AND mapping_id = 'transfers_out'
+                        WHERE predicate_iri = 'fin:transfersTo' AND mapping_id = 'berka.transfers_out'
                         ORDER BY valid_from""").collect()
     assert [(r[0], r[1], r[2]) for r in rows] == [(D(1995, 2, 1), D(1995, 2, 28), 150.0),
                                                    (D(1995, 3, 1), D(1995, 3, 31), 100.0)]
@@ -206,6 +231,6 @@ def test_canh_mo_coi_lam_job_that_bai(graph):
 
 def test_doi_soat_lech_lam_job_that_bai(graph):
     spark, entity, triple, _ = graph
-    exp = [{"id": "loan", "sql": "SELECT count(*) + 1 FROM {silver_berka.loan}"}]
-    with pytest.raises(B.InvariantError, match="doi soat loan"):
+    exp = [{"id": "berka.loan", "sql": "SELECT count(*) + 1 FROM {silver_berka.loan}"}]
+    with pytest.raises(B.InvariantError, match="doi soat berka.loan"):
         B.check_invariants(spark, entity, triple, exp, T.load())

@@ -120,6 +120,7 @@ def entity_frame(spark, m: M.Mapping, e: M.Entity):
         _date(e.valid_from).alias("valid_from"),
         _date(e.valid_to).alias("valid_to"),
         _null_key(list(e.key.values())).alias("_null_key"),
+        F.lit(f"{m.source_system}.{e.id}").alias("_entity_id"),
     )
 
 
@@ -136,7 +137,7 @@ def product_entities(spark, tb: Dict[str, Any]):
                     F.lit(ids.PRODUCT_SYSTEM).alias("source_system"), F.lit("ontology/fingraph.ttl").alias("source_dataset"),
                     "natural_key", F.create_map().cast("map<string,string>").alias("attributes"),
                     F.lit(None).cast("date").alias("valid_from"), F.lit(None).cast("date").alias("valid_to"),
-                    F.lit(False).alias("_null_key")))
+                    F.lit(False).alias("_null_key"), F.lit("ontology.product").alias("_entity_id")))
 
 
 def _triple(subject, predicate, obj_uid, literal, datatype, weight, vf, vt, dataset, skey, mapping_id):
@@ -159,10 +160,10 @@ def edge_frame(spark, m: M.Mapping, e: M.Edge):
     weight = F.expr(e.weight) if e.weight else F.lit(None)
     if e.obj is not None:
         cols = _triple(subj, e.predicate, _ref_uid(m, e.obj), F.lit(None), F.lit(None), weight,
-                       _date(e.valid_from), _date(e.valid_to), e.source.dataset, skey, e.id)
+                       _date(e.valid_from), _date(e.valid_to), e.source.dataset, skey, f"{m.source_system}.{e.id}")
     else:
         cols = _triple(subj, e.predicate, F.lit(None), F.expr(e.literal["expr"]), F.lit(e.literal["datatype"]),
-                       weight, _date(e.valid_from), _date(e.valid_to), e.source.dataset, skey, e.id)
+                       weight, _date(e.valid_from), _date(e.valid_to), e.source.dataset, skey, f"{m.source_system}.{e.id}")
     out = df.select(*cols)
     return out.where(F.col("object_literal").isNotNull()) if e.obj is None else out
 
@@ -203,8 +204,9 @@ def holding_frames(spark, m: M.Mapping, h: M.Holding, notations: Dict[str, str],
         (F.create_map(*[x for k, v in attrs.items() for x in (F.lit(k), F.expr(v).cast("string"))])
          if attrs else F.create_map().cast("map<string,string>")).alias("attributes"),
         F.col("_vf").alias("valid_from"), F.col("_vt").alias("valid_to"),
-        (_null_key(list(h.key.values())) | F.col("_product").isNull()).alias("_null_key"))
-    ds, mid = h.source.dataset, h.id
+        (_null_key(list(h.key.values())) | F.col("_product").isNull()).alias("_null_key"),
+        F.lit(f"{m.source_system}.{h.id}").alias("_entity_id"))
+    ds, mid = h.source.dataset, f"{m.source_system}.{h.id}"
     vf, vt, sk = F.col("_vf"), F.col("_vt"), F.col("_skey")
     none = F.lit(None)
     parts = [
@@ -263,8 +265,12 @@ def check_invariants(spark, entity, triple, expectations: List[Dict[str, Any]], 
               .unionByName(triple.where(F.col("object_uid").isNotNull())
                            .join(uids, triple.object_uid == uids.uid, "left_anti"))
               .groupBy("mapping_id").count().collect())
+        sample = (triple.join(uids, triple.object_uid == uids.uid, "left_anti")
+                  .where(F.col("object_uid").isNotNull()).select("mapping_id", "source_key", "object_uid").limit(3).collect())
+        nodes = sorted((r[0], r[1]) for r in entity.groupBy("_entity_id").count().collect())
         problems.append(f"canh mo coi: {orphan_s} subject, {orphan_o} object khong co trong entity "
-                        f"(theo mapping: {[(r[0], r[1]) for r in ex]})")
+                        f"(theo mapping: {[(r[0], r[1]) for r in ex]}; vd {[tuple(r) for r in sample]}; "
+                        f"so node theo muc: {nodes})")
     bad_pred = [r[0] for r in triple.select("predicate_iri").distinct().collect() if r[0] not in props]
     if bad_pred:
         problems.append(f"predicate khong co trong TBox: {bad_pred}")
@@ -307,13 +313,13 @@ def build(spark, mappings: List[M.Mapping], tb: Dict[str, Any]):
         for e in m.edges:
             tris.append(edge_frame(spark, m, e))
             if e.expect_rows:
-                expectations.append({"id": e.id, "sql": e.expect_rows})
+                expectations.append({"id": f"{m.source_system}.{e.id}", "sql": e.expect_rows})
         for h in m.holdings:
             ent, tri = holding_frames(spark, m, h, notations, labels)
             ents.append(ent)
             tris.append(tri)
             if h.expect_rows:
-                expectations.append({"id": h.id, "sql": h.expect_rows})
+                expectations.append({"id": f"{m.source_system}.{h.id}", "sql": h.expect_rows})
 
     entity = ents[0]
     for x in ents[1:]:
@@ -331,7 +337,11 @@ def build(spark, mappings: List[M.Mapping], tb: Dict[str, Any]):
     triple = triple.withColumn("triple_id", ids.triple_id_col(
         F.col("subject_uid"), F.col("predicate_iri"), F.coalesce(F.col("object_uid"), F.col("object_literal")),
         F.col("valid_from"), F.col("source_dataset")))
-    return entity, triple, expectations
+    # Chốt kết quả MỘT lần (cắt lineage): đồ thị là hợp của hàng chục nhánh SQL/join; không chốt thì
+    # mỗi phép kiểm bất biến tính lại cả cây và kế hoạch truy vấn phình tới mức driver hết heap khi
+    # in plan (gặp khi dựng berka + corebank cùng lúc). localCheckpoint giữ trên executor, đủ cho
+    # một job chạy lại được từ đầu.
+    return entity.localCheckpoint(eager=True), triple.localCheckpoint(eager=True), expectations
 
 
 def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
@@ -345,7 +355,6 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
     print(f"  mapping: {[m.name for m in mappings]}, TBox {tb['version']}, run_id {run_id}")
 
     entity, triple, expectations = build(spark, mappings, tb)
-    entity, triple = entity.cache(), triple.cache()
     report = check_invariants(spark, entity, triple, expectations, tb)
 
     stamp = [F.lit(tb["version"]).alias("ontology_version"), F.current_timestamp().alias("recorded_at"),
@@ -358,8 +367,6 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
                         comment="ABox FinGraph: canh (triple_id de trich dan, thoi gian nghiep vu, nguon)")
     by_class = {r[0]: r[1] for r in entity.groupBy("class_iri").count().collect()}
     by_pred = {r[0]: r[1] for r in triple.groupBy("predicate_iri").count().collect()}
-    entity.unpersist()
-    triple.unpersist()
     for k in sorted(by_class):
         print(f"    node {k}: {by_class[k]}")
     for k in sorted(by_pred):

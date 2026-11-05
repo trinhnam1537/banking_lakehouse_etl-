@@ -1,13 +1,34 @@
 {
  "bank_marketing": {
+  "source_system": "bank_marketing",
   "database": "silver_bank_marketing",
+  "reviewed_by": "namth (cho duyet)",
+  "entities": [
+   {
+    "id": "customer",
+    "class": "fin:Customer",
+    "also": [
+     "fin:Person"
+    ],
+    "sql": "SELECT source_file, source_row, age, job, marital, education, credit_default,\n       CAST(balance_eur AS string) AS balance_eur\nFROM {silver_bank_marketing.contact_full}\nUNION ALL\nSELECT source_file, source_row, age, job, marital, education, credit_default,\n       CAST(NULL AS string) AS balance_eur\nFROM {silver_bank_marketing.contact_additional}\n",
+    "key": {
+     "file": "source_file",
+     "row": "source_row"
+    },
+    "label": "concat('Khách BM ', source_row)",
+    "attributes": {
+     "age": "age",
+     "occupation": "job",
+     "marital": "marital",
+     "education": "education",
+     "credit_default": "credit_default",
+     "balance_eur": "balance_eur"
+    }
+   }
+  ],
   "edges": [
    {
     "id": "occupation",
-    "object_literal": {
-     "datatype": "xsd:string",
-     "expr": "nullif(job, 'unknown')"
-    },
     "predicate": "fin:occupation",
     "sql": "SELECT source_file, source_row, job FROM {silver_bank_marketing.contact_full}\nUNION ALL\nSELECT source_file, source_row, job FROM {silver_bank_marketing.contact_additional}\n",
     "subject": {
@@ -16,34 +37,22 @@
       "source_file",
       "source_row"
      ]
+    },
+    "object_literal": {
+     "expr": "nullif(job, 'unknown')",
+     "datatype": "xsd:string"
     }
-   }
-  ],
-  "entities": [
-   {
-    "also": [
-     "fin:Person"
-    ],
-    "attributes": {
-     "age": "age",
-     "balance_eur": "balance_eur",
-     "credit_default": "credit_default",
-     "education": "education",
-     "marital": "marital",
-     "occupation": "job"
-    },
-    "class": "fin:Customer",
-    "id": "customer",
-    "key": {
-     "file": "source_file",
-     "row": "source_row"
-    },
-    "label": "concat('Khách BM ', source_row)",
-    "sql": "SELECT source_file, source_row, age, job, marital, education, credit_default,\n       CAST(balance_eur AS string) AS balance_eur\nFROM {silver_bank_marketing.contact_full}\nUNION ALL\nSELECT source_file, source_row, age, job, marital, education, credit_default,\n       CAST(NULL AS string) AS balance_eur\nFROM {silver_bank_marketing.contact_additional}\n"
    }
   ],
   "holdings": [
    {
+    "id": "term_deposit",
+    "product": "fin:TermDeposit",
+    "sql": "SELECT source_file, source_row FROM {silver_bank_marketing.contact_full} WHERE subscribed\nUNION ALL\nSELECT source_file, source_row FROM {silver_bank_marketing.contact_additional} WHERE subscribed\n",
+    "key": {
+     "file": "source_file",
+     "row": "source_row"
+    },
     "customer": {
      "entity": "customer",
      "key": [
@@ -51,30 +60,105 @@
       "source_row"
      ]
     },
-    "expect_rows": "SELECT (SELECT count(*) FROM {silver_bank_marketing.contact_full} WHERE subscribed)\n     + (SELECT count(*) FROM {silver_bank_marketing.contact_additional} WHERE subscribed)\n",
-    "id": "term_deposit",
-    "key": {
-     "file": "source_file",
-     "row": "source_row"
-    },
-    "product": "fin:TermDeposit",
-    "sql": "SELECT source_file, source_row FROM {silver_bank_marketing.contact_full} WHERE subscribed\nUNION ALL\nSELECT source_file, source_row FROM {silver_bank_marketing.contact_additional} WHERE subscribed\n"
+    "expect_rows": "SELECT (SELECT count(*) FROM {silver_bank_marketing.contact_full} WHERE subscribed)\n     + (SELECT count(*) FROM {silver_bank_marketing.contact_additional} WHERE subscribed)\n"
    }
-  ],
-  "reviewed_by": "namth (cho duyet)",
-  "source_system": "bank_marketing"
+  ]
  },
  "berka": {
+  "source_system": "berka",
   "database": "silver_berka",
+  "reviewed_by": "namth (cho duyet)",
+  "entities": [
+   {
+    "id": "country",
+    "class": "fin:Country",
+    "sql": "SELECT DISTINCT 'CZ' AS code FROM {silver_berka.district}",
+    "key": [
+     "code"
+    ],
+    "label": "'Cộng hoà Séc'"
+   },
+   {
+    "id": "region",
+    "class": "fin:Region",
+    "sql": "SELECT DISTINCT region FROM {silver_berka.district}",
+    "key": [
+     "region"
+    ],
+    "label": "concat('Vùng ', region)"
+   },
+   {
+    "id": "district",
+    "class": "fin:District",
+    "from": "district",
+    "key": [
+     "district_id"
+    ],
+    "label": "district_name",
+    "attributes": {
+     "inhabitants": "inhabitants",
+     "avg_salary_czk": "avg_salary",
+     "urban_ratio": "urban_ratio",
+     "unemployment_96": "unemployment_96"
+    }
+   },
+   {
+    "id": "customer",
+    "class": "fin:Customer",
+    "also": [
+     "fin:Person"
+    ],
+    "sql": "SELECT c.client_id, c.gender, c.birth_date, min(a.opened_date) AS since\nFROM {silver_berka.client} c\nLEFT JOIN {silver_berka.disp} d ON d.client_id = c.client_id\nLEFT JOIN {silver_berka.account} a ON a.account_id = d.account_id\nGROUP BY c.client_id, c.gender, c.birth_date\n",
+    "key": [
+     "client_id"
+    ],
+    "label": "concat('Khách ', client_id)",
+    "valid_from": "since",
+    "attributes": {
+     "gender": "gender",
+     "birth_year": "year(birth_date)"
+    }
+   },
+   {
+    "id": "account",
+    "class": "fin:Account",
+    "from": "account",
+    "key": [
+     "account_id"
+    ],
+    "label": "concat('Tài khoản ', account_id)",
+    "valid_from": "opened_date",
+    "attributes": {
+     "statement_frequency": "statement_frequency"
+    }
+   },
+   {
+    "id": "bank",
+    "class": "fin:Bank",
+    "sql": "SELECT DISTINCT counterparty_bank FROM {silver_berka.trans} WHERE counterparty_bank IS NOT NULL",
+    "key": {
+     "bank_code": "counterparty_bank"
+    },
+    "label": "concat('Ngân hàng ', counterparty_bank)"
+   },
+   {
+    "id": "external_account",
+    "class": "fin:Account",
+    "sql": "SELECT counterparty_bank, counterparty_account, min(trans_date) AS first_seen\nFROM {silver_berka.trans}\nWHERE counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL\nGROUP BY counterparty_bank, counterparty_account\n",
+    "key": {
+     "bank_code": "counterparty_bank",
+     "account_no": "counterparty_account"
+    },
+    "label": "concat('Tài khoản ngoài ', counterparty_bank, '-', counterparty_account)",
+    "valid_from": "first_seen",
+    "attributes": {
+     "external": "'true'"
+    }
+   }
+  ],
   "edges": [
    {
     "id": "region_in_country",
-    "object": {
-     "entity": "country",
-     "key": [
-      "code"
-     ]
-    },
     "predicate": "fin:partOf",
     "sql": "SELECT DISTINCT region, 'CZ' AS code FROM {silver_berka.district}",
     "subject": {
@@ -82,38 +166,36 @@
      "key": [
       "region"
      ]
+    },
+    "object": {
+     "entity": "country",
+     "key": [
+      "code"
+     ]
     }
    },
    {
-    "expect_rows": "SELECT count(*) FROM {silver_berka.district}",
-    "from": "district",
     "id": "district_in_region",
+    "predicate": "fin:partOf",
+    "from": "district",
+    "subject": {
+     "entity": "district",
+     "key": [
+      "district_id"
+     ]
+    },
     "object": {
      "entity": "region",
      "key": [
       "region"
      ]
     },
-    "predicate": "fin:partOf",
     "source_key": "concat('district_id=', district_id)",
-    "subject": {
-     "entity": "district",
-     "key": [
-      "district_id"
-     ]
-    }
+    "expect_rows": "SELECT count(*) FROM {silver_berka.district}"
    },
    {
-    "expect_rows": "SELECT count(*) FROM {silver_berka.client} WHERE district_id IS NOT NULL",
     "id": "customer_located_in",
-    "object": {
-     "entity": "district",
-     "key": [
-      "district_id"
-     ]
-    },
     "predicate": "fin:locatedIn",
-    "source_key": "concat('client_id=', client_id)",
     "sql": "SELECT c.client_id, c.district_id, min(a.opened_date) AS since\nFROM {silver_berka.client} c\nLEFT JOIN {silver_berka.disp} d ON d.client_id = c.client_id\nLEFT JOIN {silver_berka.account} a ON a.account_id = d.account_id\nWHERE c.district_id IS NOT NULL\nGROUP BY c.client_id, c.district_id\n",
     "subject": {
      "entity": "customer",
@@ -121,40 +203,40 @@
       "client_id"
      ]
     },
-    "valid_from": "since"
-   },
-   {
-    "expect_rows": "SELECT count(*) FROM {silver_berka.account} WHERE district_id IS NOT NULL",
-    "from": "account",
-    "id": "account_located_in",
     "object": {
      "entity": "district",
      "key": [
       "district_id"
      ]
     },
+    "valid_from": "since",
+    "source_key": "concat('client_id=', client_id)",
+    "expect_rows": "SELECT count(*) FROM {silver_berka.client} WHERE district_id IS NOT NULL"
+   },
+   {
+    "id": "account_located_in",
     "predicate": "fin:locatedIn",
-    "source_key": "concat('account_id=', account_id)",
+    "from": "account",
+    "where": "district_id IS NOT NULL",
     "subject": {
      "entity": "account",
      "key": [
       "account_id"
      ]
     },
-    "valid_from": "opened_date",
-    "where": "district_id IS NOT NULL"
-   },
-   {
-    "expect_rows": "SELECT count(*) FROM {silver_berka.disp} WHERE is_owner",
-    "id": "holds_account",
     "object": {
-     "entity": "account",
+     "entity": "district",
      "key": [
-      "account_id"
+      "district_id"
      ]
     },
+    "valid_from": "opened_date",
+    "source_key": "concat('account_id=', account_id)",
+    "expect_rows": "SELECT count(*) FROM {silver_berka.account} WHERE district_id IS NOT NULL"
+   },
+   {
+    "id": "holds_account",
     "predicate": "fin:holdsAccount",
-    "source_key": "concat('disp_id=', disp_id)",
     "sql": "SELECT d.disp_id, d.client_id, d.account_id, a.opened_date\nFROM {silver_berka.disp} d JOIN {silver_berka.account} a ON a.account_id = d.account_id\nWHERE d.is_owner\n",
     "subject": {
      "entity": "customer",
@@ -162,19 +244,19 @@
       "client_id"
      ]
     },
-    "valid_from": "opened_date"
-   },
-   {
-    "expect_rows": "SELECT count(*) FROM {silver_berka.disp} WHERE disp_type = 'DISPONENT'",
-    "id": "authorized_on",
     "object": {
      "entity": "account",
      "key": [
       "account_id"
      ]
     },
-    "predicate": "fin:isAuthorizedOn",
+    "valid_from": "opened_date",
     "source_key": "concat('disp_id=', disp_id)",
+    "expect_rows": "SELECT count(*) FROM {silver_berka.disp} WHERE is_owner"
+   },
+   {
+    "id": "authorized_on",
+    "predicate": "fin:isAuthorizedOn",
     "sql": "SELECT d.disp_id, d.client_id, d.account_id, a.opened_date\nFROM {silver_berka.disp} d JOIN {silver_berka.account} a ON a.account_id = d.account_id\nWHERE d.disp_type = 'DISPONENT'\n",
     "subject": {
      "entity": "customer",
@@ -182,16 +264,18 @@
       "client_id"
      ]
     },
-    "valid_from": "opened_date"
+    "object": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "opened_date",
+    "source_key": "concat('disp_id=', disp_id)",
+    "expect_rows": "SELECT count(*) FROM {silver_berka.disp} WHERE disp_type = 'DISPONENT'"
    },
    {
     "id": "external_at_bank",
-    "object": {
-     "entity": "bank",
-     "key": [
-      "counterparty_bank"
-     ]
-    },
     "predicate": "fin:atBank",
     "sql": "SELECT counterparty_bank, counterparty_account, min(trans_date) AS first_seen\nFROM {silver_berka.trans}\nWHERE counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL\nGROUP BY counterparty_bank, counterparty_account\n",
     "subject": {
@@ -201,19 +285,17 @@
       "counterparty_account"
      ]
     },
+    "object": {
+     "entity": "bank",
+     "key": [
+      "counterparty_bank"
+     ]
+    },
     "valid_from": "first_seen"
    },
    {
     "id": "transfers_out",
-    "object": {
-     "entity": "external_account",
-     "key": [
-      "counterparty_bank",
-      "counterparty_account"
-     ]
-    },
     "predicate": "fin:transfersTo",
-    "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)",
     "sql": "SELECT account_id, counterparty_bank, counterparty_account,\n       trunc(trans_date, 'MM') AS month, sum(amount) AS total, count(*) AS n\nFROM {silver_berka.trans}\nWHERE direction = 'DEBIT' AND counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL\nGROUP BY account_id, counterparty_bank, counterparty_account, trunc(trans_date, 'MM')\n",
     "subject": {
      "entity": "account",
@@ -221,20 +303,21 @@
       "account_id"
      ]
     },
+    "object": {
+     "entity": "external_account",
+     "key": [
+      "counterparty_bank",
+      "counterparty_account"
+     ]
+    },
+    "weight": "total",
     "valid_from": "month",
     "valid_to": "last_day(month)",
-    "weight": "total"
+    "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)"
    },
    {
     "id": "transfers_in",
-    "object": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
     "predicate": "fin:transfersTo",
-    "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)",
     "sql": "SELECT account_id, counterparty_bank, counterparty_account,\n       trunc(trans_date, 'MM') AS month, sum(amount) AS total, count(*) AS n\nFROM {silver_berka.trans}\nWHERE direction = 'CREDIT' AND counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL\nGROUP BY account_id, counterparty_bank, counterparty_account, trunc(trans_date, 'MM')\n",
     "subject": {
      "entity": "external_account",
@@ -243,207 +326,209 @@
       "counterparty_account"
      ]
     },
+    "object": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "weight": "total",
     "valid_from": "month",
     "valid_to": "last_day(month)",
-    "weight": "total"
-   }
-  ],
-  "entities": [
-   {
-    "class": "fin:Country",
-    "id": "country",
-    "key": [
-     "code"
-    ],
-    "label": "'Cộng hoà Séc'",
-    "sql": "SELECT DISTINCT 'CZ' AS code FROM {silver_berka.district}"
-   },
-   {
-    "class": "fin:Region",
-    "id": "region",
-    "key": [
-     "region"
-    ],
-    "label": "concat('Vùng ', region)",
-    "sql": "SELECT DISTINCT region FROM {silver_berka.district}"
-   },
-   {
-    "attributes": {
-     "avg_salary_czk": "avg_salary",
-     "inhabitants": "inhabitants",
-     "unemployment_96": "unemployment_96",
-     "urban_ratio": "urban_ratio"
-    },
-    "class": "fin:District",
-    "from": "district",
-    "id": "district",
-    "key": [
-     "district_id"
-    ],
-    "label": "district_name"
-   },
-   {
-    "also": [
-     "fin:Person"
-    ],
-    "attributes": {
-     "birth_year": "year(birth_date)",
-     "gender": "gender"
-    },
-    "class": "fin:Customer",
-    "id": "customer",
-    "key": [
-     "client_id"
-    ],
-    "label": "concat('Khách ', client_id)",
-    "sql": "SELECT c.client_id, c.gender, c.birth_date, min(a.opened_date) AS since\nFROM {silver_berka.client} c\nLEFT JOIN {silver_berka.disp} d ON d.client_id = c.client_id\nLEFT JOIN {silver_berka.account} a ON a.account_id = d.account_id\nGROUP BY c.client_id, c.gender, c.birth_date\n",
-    "valid_from": "since"
-   },
-   {
-    "attributes": {
-     "statement_frequency": "statement_frequency"
-    },
-    "class": "fin:Account",
-    "from": "account",
-    "id": "account",
-    "key": [
-     "account_id"
-    ],
-    "label": "concat('Tài khoản ', account_id)",
-    "valid_from": "opened_date"
-   },
-   {
-    "class": "fin:Bank",
-    "id": "bank",
-    "key": {
-     "bank_code": "counterparty_bank"
-    },
-    "label": "concat('Ngân hàng ', counterparty_bank)",
-    "sql": "SELECT DISTINCT counterparty_bank FROM {silver_berka.trans} WHERE counterparty_bank IS NOT NULL"
-   },
-   {
-    "attributes": {
-     "external": "'true'"
-    },
-    "class": "fin:Account",
-    "id": "external_account",
-    "key": {
-     "account_no": "counterparty_account",
-     "bank_code": "counterparty_bank"
-    },
-    "label": "concat('Tài khoản ngoài ', counterparty_bank, '-', counterparty_account)",
-    "sql": "SELECT counterparty_bank, counterparty_account, min(trans_date) AS first_seen\nFROM {silver_berka.trans}\nWHERE counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL\nGROUP BY counterparty_bank, counterparty_account\n",
-    "valid_from": "first_seen"
+    "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)"
    }
   ],
   "holdings": [
    {
-    "account": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
-    "customer": {
-     "entity": "customer",
-     "key": [
-      "client_id"
-     ]
-    },
-    "expect_rows": "SELECT count(*) FROM {silver_berka.disp} WHERE is_owner",
     "id": "current_account",
+    "product": "fin:CurrentAccount",
+    "sql": "SELECT d.client_id, d.account_id, a.opened_date\nFROM {silver_berka.disp} d JOIN {silver_berka.account} a ON a.account_id = d.account_id\nWHERE d.is_owner\n",
     "key": [
      "account_id"
     ],
-    "product": "fin:CurrentAccount",
-    "sql": "SELECT d.client_id, d.account_id, a.opened_date\nFROM {silver_berka.disp} d JOIN {silver_berka.account} a ON a.account_id = d.account_id\nWHERE d.is_owner\n",
-    "valid_from": "opened_date"
-   },
-   {
-    "account": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
-    "amount": "amount",
     "customer": {
      "entity": "customer",
      "key": [
       "client_id"
      ]
     },
-    "expect_rows": "SELECT count(*) FROM {silver_berka.loan}",
+    "account": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "opened_date",
+    "expect_rows": "SELECT count(*) FROM {silver_berka.disp} WHERE is_owner"
+   },
+   {
     "id": "loan",
+    "product": "fin:Loan",
+    "sql": "SELECT l.*, d.client_id\nFROM {silver_berka.loan} l\nJOIN {silver_berka.disp} d ON d.account_id = l.account_id AND d.is_owner\n",
     "key": [
      "loan_id"
     ],
-    "product": "fin:Loan",
-    "sql": "SELECT l.*, d.client_id\nFROM {silver_berka.loan} l\nJOIN {silver_berka.disp} d ON d.account_id = l.account_id AND d.is_owner\n",
-    "status": "loan_status",
-    "valid_from": "granted_date",
-    "valid_to": "maturity_date"
-   },
-   {
-    "account": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
     "customer": {
      "entity": "customer",
      "key": [
       "client_id"
      ]
     },
-    "expect_rows": "SELECT count(*) FROM {silver_berka.card}",
+    "account": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "granted_date",
+    "valid_to": "maturity_date",
+    "status": "loan_status",
+    "amount": "amount",
+    "expect_rows": "SELECT count(*) FROM {silver_berka.loan}"
+   },
+   {
     "id": "card",
+    "product_notation": "concat('card_type=', lower(trim(card_type)))",
+    "sql": "SELECT c.*, d.client_id, d.account_id\nFROM {silver_berka.card} c JOIN {silver_berka.disp} d ON d.disp_id = c.disp_id\n",
     "key": [
      "card_id"
     ],
-    "product_notation": "concat('card_type=', lower(trim(card_type)))",
-    "sql": "SELECT c.*, d.client_id, d.account_id\nFROM {silver_berka.card} c JOIN {silver_berka.disp} d ON d.disp_id = c.disp_id\n",
-    "valid_from": "issued_date"
-   },
-   {
-    "account": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
     "customer": {
      "entity": "customer",
      "key": [
       "client_id"
      ]
     },
-    "expect_rows": "SELECT count(DISTINCT d.client_id, upper(trim(t.k_symbol)))\nFROM {silver_berka.trans} t\nJOIN {silver_berka.disp} d ON d.account_id = t.account_id AND d.is_owner\nWHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')\n",
+    "account": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "issued_date",
+    "expect_rows": "SELECT count(*) FROM {silver_berka.card}"
+   },
+   {
     "id": "standing_payment",
+    "product_notation": "concat('k_symbol=', ks)",
+    "sql": "SELECT d.client_id, upper(trim(t.k_symbol)) AS ks,\n       min(t.trans_date) AS first_date, min_by(t.account_id, t.trans_date) AS account_id\nFROM {silver_berka.trans} t\nJOIN {silver_berka.disp} d ON d.account_id = t.account_id AND d.is_owner\nWHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')\nGROUP BY d.client_id, upper(trim(t.k_symbol))\n",
     "key": [
      "client_id",
      "ks"
     ],
-    "product_notation": "concat('k_symbol=', ks)",
-    "sql": "SELECT d.client_id, upper(trim(t.k_symbol)) AS ks,\n       min(t.trans_date) AS first_date, min_by(t.account_id, t.trans_date) AS account_id\nFROM {silver_berka.trans} t\nJOIN {silver_berka.disp} d ON d.account_id = t.account_id AND d.is_owner\nWHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')\nGROUP BY d.client_id, upper(trim(t.k_symbol))\n",
-    "valid_from": "first_date"
+    "customer": {
+     "entity": "customer",
+     "key": [
+      "client_id"
+     ]
+    },
+    "account": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "first_date",
+    "expect_rows": "SELECT count(DISTINCT d.client_id, upper(trim(t.k_symbol)))\nFROM {silver_berka.trans} t\nJOIN {silver_berka.disp} d ON d.account_id = t.account_id AND d.is_owner\nWHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')\n"
    }
-  ],
-  "reviewed_by": "namth (cho duyet)",
-  "source_system": "berka"
+  ]
  },
  "corebank": {
+  "source_system": "corebank",
   "database": "silver_corebank",
+  "reviewed_by": "namth (cho duyet)",
+  "entities": [
+   {
+    "id": "country",
+    "class": "fin:Country",
+    "sql": "SELECT DISTINCT 'CZ' AS code FROM {silver_corebank.district}",
+    "key": [
+     "code"
+    ],
+    "label": "'Cộng hoà Séc'"
+   },
+   {
+    "id": "region",
+    "class": "fin:Region",
+    "sql": "SELECT DISTINCT region FROM {silver_corebank.district}",
+    "key": [
+     "region"
+    ],
+    "label": "concat('Vùng ', region)"
+   },
+   {
+    "id": "district",
+    "class": "fin:District",
+    "from": "district",
+    "key": [
+     "district_id"
+    ],
+    "label": "district_name",
+    "attributes": {
+     "inhabitants": "inhabitants",
+     "avg_salary_czk": "avg_salary",
+     "urban_ratio": "urban_ratio",
+     "unemployment_96": "unemployment_96"
+    }
+   },
+   {
+    "id": "customer",
+    "class": "fin:Customer",
+    "also": [
+     "fin:Person"
+    ],
+    "sql": "SELECT c.client_id, c.gender, c.birth_date, c.status, min(a.opened_date) AS since\nFROM {silver_corebank.client} c\nLEFT JOIN {silver_corebank.disp} d ON d.client_id = c.client_id\nLEFT JOIN {silver_corebank.account} a ON a.account_id = d.account_id\nGROUP BY c.client_id, c.gender, c.birth_date, c.status\n",
+    "key": [
+     "client_id"
+    ],
+    "label": "concat('Khách ', client_id)",
+    "valid_from": "since",
+    "attributes": {
+     "gender": "gender",
+     "birth_year": "year(birth_date)",
+     "status": "status"
+    }
+   },
+   {
+    "id": "account",
+    "class": "fin:Account",
+    "from": "account",
+    "key": [
+     "account_id"
+    ],
+    "label": "concat('Tài khoản ', account_id)",
+    "valid_from": "opened_date",
+    "attributes": {
+     "statement_frequency": "statement_frequency"
+    }
+   },
+   {
+    "id": "bank",
+    "class": "fin:Bank",
+    "sql": "SELECT DISTINCT counterparty_bank FROM {silver_corebank.trans} WHERE counterparty_bank IS NOT NULL",
+    "key": {
+     "bank_code": "counterparty_bank"
+    },
+    "label": "concat('Ngân hàng ', counterparty_bank)"
+   },
+   {
+    "id": "external_account",
+    "class": "fin:Account",
+    "sql": "SELECT counterparty_bank, counterparty_account, min(trans_date) AS first_seen\nFROM {silver_corebank.trans}\nWHERE counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL AND counterparty_account <> 0\nGROUP BY counterparty_bank, counterparty_account\n",
+    "key": {
+     "bank_code": "counterparty_bank",
+     "account_no": "counterparty_account"
+    },
+    "label": "concat('Tài khoản ngoài ', counterparty_bank, '-', counterparty_account)",
+    "valid_from": "first_seen",
+    "attributes": {
+     "external": "'true'"
+    }
+   }
+  ],
   "edges": [
    {
     "id": "region_in_country",
-    "object": {
-     "entity": "country",
-     "key": [
-      "code"
-     ]
-    },
     "predicate": "fin:partOf",
     "sql": "SELECT DISTINCT region, 'CZ' AS code FROM {silver_corebank.district}",
     "subject": {
@@ -451,38 +536,36 @@
      "key": [
       "region"
      ]
+    },
+    "object": {
+     "entity": "country",
+     "key": [
+      "code"
+     ]
     }
    },
    {
-    "expect_rows": "SELECT count(*) FROM {silver_corebank.district}",
-    "from": "district",
     "id": "district_in_region",
+    "predicate": "fin:partOf",
+    "from": "district",
+    "subject": {
+     "entity": "district",
+     "key": [
+      "district_id"
+     ]
+    },
     "object": {
      "entity": "region",
      "key": [
       "region"
      ]
     },
-    "predicate": "fin:partOf",
     "source_key": "concat('district_id=', district_id)",
-    "subject": {
-     "entity": "district",
-     "key": [
-      "district_id"
-     ]
-    }
+    "expect_rows": "SELECT count(*) FROM {silver_corebank.district}"
    },
    {
-    "expect_rows": "SELECT count(*) FROM {silver_corebank.client} WHERE district_id IS NOT NULL",
     "id": "customer_located_in",
-    "object": {
-     "entity": "district",
-     "key": [
-      "district_id"
-     ]
-    },
     "predicate": "fin:locatedIn",
-    "source_key": "concat('client_id=', client_id)",
     "sql": "SELECT c.client_id, c.district_id, min(a.opened_date) AS since\nFROM {silver_corebank.client} c\nLEFT JOIN {silver_corebank.disp} d ON d.client_id = c.client_id\nLEFT JOIN {silver_corebank.account} a ON a.account_id = d.account_id\nWHERE c.district_id IS NOT NULL\nGROUP BY c.client_id, c.district_id\n",
     "subject": {
      "entity": "customer",
@@ -490,40 +573,40 @@
       "client_id"
      ]
     },
-    "valid_from": "since"
-   },
-   {
-    "expect_rows": "SELECT count(*) FROM {silver_corebank.account} WHERE district_id IS NOT NULL",
-    "from": "account",
-    "id": "account_located_in",
     "object": {
      "entity": "district",
      "key": [
       "district_id"
      ]
     },
+    "valid_from": "since",
+    "source_key": "concat('client_id=', client_id)",
+    "expect_rows": "SELECT count(*) FROM {silver_corebank.client} WHERE district_id IS NOT NULL"
+   },
+   {
+    "id": "account_located_in",
     "predicate": "fin:locatedIn",
-    "source_key": "concat('account_id=', account_id)",
+    "from": "account",
+    "where": "district_id IS NOT NULL",
     "subject": {
      "entity": "account",
      "key": [
       "account_id"
      ]
     },
-    "valid_from": "opened_date",
-    "where": "district_id IS NOT NULL"
-   },
-   {
-    "expect_rows": "SELECT count(*) FROM {silver_corebank.disp} WHERE is_owner",
-    "id": "holds_account",
     "object": {
-     "entity": "account",
+     "entity": "district",
      "key": [
-      "account_id"
+      "district_id"
      ]
     },
+    "valid_from": "opened_date",
+    "source_key": "concat('account_id=', account_id)",
+    "expect_rows": "SELECT count(*) FROM {silver_corebank.account} WHERE district_id IS NOT NULL"
+   },
+   {
+    "id": "holds_account",
     "predicate": "fin:holdsAccount",
-    "source_key": "concat('disp_id=', disp_id)",
     "sql": "SELECT d.disp_id, d.client_id, d.account_id, a.opened_date\nFROM {silver_corebank.disp} d JOIN {silver_corebank.account} a ON a.account_id = d.account_id\nWHERE d.is_owner\n",
     "subject": {
      "entity": "customer",
@@ -531,19 +614,19 @@
       "client_id"
      ]
     },
-    "valid_from": "opened_date"
-   },
-   {
-    "expect_rows": "SELECT count(*) FROM {silver_corebank.disp} WHERE disp_type = 'DISPONENT'",
-    "id": "authorized_on",
     "object": {
      "entity": "account",
      "key": [
       "account_id"
      ]
     },
-    "predicate": "fin:isAuthorizedOn",
+    "valid_from": "opened_date",
     "source_key": "concat('disp_id=', disp_id)",
+    "expect_rows": "SELECT count(*) FROM {silver_corebank.disp} WHERE is_owner"
+   },
+   {
+    "id": "authorized_on",
+    "predicate": "fin:isAuthorizedOn",
     "sql": "SELECT d.disp_id, d.client_id, d.account_id, a.opened_date\nFROM {silver_corebank.disp} d JOIN {silver_corebank.account} a ON a.account_id = d.account_id\nWHERE d.disp_type = 'DISPONENT'\n",
     "subject": {
      "entity": "customer",
@@ -551,16 +634,18 @@
       "client_id"
      ]
     },
-    "valid_from": "opened_date"
+    "object": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "opened_date",
+    "source_key": "concat('disp_id=', disp_id)",
+    "expect_rows": "SELECT count(*) FROM {silver_corebank.disp} WHERE disp_type = 'DISPONENT'"
    },
    {
     "id": "external_at_bank",
-    "object": {
-     "entity": "bank",
-     "key": [
-      "counterparty_bank"
-     ]
-    },
     "predicate": "fin:atBank",
     "sql": "SELECT counterparty_bank, counterparty_account, min(trans_date) AS first_seen\nFROM {silver_corebank.trans}\nWHERE counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL AND counterparty_account <> 0\nGROUP BY counterparty_bank, counterparty_account\n",
     "subject": {
@@ -570,19 +655,17 @@
       "counterparty_account"
      ]
     },
+    "object": {
+     "entity": "bank",
+     "key": [
+      "counterparty_bank"
+     ]
+    },
     "valid_from": "first_seen"
    },
    {
     "id": "transfers_out",
-    "object": {
-     "entity": "external_account",
-     "key": [
-      "counterparty_bank",
-      "counterparty_account"
-     ]
-    },
     "predicate": "fin:transfersTo",
-    "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)",
     "sql": "SELECT account_id, counterparty_bank, counterparty_account,\n       trunc(trans_date, 'MM') AS month, sum(amount) AS total, count(*) AS n\nFROM {silver_corebank.trans}\nWHERE direction = 'DEBIT' AND counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL AND counterparty_account <> 0\nGROUP BY account_id, counterparty_bank, counterparty_account, trunc(trans_date, 'MM')\n",
     "subject": {
      "entity": "account",
@@ -590,20 +673,21 @@
       "account_id"
      ]
     },
+    "object": {
+     "entity": "external_account",
+     "key": [
+      "counterparty_bank",
+      "counterparty_account"
+     ]
+    },
+    "weight": "total",
     "valid_from": "month",
     "valid_to": "last_day(month)",
-    "weight": "total"
+    "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)"
    },
    {
     "id": "transfers_in",
-    "object": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
     "predicate": "fin:transfersTo",
-    "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)",
     "sql": "SELECT account_id, counterparty_bank, counterparty_account,\n       trunc(trans_date, 'MM') AS month, sum(amount) AS total, count(*) AS n\nFROM {silver_corebank.trans}\nWHERE direction = 'CREDIT' AND counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL AND counterparty_account <> 0\nGROUP BY account_id, counterparty_bank, counterparty_account, trunc(trans_date, 'MM')\n",
     "subject": {
      "entity": "external_account",
@@ -612,240 +696,156 @@
       "counterparty_account"
      ]
     },
+    "object": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "weight": "total",
     "valid_from": "month",
     "valid_to": "last_day(month)",
-    "weight": "total"
-   }
-  ],
-  "entities": [
-   {
-    "class": "fin:Country",
-    "id": "country",
-    "key": [
-     "code"
-    ],
-    "label": "'Cộng hoà Séc'",
-    "sql": "SELECT DISTINCT 'CZ' AS code FROM {silver_corebank.district}"
-   },
-   {
-    "class": "fin:Region",
-    "id": "region",
-    "key": [
-     "region"
-    ],
-    "label": "concat('Vùng ', region)",
-    "sql": "SELECT DISTINCT region FROM {silver_corebank.district}"
-   },
-   {
-    "attributes": {
-     "avg_salary_czk": "avg_salary",
-     "inhabitants": "inhabitants",
-     "unemployment_96": "unemployment_96",
-     "urban_ratio": "urban_ratio"
-    },
-    "class": "fin:District",
-    "from": "district",
-    "id": "district",
-    "key": [
-     "district_id"
-    ],
-    "label": "district_name"
-   },
-   {
-    "also": [
-     "fin:Person"
-    ],
-    "attributes": {
-     "birth_year": "year(birth_date)",
-     "gender": "gender",
-     "status": "status"
-    },
-    "class": "fin:Customer",
-    "id": "customer",
-    "key": [
-     "client_id"
-    ],
-    "label": "concat('Khách ', client_id)",
-    "sql": "SELECT c.client_id, c.gender, c.birth_date, c.status, min(a.opened_date) AS since\nFROM {silver_corebank.client} c\nLEFT JOIN {silver_corebank.disp} d ON d.client_id = c.client_id\nLEFT JOIN {silver_corebank.account} a ON a.account_id = d.account_id\nGROUP BY c.client_id, c.gender, c.birth_date, c.status\n",
-    "valid_from": "since"
-   },
-   {
-    "attributes": {
-     "statement_frequency": "statement_frequency"
-    },
-    "class": "fin:Account",
-    "from": "account",
-    "id": "account",
-    "key": [
-     "account_id"
-    ],
-    "label": "concat('Tài khoản ', account_id)",
-    "valid_from": "opened_date"
-   },
-   {
-    "class": "fin:Bank",
-    "id": "bank",
-    "key": {
-     "bank_code": "counterparty_bank"
-    },
-    "label": "concat('Ngân hàng ', counterparty_bank)",
-    "sql": "SELECT DISTINCT counterparty_bank FROM {silver_corebank.trans} WHERE counterparty_bank IS NOT NULL"
-   },
-   {
-    "attributes": {
-     "external": "'true'"
-    },
-    "class": "fin:Account",
-    "id": "external_account",
-    "key": {
-     "account_no": "counterparty_account",
-     "bank_code": "counterparty_bank"
-    },
-    "label": "concat('Tài khoản ngoài ', counterparty_bank, '-', counterparty_account)",
-    "sql": "SELECT counterparty_bank, counterparty_account, min(trans_date) AS first_seen\nFROM {silver_corebank.trans}\nWHERE counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL AND counterparty_account <> 0\nGROUP BY counterparty_bank, counterparty_account\n",
-    "valid_from": "first_seen"
+    "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)"
    }
   ],
   "holdings": [
    {
-    "account": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
-    "customer": {
-     "entity": "customer",
-     "key": [
-      "client_id"
-     ]
-    },
-    "expect_rows": "SELECT count(*) FROM {silver_corebank.disp} WHERE is_owner",
     "id": "current_account",
+    "product": "fin:CurrentAccount",
+    "sql": "SELECT d.client_id, d.account_id, a.opened_date\nFROM {silver_corebank.disp} d JOIN {silver_corebank.account} a ON a.account_id = d.account_id\nWHERE d.is_owner\n",
     "key": [
      "account_id"
     ],
-    "product": "fin:CurrentAccount",
-    "sql": "SELECT d.client_id, d.account_id, a.opened_date\nFROM {silver_corebank.disp} d JOIN {silver_corebank.account} a ON a.account_id = d.account_id\nWHERE d.is_owner\n",
-    "valid_from": "opened_date"
-   },
-   {
-    "account": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
-    "amount": "amount",
     "customer": {
      "entity": "customer",
      "key": [
       "client_id"
      ]
     },
-    "expect_rows": "SELECT count(*) FROM {silver_corebank.loan}",
+    "account": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "opened_date",
+    "expect_rows": "SELECT count(*) FROM {silver_corebank.disp} WHERE is_owner"
+   },
+   {
     "id": "loan",
+    "product": "fin:Loan",
+    "sql": "SELECT l.*, d.client_id\nFROM {silver_corebank.loan} l\nJOIN {silver_corebank.disp} d ON d.account_id = l.account_id AND d.is_owner\n",
     "key": [
      "loan_id"
     ],
-    "product": "fin:Loan",
-    "sql": "SELECT l.*, d.client_id\nFROM {silver_corebank.loan} l\nJOIN {silver_corebank.disp} d ON d.account_id = l.account_id AND d.is_owner\n",
-    "status": "loan_status",
-    "valid_from": "granted_date",
-    "valid_to": "maturity_date"
-   },
-   {
-    "account": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
     "customer": {
      "entity": "customer",
      "key": [
       "client_id"
      ]
     },
-    "expect_rows": "SELECT count(*) FROM {silver_corebank.card}",
+    "account": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "granted_date",
+    "valid_to": "maturity_date",
+    "status": "loan_status",
+    "amount": "amount",
+    "expect_rows": "SELECT count(*) FROM {silver_corebank.loan}"
+   },
+   {
     "id": "card",
+    "product_notation": "concat('card_type=', lower(trim(card_type)))",
+    "sql": "SELECT c.*, d.client_id, d.account_id\nFROM {silver_corebank.card} c JOIN {silver_corebank.disp} d ON d.disp_id = c.disp_id\n",
     "key": [
      "card_id"
     ],
-    "product_notation": "concat('card_type=', lower(trim(card_type)))",
-    "sql": "SELECT c.*, d.client_id, d.account_id\nFROM {silver_corebank.card} c JOIN {silver_corebank.disp} d ON d.disp_id = c.disp_id\n",
-    "valid_from": "issued_date"
-   },
-   {
-    "account": {
-     "entity": "account",
-     "key": [
-      "account_id"
-     ]
-    },
     "customer": {
      "entity": "customer",
      "key": [
       "client_id"
      ]
     },
-    "expect_rows": "SELECT count(DISTINCT d.client_id, upper(trim(t.k_symbol)))\nFROM {silver_corebank.trans} t\nJOIN {silver_corebank.disp} d ON d.account_id = t.account_id AND d.is_owner\nWHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')\n",
+    "account": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "issued_date",
+    "expect_rows": "SELECT count(*) FROM {silver_corebank.card}"
+   },
+   {
     "id": "standing_payment",
+    "product_notation": "concat('k_symbol=', ks)",
+    "sql": "SELECT d.client_id, upper(trim(t.k_symbol)) AS ks,\n       min(t.trans_date) AS first_date, min_by(t.account_id, t.trans_date) AS account_id\nFROM {silver_corebank.trans} t\nJOIN {silver_corebank.disp} d ON d.account_id = t.account_id AND d.is_owner\nWHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')\nGROUP BY d.client_id, upper(trim(t.k_symbol))\n",
     "key": [
      "client_id",
      "ks"
     ],
-    "product_notation": "concat('k_symbol=', ks)",
-    "sql": "SELECT d.client_id, upper(trim(t.k_symbol)) AS ks,\n       min(t.trans_date) AS first_date, min_by(t.account_id, t.trans_date) AS account_id\nFROM {silver_corebank.trans} t\nJOIN {silver_corebank.disp} d ON d.account_id = t.account_id AND d.is_owner\nWHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')\nGROUP BY d.client_id, upper(trim(t.k_symbol))\n",
-    "valid_from": "first_date"
-   }
-  ],
-  "reviewed_by": "namth (cho duyet)",
-  "source_system": "corebank"
- },
- "mbd": {
-  "database": "silver_mbd",
-  "entities": [
-   {
-    "also": [
-     "fin:Organization"
-    ],
-    "attributes": {
-     "fold": "fold"
-    },
-    "class": "fin:Customer",
-    "id": "customer",
-    "key": [
-     "client_id"
-    ],
-    "label": "concat('Doanh nghiệp ', substr(client_id, 1, 10))",
-    "sql": "SELECT client_id, min(report_month) AS first_month, max(fold) AS fold\nFROM {silver_mbd.target_month}\nGROUP BY client_id\n",
-    "valid_from": "trunc(first_month, 'MM')"
-   }
-  ],
-  "holdings": [
-   {
-    "attributes": {
-     "purchase_months": "purchase_months"
-    },
     "customer": {
      "entity": "customer",
      "key": [
       "client_id"
      ]
     },
-    "expect_rows": "SELECT count(*) FROM (\n  SELECT DISTINCT client_id, k FROM (\n    SELECT client_id, stack(4, 1, target_1, 2, target_2, 3, target_3, 4, target_4) AS (k, flag)\n    FROM {silver_mbd.target_month}) t\n  WHERE flag)\n",
+    "account": {
+     "entity": "account",
+     "key": [
+      "account_id"
+     ]
+    },
+    "valid_from": "first_date",
+    "expect_rows": "SELECT count(DISTINCT d.client_id, upper(trim(t.k_symbol)))\nFROM {silver_corebank.trans} t\nJOIN {silver_corebank.disp} d ON d.account_id = t.account_id AND d.is_owner\nWHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')\n"
+   }
+  ]
+ },
+ "mbd": {
+  "source_system": "mbd",
+  "database": "silver_mbd",
+  "reviewed_by": "namth (cho duyet)",
+  "entities": [
+   {
+    "id": "customer",
+    "class": "fin:Customer",
+    "also": [
+     "fin:Organization"
+    ],
+    "sql": "SELECT client_id, min(report_month) AS first_month, max(fold) AS fold\nFROM {silver_mbd.target_month}\nGROUP BY client_id\n",
+    "key": [
+     "client_id"
+    ],
+    "label": "concat('Doanh nghiệp ', substr(client_id, 1, 10))",
+    "valid_from": "trunc(first_month, 'MM')",
+    "attributes": {
+     "fold": "fold"
+    }
+   }
+  ],
+  "holdings": [
+   {
     "id": "anonymous_product",
+    "product_notation": "concat('target_', k)",
+    "sql": "SELECT client_id, k, date_add(min(report_month), 1) AS first_purchase, count(*) AS purchase_months\nFROM (\n  SELECT client_id, report_month,\n         stack(4, 1, target_1, 2, target_2, 3, target_3, 4, target_4) AS (k, flag)\n  FROM {silver_mbd.target_month}\n) t\nWHERE flag\nGROUP BY client_id, k\n",
     "key": [
      "client_id",
      "k"
     ],
-    "product_notation": "concat('target_', k)",
-    "sql": "SELECT client_id, k, date_add(min(report_month), 1) AS first_purchase, count(*) AS purchase_months\nFROM (\n  SELECT client_id, report_month,\n         stack(4, 1, target_1, 2, target_2, 3, target_3, 4, target_4) AS (k, flag)\n  FROM {silver_mbd.target_month}\n) t\nWHERE flag\nGROUP BY client_id, k\n",
-    "valid_from": "first_purchase"
+    "customer": {
+     "entity": "customer",
+     "key": [
+      "client_id"
+     ]
+    },
+    "valid_from": "first_purchase",
+    "attributes": {
+     "purchase_months": "purchase_months"
+    },
+    "expect_rows": "SELECT count(*) FROM (\n  SELECT DISTINCT client_id, k FROM (\n    SELECT client_id, stack(4, 1, target_1, 2, target_2, 3, target_3, 4, target_4) AS (k, flag)\n    FROM {silver_mbd.target_month}) t\n  WHERE flag)\n"
    }
-  ],
-  "reviewed_by": "namth (cho duyet)",
-  "source_system": "mbd"
+  ]
  }
 }

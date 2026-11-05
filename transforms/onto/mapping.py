@@ -210,7 +210,10 @@ def read_yaml_dir(directory: pathlib.Path = MAPPING_DIR) -> Dict[str, Dict[str, 
 
 
 def dumps(raw: Dict[str, Dict[str, Any]]) -> str:
-    return json.dumps(raw, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+    # KHÔNG sort_keys: thứ tự cột khoá là một phần nghĩa (cạnh tham chiếu khoá node THEO VỊ TRÍ).
+    # Sắp lại thì natural_key của node và của cạnh lệch nhau -> mọi cạnh tới node đó mồ côi
+    # (gặp trên dev 05-11 với external_account {bank_code, account_no}).
+    return json.dumps(raw, ensure_ascii=False, indent=1) + "\n"
 
 
 def load_raw() -> Dict[str, Dict[str, Any]]:

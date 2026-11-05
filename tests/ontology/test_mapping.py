@@ -28,6 +28,18 @@ def test_mappings_json_khop_yaml():
     assert M.JSON_PATH.read_text(encoding="utf-8") == M.dumps(M.read_yaml_dir())
 
 
+def test_thu_tu_cot_khoa_giu_nguyen_nhu_yaml():
+    """Cạnh tham chiếu khoá node theo vị trí: bản JSON phải giữ đúng thứ tự cột khoá của YAML."""
+    raw = M.read_yaml_dir()
+    for m in M.load_all():
+        for e in raw[m.name].get("entities") or []:
+            k = e["key"]
+            want = list(k) if isinstance(k, dict) else [str(x) for x in k]
+            assert list(m.entities[e["id"]].key) == want, (m.name, e["id"])
+    ext = M.load_all(["berka"])[0].entities["external_account"]
+    assert list(ext.key) == ["bank_code", "account_no"]
+
+
 def test_moi_mapping_hop_le_voi_tbox(tb):
     ms = M.load_all()
     assert {m.name for m in ms} >= {"berka", "corebank", "bank_marketing", "mbd"}
