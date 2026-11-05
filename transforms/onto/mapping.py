@@ -1,7 +1,12 @@
 """Mapping nguồn -> ontology (bước O5, docs/ONTOLOGY-BUILD.md): đọc và KIỂM TRA TĨNH.
 
-Mỗi nguồn một file `transforms/onto/mappings/<nguồn>.yml` (nằm trong package nên tự vào
-etl.zip như entry silver). Ba loại mục:
+Mỗi nguồn một file `transforms/onto/mappings/<nguồn>.yml` — nguồn sự thật, người duyệt sửa.
+Glue Spark không có PyYAML, nên YAML được biên dịch thành `mappings.json` (giống tbox.json):
+
+    python -m transforms.onto.mapping            # ghi lại mappings.json
+    python -m transforms.onto.mapping --check    # CI: JSON lệch YAML thì exit 1
+
+Ba loại mục:
 
     entities   một node mỗi khoá:        class, key, label, valid_from/to, attributes
     edges      một cạnh mỗi dòng nguồn:  predicate, subject, object (node) | object_literal
@@ -20,12 +25,14 @@ subClassOf. Kiểm kiểu tường minh ở đây vì suy diễn RDFS sẽ "ch�
 
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 MAPPING_DIR = pathlib.Path(__file__).with_name("mappings")
+JSON_PATH = pathlib.Path(__file__).with_name("mappings.json")  # bản biên dịch cho Glue
 TABLE_REF = re.compile(r"\{([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)\}")
 DATATYPES = {"xsd:string", "xsd:integer", "xsd:decimal", "xsd:double", "xsd:date", "xsd:boolean"}
 
@@ -191,32 +198,58 @@ def parse(raw: Dict[str, Any], name: str) -> Mapping:
     return m
 
 
-def load_file(path: pathlib.Path) -> Mapping:
+def read_yaml_dir(directory: pathlib.Path = MAPPING_DIR) -> Dict[str, Dict[str, Any]]:
+    """YAML gốc (người duyệt sửa) -> dict theo tên file. Cần PyYAML: chỉ chạy trên máy/CI."""
     import yaml
 
-    with open(path, encoding="utf-8") as f:
-        return parse(yaml.safe_load(f) or {}, path.stem)
+    out = {}
+    for p in sorted(directory.glob("*.yml")):
+        with open(p, encoding="utf-8") as f:
+            out[p.stem] = yaml.safe_load(f) or {}
+    return out
 
 
-def load_all(names: Optional[Iterable[str]] = None, directory: pathlib.Path = MAPPING_DIR) -> List[Mapping]:
-    """Đọc mapping. Chạy từ etl.zip thì thư mục là đường dẫn trong zip -> đọc qua importlib."""
+def dumps(raw: Dict[str, Dict[str, Any]]) -> str:
+    return json.dumps(raw, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+
+
+def load_raw() -> Dict[str, Dict[str, Any]]:
+    """mappings.json đóng gói trong etl.zip (Glue Spark không có PyYAML). Chỉ thư viện chuẩn."""
+    if JSON_PATH.is_file():
+        return json.loads(JSON_PATH.read_text(encoding="utf-8"))
+    import importlib.resources as ir
+
+    return json.loads(ir.files("transforms.onto").joinpath("mappings.json").read_text(encoding="utf-8"))
+
+
+def load_all(names: Optional[Iterable[str]] = None) -> List[Mapping]:
     wanted = set(names) if names else None
-    if directory.is_dir():
-        files = sorted(directory.glob("*.yml"))
-        out = [load_file(p) for p in files if wanted is None or p.stem in wanted]
-    else:
-        import importlib.resources as ir
-
-        import yaml
-
-        out = []
-        for res in sorted(ir.files("transforms.onto").joinpath("mappings").iterdir(), key=lambda r: r.name):
-            stem = res.name.rsplit(".", 1)[0]
-            if res.name.endswith(".yml") and (wanted is None or stem in wanted):
-                out.append(parse(yaml.safe_load(res.read_text(encoding="utf-8")) or {}, stem))
+    raw = load_raw()
+    out = [parse(raw[k], k) for k in sorted(raw) if wanted is None or k in wanted]
     if wanted and {m.name for m in out} != wanted:
         raise MappingError(f"Khong co mapping: {sorted(wanted - {m.name for m in out})}")
     return out
+
+
+def main(argv=None) -> int:
+    """python -m transforms.onto.mapping [--check]: YAML -> mappings.json (như tbox.json)."""
+    import argparse
+    import sys
+
+    ap = argparse.ArgumentParser(description="Bien dich mapping YAML -> mappings.json")
+    ap.add_argument("--check", action="store_true", help="khac file dang co thi exit 1 (CI)")
+    a = ap.parse_args(argv)
+    raw = read_yaml_dir()
+    for k, v in raw.items():
+        parse(v, k)
+    text = dumps(raw)
+    if a.check:
+        same = JSON_PATH.is_file() and JSON_PATH.read_text(encoding="utf-8") == text
+        print("mappings.json khop YAML" if same else "mappings.json LECH YAML: chay python -m transforms.onto.mapping")
+        return 0 if same else 1
+    JSON_PATH.write_text(text, encoding="utf-8", newline="\n")
+    print(f"ghi {JSON_PATH} ({len(raw)} mapping)")
+    return 0
 
 
 # ---------------------------------------------------------------- kiểm tĩnh
@@ -315,3 +348,7 @@ def validate(mappings: List[Mapping], tbox: Dict[str, Any]) -> None:
                 errors.append(f"{ctx}: TBox khong co skos:notation nao cho nguon {m.source_system}")
     if errors:
         raise MappingError("Mapping sai:\n  - " + "\n  - ".join(errors))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

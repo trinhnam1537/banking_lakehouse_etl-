@@ -23,6 +23,11 @@ def raw_berka():
         return yaml.safe_load(f)
 
 
+def test_mappings_json_khop_yaml():
+    """Glue đọc mappings.json: phải là bản biên dịch đúng của YAML (sửa YAML mà quên biên dịch -> đỏ)."""
+    assert M.JSON_PATH.read_text(encoding="utf-8") == M.dumps(M.read_yaml_dir())
+
+
 def test_moi_mapping_hop_le_voi_tbox(tb):
     ms = M.load_all()
     assert {m.name for m in ms} >= {"berka", "corebank", "bank_marketing", "mbd"}

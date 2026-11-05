@@ -24,8 +24,9 @@ PACKAGES = ("sourcing", "silver", "orchestrator", "simulators", "transforms")
 # simulator tren may nguon AWS tu ap schema khi DB rong). Glue/Lambda khong dung toi.
 DATA_SUFFIXES = (".sql", ".yml")
 # File du lieu dong goi DICH DANH (khong mo cho moi .json: orchestrator/events/*.json la
-# payload mau, khong phai code). tbox.json: TBox bien dich tu ontology/*.ttl cho Glue.
-DATA_FILES = ("transforms/onto/tbox.json",)
+# payload mau, khong phai code). tbox.json: TBox bien dich tu ontology/*.ttl cho Glue;
+# mappings.json: mapping ontology bien dich tu transforms/onto/mappings/*.yml (Glue khong co PyYAML).
+DATA_FILES = ("transforms/onto/tbox.json", "transforms/onto/mappings.json")
 _FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 
 
