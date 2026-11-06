@@ -138,15 +138,15 @@ lời của agent trích `triple_id` từ Neptune vẫn tra ngược được v�
 | PageRank, cộng đồng trên 2 triệu đỉnh | Không làm được bằng SQL | Neptune Analytics (hoặc Spark GraphFrames) |
 | Truy vấn của agent cần dưới 1 giây khi duyệt nhiều bước | Không | **Tốt** |
 
-**Quy mô thực tế** (lần dựng trên dev 05-11, trước khi bất biến chặn):
+**Quy mô thực tế** (lần dựng trên dev 06-11, release `498af33`):
 
 | Phạm vi | Node | Cạnh | Ghi chú |
 |---|---|---|---|
-| Nhóm A + UC2 hiện tại | khoảng 0,3–0,4 triệu | khoảng 1,5 triệu | ~200 nghìn khách (Berka + corebank ~10,8 nghìn, Bank Marketing 86 nghìn, MBD ~100 nghìn), ~550 nghìn cạnh `transfersTo` gộp theo tháng |
+| Nhóm A + UC2 hiện tại | **265.456** (đo 06-11) | **788.338** | 197 nghìn khách (Berka + corebank ~10,8 nghìn, Bank Marketing 86 nghìn, MBD ~100 nghìn), ~550 nghìn cạnh `transfersTo` gộp theo tháng |
 | + IBM AML (giai đoạn 2) | + 2,1 triệu tài khoản | + vài triệu tới ~10 triệu cạnh gộp theo (cặp, ngày) | 31,9 triệu giao dịch gốc, 2.756 vụ rửa tiền có nhãn |
 | + OpenSanctions | + ~0,3 triệu thực thể | + quan hệ sở hữu | |
 
-1,5 triệu cạnh vẫn nằm gọn trong Athena. Ngưỡng đổi chiều là AML: nhiều triệu cạnh và câu hỏi đường đi độ dài
+0,8 triệu cạnh vẫn nằm gọn trong Athena. Ngưỡng đổi chiều là AML: nhiều triệu cạnh và câu hỏi đường đi độ dài
 thay đổi.
 
 ---
@@ -345,7 +345,7 @@ dùng (on-demand). Giá đổi theo thời gian, kiểm lại trước khi apply
 | Neptune Analytics 16 m-NCU | khoảng 0,58 USD/giờ khi chạy; 0,0581 USD/giờ khi dừng | Price List trả giá chạy kèm nhãn ap-northeast-1, giá dừng là của Singapore (bằng 10% giá chạy). **Cần xác nhận lại** trên trang giá |
 | Free tier (tài khoản chưa dùng Neptune) | 750 giờ `db.t4g.medium`, 10 triệu I/O, 1 GB lưu trữ, trong 30 ngày | Đủ thử toàn bộ thiết kế miễn phí trong tháng đầu |
 
-**Ước lượng kích thước:** khoảng 1,5 triệu cạnh hiện tại, và khoảng 10 triệu cạnh khi có AML, mỗi cạnh có 6
+**Ước lượng kích thước:** 0,8 triệu cạnh hiện tại (đo 06-11), và khoảng 10 triệu cạnh khi có AML, mỗi cạnh có 6
 thuộc tính. Ước vài trăm byte mỗi cạnh trên Neptune, tức **1–5 GB**, nên chi phí lưu trữ dưới 1 USD/tháng. Chi phí
 nằm ở **giờ chạy instance**.
 

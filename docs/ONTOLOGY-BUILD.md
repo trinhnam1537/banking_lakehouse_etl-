@@ -21,8 +21,35 @@ Ký hiệu ở cột "Phục vụ": **M** model, **A** agent, **M+A** cả hai.
 
 Còn chờ: quyền SELECT `track_a_onto` cho persona analyst (cần duyệt cấp quyền).
 
-**Trạng thái (06-11-2026):** giai đoạn 2 (O5 lượt 1, O6, O7) **xong code, đang chạy trên dev**. Mapping nằm ở
+**Trạng thái (06-11-2026):** giai đoạn 2 (O5 lượt 1, O6, O7) **xong trên dev**. Mapping nằm ở
 `transforms/onto/mappings/{berka,corebank,bank_marketing,mbd}.yml`.
+
+Lần chạy release `498af33` (`jr_1dff…`) **SUCCEEDED** trong 267 s:
+- `track_a_onto.entity` có **265.456 node**, `track_a_onto.triple` có **788.338 cạnh**.
+- **20/20 mục đối soát khớp nguồn.**
+
+| Node | Số | Cạnh | Số |
+|---|---|---|---|
+| `fin:Customer` | 197.395 | `fin:transfersTo` (gộp theo tháng) | 548.678 |
+| `fin:ProductHolding` | 41.804 | `fin:occupation` | 85.781 |
+| `fin:Account` (gồm tài khoản ngoài) | 26.024 | `fin:hasHolding` = `fin:ofProduct` | 41.804 |
+| `fin:District` / `Region` / `Country` | 154 / 16 / 2 | `fin:viaAccount` | 19.805 |
+| `fin:Bank` (đối tác) | 26 | `fin:locatedIn` | 19.806 |
+| Node sản phẩm (taxonomy) | 35 | `fin:atBank` | 16.990 |
+| | | `fin:holdsAccount` / `isAuthorizedOn` | 9.034 / 1.738 |
+| | | `fin:holdingStatus` / `amount` | 1.364 / 1.364 |
+| | | `fin:partOf` | 170 |
+
+Đối soát:
+
+| Mục | Berka | corebank |
+|---|---|---|
+| `holds_account` | 4.500 | 4.534 |
+| `loan` | 682 | 682 |
+| `card` | 892 | 901 |
+| `standing_payment` | 3.807 | 3.807 |
+
+Bank Marketing: `term_deposit` 9.929. MBD: `anonymous_product` 12.070.
 
 Code:
 - `transforms/onto/mappings/` nằm trong package nên vào `etl.zip`, và được biên dịch thành `mappings.json` vì Glue Spark không có PyYAML.
@@ -34,11 +61,8 @@ Ba lần chạy đầu trên dev đều bị **bất biến O7 chặn**, không 
 2. Biên dịch JSON với `sort_keys` làm đảo thứ tự cột khoá, gây 565 nghìn cạnh mồ côi.
 3. `mapping_id` trùng giữa Berka và corebank, làm đối soát lệch 4.500 / 4.534.
 
-Số liệu thật từ lần chạy bị chặn: ~550 nghìn cạnh `transfersTo` gộp theo tháng, 4.500 (Berka) / 4.534 (corebank)
-cạnh `holdsAccount`.
-
 Việc tiếp:
-- chạy lại `onto.build_graph` trên dev (credential hết hạn giữa chừng), ghi số node/cạnh vào đây;
+- nghiệm thu "hồ sơ 360 chỉ bằng SQL" dưới persona DE / analyst (TerraformAdmin bị LF chặn, đúng thiết kế);
 - O8 `same_as`;
 - O9 closure / `product_transition`.
 
