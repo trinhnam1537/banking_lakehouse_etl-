@@ -89,6 +89,8 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
     vertices, edges = frames(ent, tri, sub.select("class_iri", "ancestor_iri"), as_of)
     out = f"{base}/{run_id}" + (f"/as_of={as_of}" if as_of else "")
     opts = {"header": "true", "escape": '"', "quoteAll": "false", "emptyValue": ""}
+    # Bulk loader nap MOI file duoi prefix: khong de Spark ghi file rong _SUCCESS
+    spark.sparkContext._jsc.hadoopConfiguration().set("mapreduce.fileoutputcommitter.marksuccessfuljobs", "false")
     vertices.write.mode("overwrite").options(**opts).csv(f"{out}/vertices")
     edges.write.mode("overwrite").options(**opts).csv(f"{out}/edges")
     n_v, n_e = spark.read.option("header", "true").csv(f"{out}/vertices").count(), \
