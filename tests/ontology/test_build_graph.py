@@ -347,3 +347,39 @@ def test_aml_vung_dieu_tra_cho_neptune(silver):
     assert ent.where("source_system = 'mbd'").count() == entity.where("source_system = 'mbd'").count()
     assert tri.where("predicate_iri = 'fin:hasTypology'").count() == 1
     spark.sql("DELETE FROM glue_catalog.silver_aml.transfer WHERE txn_id IN ('t6', 't7')")
+
+
+def test_o9_closure_vi_tri(graph):
+    from transforms.onto import derive as DV
+
+    _, entity, triple, _ = graph
+    clo = DV.closure(triple).collect()
+    district = ids.make_uid("fin:District", "berka", "district_id=1")
+    country = ids.make_uid("fin:Country", "berka", "code=CZ")
+    assert (district, country, 2) in {(r.start_uid, r.node_uid, r.depth) for r in clo}
+    assert max(r.depth for r in clo) == 2
+
+
+def test_o9_product_transition_va_khong_ro_ri(graph, silver):
+    """P(B | A, H) đúng đáp án tính tay; thêm sự kiện SAU mốc cắt không đổi bất kỳ giá trị nào (O9)."""
+    import datetime as dt
+
+    from transforms.onto import derive as DV
+
+    spark, entity, triple, _ = graph
+    acq = DV.acquisitions(entity, triple).cache()
+    cut = {"berka": "1997-12-31", "mbd": "2022-12-31"}
+    pt = {(r.from_product, r.to_product, r.horizon_months): (r.n_from, r.n_both, r.p)
+          for r in DV.product_transition(acq, cut, horizons=(3,)).collect()}
+    # Khach 1: TK thanh toan 1995-01-10 -> bao hiem 02-03, dinh ky 02-20 (trong 3 thang)
+    # Khach 2: TK thanh toan 1996-03-01 -> vay 1996-06-01 (dung 3 thang) => 2 khach co CurrentAccount
+    assert pt[("fin:CurrentAccount", "fin:InsuranceProduct", 3)] == (2, 1, 0.5)
+    assert pt[("fin:CurrentAccount", "fin:Loan", 3)] == (2, 1, 0.5)
+    assert ("fin:ClassicCard", "fin:Loan", 3) not in pt          # the sau vay: khong phai A -> B
+    # Ro ri: them luot mua SAU moc cat -> bang khong doi
+    extra = spark.createDataFrame(
+        [(ids.make_uid("fin:Customer", "berka", "client_id=1"), "berka", "fin:Loan", dt.date(1998, 3, 1))],
+        acq.schema)
+    pt2 = {(r.from_product, r.to_product, r.horizon_months): (r.n_from, r.n_both, r.p)
+           for r in DV.product_transition(acq.unionByName(extra), cut, horizons=(3,)).collect()}
+    assert pt2 == pt
