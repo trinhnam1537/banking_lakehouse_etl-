@@ -571,7 +571,8 @@
     "aml",
     "berka",
     "corebank",
-    "mbd"
+    "mbd",
+    "opensanctions"
    ],
    "iri": "fin:Organization",
    "label_en": "Organization",
@@ -595,7 +596,8 @@
     "bank_marketing",
     "berka",
     "corebank",
-    "mbd"
+    "mbd",
+    "opensanctions"
    ],
    "iri": "fin:Party",
    "label_en": "Party",
@@ -694,7 +696,8 @@
    "graph_sources": [
     "bank_marketing",
     "berka",
-    "corebank"
+    "corebank",
+    "opensanctions"
    ],
    "iri": "fin:Person",
    "label_en": "Person",
@@ -797,7 +800,9 @@
   {
    "children": [],
    "definition": "Thuc the co trong danh sach cam van / theo doi (OpenSanctions).",
-   "graph_sources": [],
+   "graph_sources": [
+    "opensanctions"
+   ],
    "iri": "fin:SanctionedEntity",
    "label_en": "Sanctioned entity",
    "label_vi": "Đối tượng bị cấm vận",
@@ -1065,7 +1070,9 @@
   {
    "definition": "So huu phap nhan truc tiep (weight = ty le so huu). Bac cau tinh san o track_a_onto.closure.",
    "domain": "fin:Party",
-   "graph_sources": [],
+   "graph_sources": [
+    "opensanctions"
+   ],
    "iri": "fin:isDirectlyOwnedBy",
    "kind": "object",
    "label_vi": "được sở hữu trực tiếp bởi",
@@ -1160,7 +1167,10 @@
   {
    "definition": "Hai node la cung mot thuc the o hai nguon, KEM do tin cay. Khong dung owl:sameAs: gop cung sai thi khong go duoc.",
    "domain": "fin:Party",
-   "graph_sources": [],
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
    "iri": "fin:sameAs",
    "kind": "object",
    "label_vi": "cùng là",
@@ -1250,6 +1260,7 @@
   "bank_marketing",
   "berka",
   "corebank",
-  "mbd"
+  "mbd",
+  "opensanctions"
  ]
 }

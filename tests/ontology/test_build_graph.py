@@ -407,3 +407,54 @@ def test_o9_khach_trung_sameas_chi_dem_mot_lan(corebank):
     n_cust = acq.select("customer_uid").distinct().count()
     assert n_cust == entity.where("source_system = 'corebank' AND class_iri = 'fin:Customer'").join(
         acq.select(acq.customer_uid.alias("uid")).distinct(), "uid").count()
+
+
+def test_opensanctions_so_huu_va_khop_ten_vao_hang_doi_duyet(corebank):
+    """OpenSanctions lên đồ thị (Party + SanctionedEntity, isDirectlyOwnedBy) và khớp mờ khách <-> cấm vận:
+    tên trùng (như corebank.seed --sanction-hits) phải vào HÀNG ĐỢI DUYỆT, không tự thành cạnh sameAs."""
+    from transforms.onto import derive as DV
+    from transforms.onto import resolve as R
+
+    spark = corebank
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS glue_catalog.silver_opensanctions")
+    if "full_name" not in spark.table("glue_catalog.silver_corebank.client").columns:
+        spark.sql("ALTER TABLE glue_catalog.silver_corebank.client ADD COLUMN full_name string")
+    for cid, nm in [(1, "Jana Nováková"), (2, "Ivan Aleksandrovich TYRYSHKIN"), (3, "Petr Svoboda"),
+                    (4, "Tyryshkin Ivan Aleksandrovic")]:
+        spark.sql(f"UPDATE glue_catalog.silver_corebank.client SET full_name = '{nm}' WHERE client_id = {cid}")
+    _table(spark, "silver_opensanctions.target", [
+        ("NK-1", "Person", "Ivan Aleksandrovich TYRYSHKIN", "1961-03-05", ["Иван Тырышкин"], ["ru"]),
+        ("NK-2", "Company", "Sanctioned Holding LLC", None, [], ["ru"]),
+    ], "entity_id string, entity_schema string, name string, birth_date string, aliases array<string>, "
+       "countries array<string>")
+    import datetime as dt
+    ts = dt.datetime(2026, 10, 1)
+    _table(spark, "silver_opensanctions.entity", [
+        ("NK-1", "Person", "Ivan TYRYSHKIN", True, {"name": ["Ivan Aleksandrovich TYRYSHKIN"], "country": ["ru"]}, ts),
+        ("NK-2", "Company", "Sanctioned Holding", True, {"name": ["Sanctioned Holding LLC"]}, ts),
+        ("NK-3", "Company", "Shell s.r.o.", False, {"name": ["Shell s.r.o."]}, ts),
+        ("OWN-1", "Ownership", "own", False, {"asset": ["NK-3"], "owner": ["NK-1"], "percentage": ["50%"]}, ts),
+        ("OWN-2", "Ownership", "own", False, {"asset": ["VESSEL-9"], "owner": ["NK-1"]}, ts),  # tau: bo
+    ], "entity_id string, entity_schema string, caption string, is_target boolean, "
+       "properties map<string,array<string>>, first_seen timestamp")
+    tb = T.load()
+    entity, triple, exp = B.build(spark, M.load_all(["corebank", "opensanctions"]), tb)
+    B.check_invariants(spark, entity, triple, exp, tb)
+    nk1 = ids.make_uid("fin:Party", "opensanctions", "entity_id=NK-1")
+    nk3 = ids.make_uid("fin:Party", "opensanctions", "entity_id=NK-3")
+    assert set(entity.where(f"uid = '{nk1}'").first().also_types) == {"fin:SanctionedEntity", "fin:Person"}
+    own = triple.where("predicate_iri = 'fin:isDirectlyOwnedBy'").collect()
+    assert [(r.subject_uid, r.object_uid, r.weight) for r in own] == [(nk3, nk1, 0.5)]
+    # Khop: KHONG tu thanh canh (ten trung nhung nam sinh / nuoc khong khop -> < 0.9)
+    assert triple.where("predicate_iri = 'fin:sameAs'").count() == 0
+    auto, review = R.all_links(spark, entity)
+    rv = {r.uid_a if r.uid_b == nk1 else r.uid_b: (r.confidence, r.evidence) for r in review.collect()}
+    c2 = ids.make_uid("fin:Customer", "corebank", "client_id=2")
+    c4 = ids.make_uid("fin:Customer", "corebank", "client_id=4")
+    assert rv[c2] == (0.8, "name=exact;birth=no;country=no")
+    assert rv[c4][1].startswith("name=fuzzy:") and 0.6 <= rv[c4][0] < 0.8
+    assert ids.make_uid("fin:Customer", "corebank", "client_id=1") not in rv
+    assert not any("TYRYSHKIN" in e or "Ivan" in e for _, e in rv.values())   # evidence khong chua ten
+    # O9: bao dong so huu
+    clo = DV.closure(triple).where("predicate_iri = 'fin:isDirectlyOwnedBy'").collect()
+    assert [(r.start_uid, r.node_uid, r.depth) for r in clo] == [(nk3, nk1, 1)]

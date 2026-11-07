@@ -358,10 +358,11 @@ def build(spark, mappings: List[M.Mapping], tb: Dict[str, Any]):
     triple = tris[0] if tris else None
     for x in tris[1:]:
         triple = triple.unionByName(x)
-    # O8: cạnh fin:sameAs giữa các nguồn có khoá chung (resolve.RULES) — đi qua cùng bất biến
-    same_as = R.links(entity)
-    if same_as is not None and triple is not None:
-        triple = triple.unionByName(R.same_as_triples(same_as))
+    # O8: cạnh fin:sameAs — chỉ cặp confidence >= AUTO_THRESHOLD (khoá chung, khớp mạnh); cặp yếu hơn
+    # nằm ở hàng đợi duyệt, KHÔNG thành cạnh. Đi qua cùng bất biến O7.
+    auto, _ = R.all_links(spark, entity)
+    if auto is not None and triple is not None:
+        triple = triple.unionByName(R.same_as_triples(auto))
     triple = triple.withColumn("triple_id", ids.triple_id_col(
         F.col("subject_uid"), F.col("predicate_iri"), F.coalesce(F.col("object_uid"), F.col("object_literal")),
         F.col("valid_from"), F.col("source_dataset")))
@@ -393,11 +394,15 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
     n_tri = write_table(triple.select(*TRIPLE_COLS, *stamp), db, "triple",
                         partition_by=["predicate_iri", F.bucket(16, F.col("subject_uid"))],
                         comment="ABox FinGraph: canh (triple_id de trich dan, thoi gian nghiep vu, nguon)")
-    same_as = R.links(entity)
-    n_same = 0
-    if same_as is not None:
-        n_same = write_table(same_as.select(*R.SAME_AS_COLS, *stamp), db, "same_as",
-                             comment="O8: cap thuc the trung giua cac nguon (khong gop cung), confidence + luat")
+    auto, review = R.all_links(spark, entity)
+    n_same = n_review = 0
+    if auto is not None:
+        n_same = write_table(auto.select(*R.SAME_AS_COLS, *stamp), db, "same_as",
+                             comment="O8: cap thuc the trung (confidence >= 0.9), da thanh canh fin:sameAs")
+        n_review = write_table(review.select(*R.SAME_AS_COLS, *stamp), db, "same_as_review",
+                               comment="O8: ung vien [0.6, 0.9) cho nguoi duyet, KHONG thanh canh (evidence khong chua ten)")
+        for r in review.groupBy("rule_id").count().collect():
+            print(f"    cho duyet {r[0]}: {r[1]}")
     by_class = {r[0]: r[1] for r in entity.groupBy("class_iri").count().collect()}
     by_pred = {r[0]: r[1] for r in triple.groupBy("predicate_iri").count().collect()}
     for k in sorted(by_class):
@@ -406,5 +411,5 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
         print(f"    canh {k}: {by_pred[k]}")
     for r in report["reconciliation"]:
         print(f"    doi soat {r['mapping_id']}: nguon {r['expected']} = do thi {r['got']}")
-    return {"ontology_version": tb["version"], "run_id": run_id, "entity": n_ent, "triple": n_tri, "same_as": n_same,
+    return {"ontology_version": tb["version"], "run_id": run_id, "entity": n_ent, "triple": n_tri, "same_as": n_same, "same_as_review": n_review,
             "by_class": by_class, "by_predicate": by_pred, **report}

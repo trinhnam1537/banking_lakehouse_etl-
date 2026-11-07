@@ -1,5 +1,5 @@
 # Ontology FinGraph 1.0.0 (namespace fin:)
-Nguon da len do thi: aml, bank_marketing, berka, corebank, mbd.
+Nguon da len do thi: aml, bank_marketing, berka, corebank, mbd, opensanctions.
 Lop | nhan | cha | nguon co du lieu:
 - fin:Account | Tài khoản / Account | - | aml,berka,corebank
 - fin:AnonymousProduct | Sản phẩm ẩn danh / Anonymous product | fin:Product | mbd
@@ -34,20 +34,20 @@ Lop | nhan | cha | nguon co du lieu:
 - fin:MediumTermDeposit | Tiền gửi trung hạn / Medium-term deposit | fin:TermDeposit | (chua co du lieu)
 - fin:MerchantCategory | Nhóm merchant / Merchant category | - | (chua co du lieu)
 - fin:Mortgage | Vay thế chấp / Mortgage | fin:Loan | (chua co du lieu)
-- fin:Organization | Tổ chức / Organization | fin:Party | aml,berka,corebank,mbd
-- fin:Party | Bên tham gia / Party | - | aml,bank_marketing,berka,corebank,mbd
+- fin:Organization | Tổ chức / Organization | fin:Party | aml,berka,corebank,mbd,opensanctions
+- fin:Party | Bên tham gia / Party | - | aml,bank_marketing,berka,corebank,mbd,opensanctions
 - fin:PaymentService | Dịch vụ thanh toán / Payment service | fin:Product | berka,corebank
 - fin:PayrollAccount | Tài khoản nhận lương / Payroll account | fin:DepositProduct | (chua co du lieu)
 - fin:PayrollService | Dịch vụ chi lương / Payroll service | fin:PaymentService | (chua co du lieu)
 - fin:PensionPlan | Kế hoạch hưu trí / Pension plan | fin:InvestmentProduct | (chua co du lieu)
 - fin:PensionReceipt | Nhận lương hưu / Pension receipt | fin:PaymentService | berka
-- fin:Person | Cá nhân / Person | fin:Party | bank_marketing,berka,corebank
+- fin:Person | Cá nhân / Person | fin:Party | bank_marketing,berka,corebank,opensanctions
 - fin:Product | Sản phẩm / Product | - | bank_marketing,berka,corebank,mbd
 - fin:ProductHolding | Việc giữ sản phẩm / Product holding | - | bank_marketing,berka,corebank,mbd
 - fin:Recommendation | Gợi ý sản phẩm / Recommendation | - | (chua co du lieu)
 - fin:RecurringPayment | Thanh toán định kỳ / Recurring payment | fin:PaymentService | berka,corebank
 - fin:Region | Vùng / Region | fin:Location | berka,corebank
-- fin:SanctionedEntity | Đối tượng bị cấm vận / Sanctioned entity | fin:Party | (chua co du lieu)
+- fin:SanctionedEntity | Đối tượng bị cấm vận / Sanctioned entity | fin:Party | opensanctions
 - fin:SavingsAccount | Tài khoản tiết kiệm / Savings account | fin:DepositProduct | (chua co du lieu)
 - fin:Securities | Chứng khoán / Securities | fin:InvestmentProduct | (chua co du lieu)
 - fin:ShortTermDeposit | Tiền gửi ngắn hạn / Short-term deposit | fin:TermDeposit | (chua co du lieu)
@@ -68,7 +68,7 @@ Quan he | nhan | domain -> range | nguon:
 - fin:holdsAccount | là chủ tài khoản | fin:Customer -> fin:Account | berka,corebank
 - fin:involvedIn | tham gia vụ | fin:Account -> fin:LaunderingAttempt | aml
 - fin:isAuthorizedOn | được uỷ quyền trên | fin:Customer -> fin:Account | berka,corebank
-- fin:isDirectlyOwnedBy | được sở hữu trực tiếp bởi | fin:Party -> fin:Party | (chua co du lieu)
+- fin:isDirectlyOwnedBy | được sở hữu trực tiếp bởi | fin:Party -> fin:Party | opensanctions
 - fin:isHeldBy | thuộc về bên | fin:Account -> fin:Party | aml
 - fin:locatedIn | ở tại | - -> fin:Location | berka,corebank
 - fin:modelVersion | phiên bản model | fin:Recommendation -> xsd:string | (chua co du lieu)
@@ -76,7 +76,7 @@ Quan he | nhan | domain -> range | nguon:
 - fin:ofProduct | thuộc sản phẩm | fin:ProductHolding -> - | bank_marketing,berka,corebank,mbd
 - fin:partOf | thuộc | fin:Location -> fin:Location | berka,corebank
 - fin:recommends | gợi ý sản phẩm | fin:Recommendation -> - | (chua co du lieu)
-- fin:sameAs | cùng là | fin:Party -> fin:Party | (chua co du lieu)
+- fin:sameAs | cùng là | fin:Party -> fin:Party | berka,corebank
 - fin:score | điểm | fin:Recommendation -> xsd:double | (chua co du lieu)
 - fin:segment | phân khúc | fin:Customer -> xsd:string | (chua co du lieu)
 - fin:spendsAt | chi tiêu ở nhóm | fin:Customer -> fin:MerchantCategory | (chua co du lieu)

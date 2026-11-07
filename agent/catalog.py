@@ -72,6 +72,13 @@ def build(tb: Optional[Dict[str, Any]] = None, mappings: Optional[List[M.Mapping
                 preds.setdefault("fin:holdingStatus", set()).add(m.source_system)
             if h.amount:
                 preds.setdefault("fin:amount", set()).add(m.source_system)
+    # Canh fin:sameAs sinh tu luat O8 (transforms/onto/resolve.py), khong tu mapping
+    from transforms.onto import resolve as R
+
+    present = {m.source_system for m in mappings}
+    for r in R.RULES:
+        if {r["a"]["source_system"], r["b"]["source_system"]} <= present:
+            preds.setdefault("fin:sameAs", set()).update({r["a"]["source_system"], r["b"]["source_system"]})
     classes = [{
         "iri": c["iri"], "label_vi": c["label_vi"], "label_en": c["label_en"], "definition": c["definition"],
         "parents": c["parents"], "children": sorted(children.get(c["iri"], [])), "notations": c["notations"],

@@ -28,7 +28,7 @@ from ..common import CATALOG, write_table
 DB = "track_a_onto"
 HORIZONS = (3, 6, 12)
 MAX_DEPTH = 6
-TRANSITIVE = ("fin:partOf",)
+TRANSITIVE = ("fin:partOf", "fin:isDirectlyOwnedBy")  # vi tri; chuoi so huu (OpenSanctions)
 CUTOFF_QUANTILE = 0.8
 # Khach trung giua nguon (fin:sameAs, O8): chi giu ban cua nguon dung TRUOC trong danh sach. Khong bo
 # thi lich su mua cua cung mot nguoi (Berka va corebank nap tu Berka) bi dem HAI lan: p khong doi nhung
