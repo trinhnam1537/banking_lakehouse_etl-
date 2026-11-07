@@ -264,9 +264,10 @@ def test_aml_vong_tien_kieu_hinh_va_chu_so_huu(silver):
     spark = silver
     spark.sql("CREATE NAMESPACE IF NOT EXISTS glue_catalog.silver_aml")
     _table(spark, "silver_aml.account", [
-        ("001", "Bank 1", "A1", "E1", "Corporation #1", "Corporation"),
-        ("001", "Bank 1", "A2", "E1", "Corporation #1", "Corporation"),   # E1 so huu 2 tai khoan
-        ("002", "Bank 2", "B1", "E2", "Partnership #2", "Partnership"),
+        # File tai khoan KHONG co so 0 dau, file giao dich CO ('001') -> phai ve cung mot khoa
+        ("1", "Bank 1", "A1", "E1", "Corporation #1", "Corporation"),
+        ("1", "Bank 1", "A2", "E1", "Corporation #1", "Corporation"),   # E1 so huu 2 tai khoan
+        ("2", "Bank 2", "B1", "E2", "Partnership #2", "Partnership"),
     ], "bank_id string, bank_name string, account_number string, entity_id string, entity_name string, "
        "entity_type string")
     t = "txn_id string, event_date date, from_bank string, from_account string, to_bank string, " \
@@ -289,15 +290,18 @@ def test_aml_vong_tien_kieu_hinh_va_chu_so_huu(silver):
     report = B.check_invariants(spark, entity, triple, exp, tb)
     assert all(r["expected"] == r["got"] for r in report["reconciliation"])
     acc = lambda b, a: ids.make_uid("fin:Account", "aml", f"bank_id={b}|account_number={a}")  # noqa: E731
-    assert entity.where(f"uid = '{acc('003', 'C1')}'").count() == 1       # tu giao dich
+    assert entity.where(f"uid = '{acc('3', 'C1')}'").count() == 1          # chi co trong giao dich
+    # 3 tai khoan bang tham chieu + C1 = 4: KHONG nhan doi vi '001' / '1'
+    assert entity.where("class_iri = 'fin:Account'").count() == 4
+    assert entity.where("class_iri = 'fin:Bank'").count() == 3
     tr = {(r.subject_uid, r.object_uid): r.weight for r in triple.where("predicate_iri = 'fin:transfersTo'").collect()}
-    assert tr == {(acc("001", "A1"), acc("002", "B1")): 2.0, (acc("002", "B1"), acc("003", "C1")): 1.0,
-                  (acc("003", "C1"), acc("001", "A1")): 1.0}
+    assert tr == {(acc("1", "A1"), acc("2", "B1")): 2.0, (acc("2", "B1"), acc("3", "C1")): 1.0,
+                  (acc("3", "C1"), acc("1", "A1")): 1.0}
     typ = triple.where("predicate_iri = 'fin:hasTypology'").first()
     assert typ.object_uid == ids.product_uid("fin:Cycle")
     assert entity.where(f"uid = '{typ.object_uid}'").first().class_iri == "fin:Typology"
     # CQ9: A1 tham gia vu HI-1; CQ10: chu so huu cua A1 (E1) co 2 tai khoan
-    assert triple.where(f"predicate_iri = 'fin:involvedIn' AND subject_uid = '{acc('001', 'A1')}'").count() == 1
+    assert triple.where(f"predicate_iri = 'fin:involvedIn' AND subject_uid = '{acc('1', 'A1')}'").count() == 1
     owner = ids.make_uid("fin:Party", "aml", "entity_id=E1")
     assert triple.where(f"predicate_iri = 'fin:isHeldBy' AND object_uid = '{owner}'").count() == 2
 

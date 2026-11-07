@@ -7,7 +7,7 @@
    {
     "id": "bank",
     "class": "fin:Bank",
-    "sql": "SELECT bank_id, max(bank_name) AS bank_name FROM (\n  SELECT bank_id, bank_name FROM {silver_aml.account}\n  UNION ALL SELECT from_bank, CAST(NULL AS string) FROM {silver_aml.transfer}\n  UNION ALL SELECT to_bank, CAST(NULL AS string) FROM {silver_aml.transfer}) b\nWHERE bank_id IS NOT NULL\nGROUP BY bank_id\n",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer}),\nac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account}),\nla AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt})\nSELECT bank_id, max(bank_name) AS bank_name FROM (\n  SELECT bank_id, bank_name FROM ac\n  UNION ALL SELECT from_bank, CAST(NULL AS string) FROM t\n  UNION ALL SELECT to_bank, CAST(NULL AS string) FROM t\n  UNION ALL SELECT from_bank, CAST(NULL AS string) FROM la\n  UNION ALL SELECT to_bank, CAST(NULL AS string) FROM la) b\nWHERE bank_id IS NOT NULL\nGROUP BY bank_id\n",
     "key": [
      "bank_id"
     ],
@@ -29,7 +29,7 @@
    {
     "id": "account",
     "class": "fin:Account",
-    "sql": "WITH ep AS (\n  SELECT from_bank AS b, from_account AS a, event_date AS d FROM {silver_aml.transfer}\n  UNION ALL\n  SELECT to_bank, to_account, event_date FROM {silver_aml.transfer}),\nseen AS (SELECT b, a, min(d) AS first_seen FROM ep GROUP BY b, a),\nk AS (SELECT bank_id AS b, account_number AS a FROM {silver_aml.account}\n      UNION SELECT b, a FROM seen)\nSELECT k.b AS bank_id, k.a AS account_number, s.first_seen\nFROM k LEFT JOIN seen s ON s.b = k.b AND s.a = k.a\nWHERE k.b IS NOT NULL AND k.a IS NOT NULL\n",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer}),\nac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account}),\nla AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt}),\nep AS (SELECT from_bank AS b, from_account AS a, event_date AS d FROM t\n       UNION ALL SELECT to_bank, to_account, event_date FROM t),\nseen AS (SELECT b, a, min(d) AS first_seen FROM ep GROUP BY b, a),\nk AS (SELECT bank_id AS b, account_number AS a FROM ac\n      UNION SELECT b, a FROM seen\n      UNION SELECT from_bank, from_account FROM la\n      UNION SELECT to_bank, to_account FROM la)\nSELECT k.b AS bank_id, k.a AS account_number, s.first_seen\nFROM k LEFT JOIN seen s ON s.b = k.b AND s.a = k.a\nWHERE k.b IS NOT NULL AND k.a IS NOT NULL\n",
     "key": {
      "bank_id": "bank_id",
      "account_number": "account_number"
@@ -40,7 +40,7 @@
    {
     "id": "attempt",
     "class": "fin:LaunderingAttempt",
-    "sql": "SELECT la.attempt_id, max(la.typology) AS typology, max(la.typology_detail) AS typology_detail,\n       count(*) AS n_txn, min(t.event_date) AS first_date, max(t.event_date) AS last_date\nFROM {silver_aml.laundering_attempt} la\nLEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id\nGROUP BY la.attempt_id\n",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer})\nSELECT la.attempt_id, max(la.typology) AS typology, max(la.typology_detail) AS typology_detail,\n       count(*) AS n_txn, min(t.event_date) AS first_date, max(t.event_date) AS last_date\nFROM {silver_aml.laundering_attempt} la\nLEFT JOIN t ON t.txn_id = la.txn_id\nGROUP BY la.attempt_id\n",
     "key": [
      "attempt_id"
     ],
@@ -57,7 +57,7 @@
    {
     "id": "account_at_bank",
     "predicate": "fin:atBank",
-    "sql": "WITH ep AS (\n  SELECT from_bank AS b, from_account AS a FROM {silver_aml.transfer}\n  UNION SELECT to_bank, to_account FROM {silver_aml.transfer}\n  UNION SELECT bank_id, account_number FROM {silver_aml.account})\nSELECT b, a FROM ep WHERE b IS NOT NULL AND a IS NOT NULL\n",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer}),\nac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account}),\nla AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt}),\nep AS (SELECT from_bank AS b, from_account AS a FROM t\n       UNION SELECT to_bank, to_account FROM t\n       UNION SELECT bank_id, account_number FROM ac\n       UNION SELECT from_bank, from_account FROM la\n       UNION SELECT to_bank, to_account FROM la)\nSELECT b, a FROM ep WHERE b IS NOT NULL AND a IS NOT NULL\n",
     "subject": {
      "entity": "account",
      "key": [
@@ -76,7 +76,7 @@
    {
     "id": "held_by",
     "predicate": "fin:isHeldBy",
-    "sql": "SELECT bank_id, account_number, entity_id FROM {silver_aml.account}\nWHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL\n",
+    "sql": "WITH ac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account})\nSELECT bank_id, account_number, entity_id FROM ac\nWHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL\n",
     "subject": {
      "entity": "account",
      "key": [
@@ -91,12 +91,12 @@
      ]
     },
     "source_key": "concat(bank_id, '-', account_number)",
-    "expect_rows": "SELECT count(DISTINCT bank_id, account_number) FROM {silver_aml.account}\nWHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL\n"
+    "expect_rows": "WITH ac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account})\nSELECT count(DISTINCT bank_id, account_number) FROM ac\nWHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL\n"
    },
    {
     "id": "transfers",
     "predicate": "fin:transfersTo",
-    "sql": "SELECT from_bank, from_account, to_bank, to_account,\n       min(event_date) AS first_date, max(event_date) AS last_date, count(*) AS n_txn\nFROM {silver_aml.transfer}\nWHERE NOT coalesce(is_self_transfer, false)\n  AND from_bank IS NOT NULL AND from_account IS NOT NULL AND to_bank IS NOT NULL AND to_account IS NOT NULL\nGROUP BY from_bank, from_account, to_bank, to_account\n",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer})\nSELECT from_bank, from_account, to_bank, to_account,\n       min(event_date) AS first_date, max(event_date) AS last_date, count(*) AS n_txn\nFROM t\nWHERE NOT coalesce(is_self_transfer, false)\n  AND NOT (from_bank = to_bank AND from_account = to_account)\n  AND from_bank IS NOT NULL AND from_account IS NOT NULL AND to_bank IS NOT NULL AND to_account IS NOT NULL\nGROUP BY from_bank, from_account, to_bank, to_account\n",
     "subject": {
      "entity": "account",
      "key": [
@@ -119,7 +119,7 @@
    {
     "id": "involved_in",
     "predicate": "fin:involvedIn",
-    "sql": "SELECT attempt_id, b, a, min(event_date) AS first_date FROM (\n  SELECT la.attempt_id, la.from_bank AS b, la.from_account AS a, t.event_date\n  FROM {silver_aml.laundering_attempt} la LEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id\n  UNION ALL\n  SELECT la.attempt_id, la.to_bank, la.to_account, t.event_date\n  FROM {silver_aml.laundering_attempt} la LEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id) x\nWHERE b IS NOT NULL AND a IS NOT NULL\nGROUP BY attempt_id, b, a\n",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer}),\nla AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt})\nSELECT attempt_id, b, a, min(event_date) AS first_date FROM (\n  SELECT la.attempt_id, la.from_bank AS b, la.from_account AS a, t.event_date\n  FROM la LEFT JOIN t ON t.txn_id = la.txn_id\n  UNION ALL\n  SELECT la.attempt_id, la.to_bank, la.to_account, t.event_date\n  FROM la LEFT JOIN t ON t.txn_id = la.txn_id) x\nWHERE b IS NOT NULL AND a IS NOT NULL\nGROUP BY attempt_id, b, a\n",
     "subject": {
      "entity": "account",
      "key": [
@@ -135,7 +135,7 @@
     },
     "valid_from": "first_date",
     "source_key": "concat(attempt_id, '|', b, '-', a)",
-    "expect_rows": "SELECT count(*) FROM (\n  SELECT DISTINCT attempt_id, from_bank, from_account FROM {silver_aml.laundering_attempt}\n  WHERE from_bank IS NOT NULL AND from_account IS NOT NULL\n  UNION\n  SELECT DISTINCT attempt_id, to_bank, to_account FROM {silver_aml.laundering_attempt}\n  WHERE to_bank IS NOT NULL AND to_account IS NOT NULL)\n"
+    "expect_rows": "WITH la AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt})\nSELECT count(*) FROM (\n  SELECT DISTINCT attempt_id, from_bank, from_account FROM la\n  WHERE from_bank IS NOT NULL AND from_account IS NOT NULL\n  UNION\n  SELECT DISTINCT attempt_id, to_bank, to_account FROM la\n  WHERE to_bank IS NOT NULL AND to_account IS NOT NULL)\n"
    },
    {
     "id": "attempt_typology",
