@@ -435,6 +435,7 @@ def test_opensanctions_so_huu_va_khop_ten_vao_hang_doi_duyet(corebank):
         ("NK-3", "Company", "Shell s.r.o.", False, {"name": ["Shell s.r.o."]}, ts),
         ("OWN-1", "Ownership", "own", False, {"asset": ["NK-3"], "owner": ["NK-1"], "percentage": ["50%"]}, ts),
         ("OWN-2", "Ownership", "own", False, {"asset": ["VESSEL-9"], "owner": ["NK-1"]}, ts),  # tau: bo
+        ("OWN-3", "Ownership", "own", False, {"asset": ["NK-3"], "owner": ["NK-1"], "percentage": ["40"]}, ts),  # trung -> gop
     ], "entity_id string, entity_schema string, caption string, is_target boolean, "
        "properties map<string,array<string>>, first_seen timestamp")
     tb = T.load()

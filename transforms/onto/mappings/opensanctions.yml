@@ -120,10 +120,15 @@ edges:
                try_cast(regexp_extract(element_at(properties['percentage'], 1), '([0-9.]+)', 1) AS double) AS pct,
                to_date(element_at(properties['startDate'], 1)) AS start_date
         FROM {silver_opensanctions.entity} WHERE entity_schema = 'Ownership')
-      SELECT own.* FROM own
+      -- Nhieu ban ghi Ownership cho CUNG (tai san, chu, ngay) - cac danh sach nguon cung ghi mot quan he:
+      -- gop lai, lay ty le lon nhat (gap tren dev 11-07: 8 triple_id trung, bat bien chan)
+      SELECT own.asset_id, own.owner_id, own.start_date, max(own.pct) AS pct,
+             min(own.ownership_id) AS ownership_id, count(*) AS n_records
+      FROM own
       JOIN le a ON a.entity_id = own.asset_id
       JOIN le o ON o.entity_id = own.owner_id
       WHERE own.asset_id <> own.owner_id
+      GROUP BY own.asset_id, own.owner_id, own.start_date
     subject: {entity: target_person, key: [asset_id]}
     object: {entity: target_person, key: [owner_id]}
     weight: "pct / 100"
