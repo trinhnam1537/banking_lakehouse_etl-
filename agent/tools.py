@@ -39,6 +39,11 @@ class Backend(Protocol):
     def run_sql(self, sql: str) -> List[Dict[str, Any]]: ...
 
 
+class GraphBackend(Protocol):
+    """openCypher CHỈ ĐỌC trên Neptune (bản chiếu track_a_onto, xem docs/NEPTUNE.md)."""
+    def run_cypher(self, query: str, params: Dict[str, Any]) -> List[Dict[str, Any]]: ...
+
+
 def _uid(v: str) -> str:
     if not isinstance(v, str) or not UID.match(v):
         raise ToolError(f"uid phai la 32 ky tu hex, nhan duoc {v!r}. Dung find_entity de lay uid.")
@@ -145,6 +150,46 @@ WHERE h.predicate_iri = 'fin:hasHolding'{_at('h', d)}{region}
 GROUP BY p.class_iri, p.label, c.source_system ORDER BY customers DESC""".strip()
 
 
+# ---------------------------------------------------------------- openCypher (Neptune)
+# Mọi giá trị vào truy vấn đi qua `params` — không ghép chuỗi. Độ dài đường đi không tham số hoá được
+# trong openCypher nên chèn SỐ NGUYÊN đã kiểm biên (int + min/max), không bao giờ chèn chuỗi.
+
+LINK_TYPES = ("transfersTo", "isHeldBy", "involvedIn", "isDirectlyOwnedBy", "sameAs", "holdsAccount",
+              "isAuthorizedOn", "atBank", "hasHolding", "ofProduct")
+MAX_LINK_HOPS = 6
+
+
+def cypher_explain_link(hops: int) -> str:
+    h = max(1, min(int(hops), MAX_LINK_HOPS))
+    rel = "|".join(LINK_TYPES)
+    return (f"MATCH p = (a)-[:{rel}*{h}]-(b) WHERE id(a) = $a AND id(b) = $b "
+            "RETURN [n IN nodes(p) | {uid: id(n), label: n.label, labels: labels(n)}] AS nodes, "
+            "[r IN relationships(p) | {triple_id: id(r), type: type(r), from_uid: id(startNode(r)), "
+            "to_uid: id(endNode(r)), weight: r.weight, confidence: r.confidence}] AS edges LIMIT 1")
+
+
+CYPHER_AML_CASES = (
+    "MATCH (a) WHERE id(a) = $uid "
+    "OPTIONAL MATCH (a)-[i:involvedIn]->(v)-[h:hasTypology]->(t) "
+    "OPTIONAL MATCH (a)-[o:isHeldBy]->(p) "
+    "RETURN a.label AS label, labels(a) AS labels, "
+    "collect(DISTINCT {attempt_uid: id(v), attempt: v.label, typology: t.label, detail: v.typology_detail, "
+    "triple_id: id(i), typology_triple_id: id(h)}) AS attempts, "
+    "collect(DISTINCT {owner_uid: id(p), owner: p.label, triple_id: id(o)}) AS owners")
+
+
+def cypher_aml_transfers(hops: int) -> str:
+    h = max(1, min(int(hops), 2))
+    return (f"MATCH p = (a)-[:transfersTo*1..{h}]-(b) WHERE id(a) = $uid "
+            "UNWIND relationships(p) AS r "
+            "WITH DISTINCT r, startNode(r) AS s, endNode(r) AS e "
+            "OPTIONAL MATCH (s)-[:involvedIn]->(vs) OPTIONAL MATCH (e)-[:involvedIn]->(ve) "
+            "RETURN id(r) AS triple_id, id(s) AS from_uid, s.label AS from_label, id(e) AS to_uid, "
+            "e.label AS to_label, r.weight AS n_txn, r.valid_from AS first_date, "
+            "count(DISTINCT vs) > 0 AS from_flagged, count(DISTINCT ve) > 0 AS to_flagged "
+            "ORDER BY n_txn DESC LIMIT $limit")
+
+
 def check_readonly_sql(sql: str) -> str:
     s = sql.strip().rstrip(";")
     if ";" in s:
@@ -200,6 +245,18 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "description": "SQL CHI DOC (Athena/Trino) tren track_a_onto (entity, triple, class, property, subclass, concept) "
                     "va track_a_gold. Chi dung khi cac tool tren khong du. Toi da 200 dong.",
      "input_schema": _obj({"sql": _S}, ["sql"])},
+    {"name": "explain_link", "strict": True,
+     "description": "Duong di NGAN NHAT giua hai node (uid_a, uid_b) tren do thi Neptune, qua chuyen tien, so huu, "
+                    "tham gia vu rua tien, trung thuc the... toi da max_hops buoc (<= 6). Moi canh co triple_id. "
+                    "Neptune chi chua VUNG DIEU TRA AML; khong thay duong thi noi ro la khong thay trong vung do.",
+     "input_schema": _obj({"uid_a": _S, "uid_b": _S, "max_hops": {"type": ["integer", "null"]}},
+                          ["uid_a", "uid_b", "max_hops"])},
+    {"name": "aml_subgraph", "strict": True,
+     "description": "Ho so dieu tra AML cua mot tai khoan (uid): vu rua tien + kieu hinh (FAN-OUT, CYCLE...), "
+                    "chu so huu, va luoi chuyen tien quanh no trong hops buoc (1 hoac 2), danh dau doi tac da nam "
+                    "trong vu nao.",
+     "input_schema": _obj({"uid": _S, "hops": {"type": ["integer", "null"]}, "limit": {"type": ["integer", "null"]}},
+                          ["uid", "hops", "limit"])},
 ]
 
 
@@ -207,8 +264,9 @@ class Tools:
     """Thực thi tool. Ghi lại mọi id đã trả về trong phiên -> dữ liệu cho kiểm grounding."""
 
     def __init__(self, backend: Backend, cat: Optional[Dict[str, Any]] = None,
-                 log: Optional[Callable[[Dict[str, Any]], None]] = None):
+                 log: Optional[Callable[[Dict[str, Any]], None]] = None, graph: Optional[GraphBackend] = None):
         self.backend = backend
+        self.graph = graph
         self.cat = cat if cat is not None else C.load()
         self.seen_ids: set = set()
         self.log = log or (lambda rec: None)
@@ -220,6 +278,24 @@ class Tools:
                 v = r.get(k)
                 if isinstance(v, str) and UID.match(v):
                     self.seen_ids.add(v)
+        return rows
+
+    def _collect(self, obj: Any) -> None:
+        """Thu MỌI id 32 hex trong kết quả lồng nhau (đường đi, danh sách cạnh) cho kiểm grounding."""
+        if isinstance(obj, dict):
+            for v in obj.values():
+                self._collect(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                self._collect(v)
+        elif isinstance(obj, str) and UID.match(obj):
+            self.seen_ids.add(obj)
+
+    def _cypher(self, query: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        if self.graph is None:
+            raise ToolError("Neptune chua bat (scripts/neptune-session.ps1 start); dung neighborhood (Athena) thay the")
+        rows = self.graph.run_cypher(query, params)
+        self._collect(rows)
         return rows
 
     def call(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -250,6 +326,22 @@ class Tools:
             return {"rows": self._rows(sql_count_holders(a["product_class"], a.get("region"), a.get("as_of")))}
         if name == "query":
             return {"rows": self._rows(check_readonly_sql(a["sql"]))}
+        if name == "explain_link":
+            ua, ub = _uid(a["uid_a"]), _uid(a["uid_b"])
+            top = max(1, min(int(a.get("max_hops") or 4), MAX_LINK_HOPS))
+            for h in range(1, top + 1):          # tang dan do dai = duong ngan nhat (Neptune khong co shortestPath)
+                rows = self._cypher(cypher_explain_link(h), {"a": ua, "b": ub})
+                if rows:
+                    return {"hops": h, "rows": rows}
+            return {"hops": None, "rows": [], "note": f"khong co duong <= {top} buoc trong vung do thi tren Neptune"}
+        if name == "aml_subgraph":
+            u = _uid(a["uid"])
+            cases = self._cypher(CYPHER_AML_CASES, {"uid": u})
+            if not cases:
+                raise ToolError("khong co node nay tren Neptune (ngoai vung dieu tra?)")
+            lim = max(1, min(int(a.get("limit") or 50), 200))
+            transfers = self._cypher(cypher_aml_transfers(a.get("hops") or 1), {"uid": u, "limit": lim})
+            return {"node": cases[0], "rows": transfers}
         raise ToolError(f"khong co tool {name}")
 
 
@@ -283,3 +375,24 @@ class AthenaBackend:
         rows = res["ResultSet"]["Rows"]
         head = [c.get("VarCharValue") for c in rows[0]["Data"]] if rows else []
         return [dict(zip(head, [c.get("VarCharValue") for c in r["Data"]])) for r in rows[1:]]
+
+
+class NeptuneBackend:
+    """openCypher qua Lambda `<prefix>-neptune-ops` (action `query`, chặn từ khoá ghi): agent chạy ngoài VPC vẫn
+    dùng được Neptune mà không mở cổng 8182. Quyền cần: lambda:InvokeFunction trên đúng hàm này."""
+
+    def __init__(self, function_name: str = "fingraph-dev-neptune-ops", session=None, region: str = "ap-southeast-1"):
+        import boto3
+
+        self.fn = function_name
+        self.lam = (session or boto3.Session()).client("lambda", region_name=region)
+
+    def run_cypher(self, query: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        import json
+
+        r = self.lam.invoke(FunctionName=self.fn, Payload=json.dumps(
+            {"action": "query", "cypher": query, "params": params}).encode())
+        body = json.loads(r["Payload"].read() or b"{}")
+        if "results" not in body:
+            raise ToolError(f"Neptune loi: {json.dumps(body, ensure_ascii=False)[:300]}")
+        return body["results"]

@@ -170,9 +170,17 @@ Hai lỗi đã gặp và test đang chặn:
 | `neighborhood(uid, predicate?, direction)` | Cạnh một bước quanh node | `triple` hai chiều | CQ6, CQ10 |
 | `count_holders(product_class, region?, as_of?)` | "Bao nhiêu khách giữ sản phẩm tín dụng ở Prague?" | `subclass` + `locatedIn → partOf` | CQ2 |
 | `query(sql)` | Câu không tool nào trả lời được | SQL chỉ đọc trên `track_a_onto`, `track_a_gold` | CQ12 |
+| `aml_subgraph(uid, hops)` | "Tài khoản này dính vụ nào, kiểu gì, ai sở hữu, chuyển cho ai?" | **Neptune**: `involvedIn → hasTypology`, `isHeldBy`, `transfersTo*1..2` | CQ9, CQ10 |
+| `explain_link(uid_a, uid_b, max_hops)` | "Hai thực thể này liên hệ thế nào?" | **Neptune**: đường ngắn nhất qua chuyển tiền / sở hữu / vụ / `sameAs` (tăng dần độ dài, Neptune không có `shortestPath`) | CQ8, CQ10 |
 
-**Thứ tự thêm tool tiếp theo:** `recommend(uid)` (sau O10: đọc `fin:Recommendation`), `explain_link(uid_a, uid_b)`
-(đường đi ngắn nhất, cần O9 closure hoặc Neptune), `aml_subgraph(uid, hops)` (use case B, xem NEPTUNE.md).
+Hai tool Neptune gọi openCypher qua Lambda `fingraph-dev-neptune-ops` (agent ở ngoài VPC vẫn dùng được), bật bằng
+`python -m agent.loop ... --neptune fingraph-dev-neptune-ops`. Mọi giá trị vào truy vấn đi qua `parameters`; độ dài
+đường đi là số nguyên đã kẹp biên. Neptune chỉ chứa **vùng điều tra AML**: tool trả "không thấy trong vùng điều
+tra" thay vì kết luận "không có liên hệ" (quy tắc 8 của system prompt). Đã chạy thử trên Neptune thật (07-11):
+vụ CYCLE `HI-Medium-01062`, chủ sở hữu, lưới chuyển tiền, đường 1 bước giữa hai tài khoản trong vòng.
+
+**Thứ tự thêm tool tiếp theo:** `recommend(uid)` (sau O10: đọc `fin:Recommendation`), `sanctions_review()`
+(đọc `same_as_review` cho điều tra viên duyệt ứng viên trùng tên cấm vận).
 
 **Hợp đồng vòng lặp** ([loop.py](loop.py)), mỗi điểm có test:
 - Chỉ **append** vào lịch sử, không sửa lượt cũ (giữ cache, hợp lệ với cơ chế thinking của model mới).

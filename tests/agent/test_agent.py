@@ -151,3 +151,50 @@ def test_tham_so_sai_tra_ve_is_error_de_model_tu_sua(cat):
     assert res["is_error"] and "find_entity" in json.loads(res["content"])["error"]
     assert "fallbacks" not in client.calls[0]          # Bedrock: khong co tham so fallbacks
     assert ans.grounded
+
+
+# ---------------------------------------------------------------- tool AML trên Neptune (backend giả)
+
+class FakeGraph:
+    """Đồ thị giả: A -(1 bước)- B không có; A -(2 bước qua P)- B có. Ghi lại truy vấn để kiểm tham số hoá."""
+
+    def __init__(self):
+        self.calls = []
+
+    def run_cypher(self, query, params):
+        self.calls.append((query, params))
+        if "*1]" in query or "*1..1}" in query:
+            return []
+        if "-[:" in query and "*2]" in query:
+            return [{"nodes": [{"uid": U1, "label": "TK AML 1-A1"}, {"uid": "c" * 32, "label": "Corporation #1"},
+                               {"uid": "d" * 32, "label": "TK AML 2-B1"}],
+                     "edges": [{"triple_id": T1, "type": "isHeldBy"}, {"triple_id": "e" * 32, "type": "isHeldBy"}]}]
+        if "involvedIn]->(v)" in query:
+            return [{"label": "TK AML 1-A1", "attempts": [{"attempt_uid": "f" * 32, "typology": "CYCLE",
+                                                           "triple_id": "0" * 32}], "owners": []}]
+        return [{"triple_id": "1" * 32, "from_uid": U1, "to_uid": "d" * 32, "n_txn": 3}]
+
+
+def test_explain_link_tang_dan_do_dai_va_tham_so_hoa(cat):
+    g = FakeGraph()
+    t = TL.Tools(FakeBackend(), cat, graph=g)
+    out = t.call("explain_link", {"uid_a": U1, "uid_b": "d" * 32, "max_hops": 4})
+    assert out["hops"] == 2 and len(out["rows"][0]["edges"]) == 2
+    assert len(g.calls) == 2                                    # 1 buoc khong thay -> thu 2 buoc
+    assert all(U1 not in q and p == {"a": U1, "b": "d" * 32} for q, p in g.calls)   # uid KHONG ghep vao chuoi
+    assert {T1, "e" * 32, "c" * 32} <= t.seen_ids              # id long nhau vao danh sach grounding
+    assert G.check(f"Hai tai khoan cung chu [triple:{T1}] [triple:{'e' * 32}]", t.seen_ids).ok
+
+
+def test_aml_subgraph_va_loi_tham_so(cat):
+    g = FakeGraph()
+    t = TL.Tools(FakeBackend(), cat, graph=g)
+    out = t.call("aml_subgraph", {"uid": U1, "hops": 9, "limit": 10_000})
+    assert out["node"]["attempts"][0]["typology"] == "CYCLE"
+    q, p = g.calls[-1]
+    assert "*1..2]" in q and p["limit"] == 200                  # hops, limit bi kep bien
+    assert "f" * 32 in t.seen_ids and "1" * 32 in t.seen_ids
+    bad = t.call("aml_subgraph", {"uid": "' OR 1=1 //", "hops": 1, "limit": 5})
+    assert bad["_is_error"] and len(g.calls) == 2              # chan truoc khi goi Neptune
+    off = TL.Tools(FakeBackend(), cat).call("explain_link", {"uid_a": U1, "uid_b": U1, "max_hops": 2})
+    assert off["_is_error"] and "Neptune chua bat" in off["error"]
