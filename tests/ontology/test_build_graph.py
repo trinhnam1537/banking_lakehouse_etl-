@@ -100,9 +100,9 @@ def _count(spark, sql):
     return spark.sql(sql).first()[0]
 
 
-def test_berka_va_corebank_cung_luc_doi_soat_rieng_tung_nguon(silver):
-    """Hai nguồn cùng id mục (holds_account...) nhưng số dòng khác nhau: corebank có thêm chủ tài khoản
-    do simulator mở. Lỗi gặp trên dev (04-11): đối soát gộp theo id mục -> lệch 4.500 / 4.534."""
+@pytest.fixture(scope="module")
+def corebank(silver):
+    """silver_corebank = bản sao Berka + một khách (4) và tài khoản (30) do simulator mở thêm."""
     spark = silver
     spark.sql("CREATE NAMESPACE IF NOT EXISTS glue_catalog.silver_corebank")
     for t in ("district", "account", "disp", "card", "loan", "trans"):
@@ -116,6 +116,13 @@ def test_berka_va_corebank_cung_luc_doi_soat_rieng_tung_nguon(silver):
     ], "client_id int, gender string, birth_date date, district_id int, status string")
     spark.sql("INSERT INTO glue_catalog.silver_corebank.account VALUES (30, 2, DATE'2023-01-05', 'MONTHLY')")
     spark.sql("INSERT INTO glue_catalog.silver_corebank.disp VALUES (300, 4, 30, 'OWNER', true)")
+    return spark
+
+
+def test_berka_va_corebank_cung_luc_doi_soat_rieng_tung_nguon(corebank):
+    """Hai nguồn cùng id mục (holds_account...) nhưng số dòng khác nhau: corebank có thêm chủ tài khoản
+    do simulator mở. Lỗi gặp trên dev (04-11): đối soát gộp theo id mục -> lệch 4.500 / 4.534."""
+    spark = corebank
     tb = T.load()
     entity, triple, exp = B.build(spark, M.load_all(["berka", "corebank"]), tb)
     report = B.check_invariants(spark, entity, triple, exp, tb)
@@ -376,6 +383,10 @@ def test_o9_product_transition_va_khong_ro_ri(graph, silver):
     assert pt[("fin:CurrentAccount", "fin:InsuranceProduct", 3)] == (2, 1, 0.5)
     assert pt[("fin:CurrentAccount", "fin:Loan", 3)] == (2, 1, 0.5)
     assert ("fin:ClassicCard", "fin:Loan", 3) not in pt          # the sau vay: khong phai A -> B
+    # base_rate chi tren nguon CO san pham: bao hiem chi o Berka (3 khach) -> 1/3, KHONG chia them khach MBD
+    row = next(r for r in DV.product_transition(acq, cut, horizons=(3,)).collect()
+               if (r.from_product, r.to_product) == ("fin:CurrentAccount", "fin:InsuranceProduct"))
+    assert abs(row.base_rate - 1 / 3) < 1e-9 and abs(row.lift - 1.5) < 1e-9
     # Ro ri: them luot mua SAU moc cat -> bang khong doi
     extra = spark.createDataFrame(
         [(ids.make_uid("fin:Customer", "berka", "client_id=1"), "berka", "fin:Loan", dt.date(1998, 3, 1))],
@@ -385,12 +396,12 @@ def test_o9_product_transition_va_khong_ro_ri(graph, silver):
     assert pt2 == pt
 
 
-def test_o9_khach_trung_sameas_chi_dem_mot_lan(silver):
+def test_o9_khach_trung_sameas_chi_dem_mot_lan(corebank):
     """Berka và corebank là cùng người (sameAs): product_transition chỉ đếm bản corebank (nguồn ưu tiên)."""
     from transforms.onto import derive as DV
 
     tb = T.load()
-    entity, triple, _ = B.build(silver, M.load_all(["berka", "corebank"]), tb)
+    entity, triple, _ = B.build(corebank, M.load_all(["berka", "corebank"]), tb)
     acq = DV.acquisitions(entity, triple)
     assert {r.source_system for r in acq.select("source_system").distinct().collect()} == {"corebank"}
     n_cust = acq.select("customer_uid").distinct().count()

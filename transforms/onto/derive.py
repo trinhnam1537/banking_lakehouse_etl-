@@ -111,7 +111,14 @@ def product_transition(acq, cut: Dict[str, str], horizons=HORIZONS):
 
     cut_col = F.create_map(*[x for k, v in cut.items() for x in (F.lit(k), F.lit(v).cast("date"))])
     train = acq.withColumn("cutoff", cut_col[F.col("source_system")]).where(F.col("acquired") < F.col("cutoff"))
-    n_cust = train.select("customer_uid").distinct().count()
+    # base_rate(B) = khach co B / khach cua CAC NGUON CO B. Chia cho moi khach moi nguon thi 100 nghin
+    # doanh nghiep MBD (khong the co "thanh toan dinh ky") pha loang mau -> lift thoi phong (dev 11-07: 3,20).
+    per_src = train.groupBy("source_system").agg(F.countDistinct("customer_uid").alias("n_src"))
+    src_of = train.select(F.col("product").alias("to_product"), "source_system").distinct()
+    denom = src_of.join(per_src, "source_system").groupBy("to_product").agg(F.sum("n_src").alias("n_den"))
+    base_all = (train.groupBy(F.col("product").alias("to_product")).agg(F.countDistinct("customer_uid").alias("n_b"))
+                .join(denom, "to_product")
+                .select("to_product", (F.col("n_b") / F.col("n_den")).alias("base_rate"))).localCheckpoint()
     out = None
     for hz in horizons:
         # A đủ sớm để còn quan sát trọn H tháng trước mốc cắt (chống censoring)
@@ -127,9 +134,7 @@ def product_transition(acq, cut: Dict[str, str], horizons=HORIZONS):
         n_from = a.groupBy("from_product").agg(F.countDistinct("customer_uid").alias("n_from"),
                                                F.array_sort(F.collect_set("source_system")).alias("sources"))
         n_both = both.groupBy("from_product", "to_product").agg(F.countDistinct("customer_uid").alias("n_both"))
-        base = train.groupBy(F.col("product").alias("to_product")).agg(
-            (F.countDistinct("customer_uid") / F.lit(max(n_cust, 1))).alias("base_rate")).localCheckpoint()
-        df = (n_both.join(n_from, "from_product").join(base, "to_product")
+        df = (n_both.join(n_from, "from_product").join(base_all, "to_product")
               .withColumn("horizon_months", F.lit(hz))
               .withColumn("p", F.col("n_both") / F.col("n_from"))
               .withColumn("lift", F.col("p") / F.col("base_rate")))
