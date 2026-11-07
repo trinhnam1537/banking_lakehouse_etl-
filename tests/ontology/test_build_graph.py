@@ -383,3 +383,16 @@ def test_o9_product_transition_va_khong_ro_ri(graph, silver):
     pt2 = {(r.from_product, r.to_product, r.horizon_months): (r.n_from, r.n_both, r.p)
            for r in DV.product_transition(acq.unionByName(extra), cut, horizons=(3,)).collect()}
     assert pt2 == pt
+
+
+def test_o9_khach_trung_sameas_chi_dem_mot_lan(silver):
+    """Berka và corebank là cùng người (sameAs): product_transition chỉ đếm bản corebank (nguồn ưu tiên)."""
+    from transforms.onto import derive as DV
+
+    tb = T.load()
+    entity, triple, _ = B.build(silver, M.load_all(["berka", "corebank"]), tb)
+    acq = DV.acquisitions(entity, triple)
+    assert {r.source_system for r in acq.select("source_system").distinct().collect()} == {"corebank"}
+    n_cust = acq.select("customer_uid").distinct().count()
+    assert n_cust == entity.where("source_system = 'corebank' AND class_iri = 'fin:Customer'").join(
+        acq.select(acq.customer_uid.alias("uid")).distinct(), "uid").count()

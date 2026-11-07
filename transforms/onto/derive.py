@@ -30,6 +30,10 @@ HORIZONS = (3, 6, 12)
 MAX_DEPTH = 6
 TRANSITIVE = ("fin:partOf",)
 CUTOFF_QUANTILE = 0.8
+# Khach trung giua nguon (fin:sameAs, O8): chi giu ban cua nguon dung TRUOC trong danh sach. Khong bo
+# thi lich su mua cua cung mot nguoi (Berka va corebank nap tu Berka) bi dem HAI lan: p khong doi nhung
+# n gap doi -> do tin cay gia tao (gap tren dev 11-07: n = 7.234 thay vi ~3.600).
+SOURCE_PRIORITY = ("corebank", "berka")
 
 
 def closure(triple, predicates=TRANSITIVE, max_depth: int = MAX_DEPTH):
@@ -70,8 +74,26 @@ def acquisitions(entity, triple):
                                                                F.col("object_uid").alias("p"))
     prod = entity.select(F.col("uid").alias("p"), F.col("class_iri").alias("product"))
     cust = entity.select(F.col("uid").alias("customer_uid"), "source_system")
-    return (h.where(F.col("t").isNotNull()).join(o, "h").join(prod, "p").join(cust, "customer_uid")
-            .groupBy("customer_uid", "source_system", "product").agg(F.min("t").alias("acquired")))
+    acq = (h.where(F.col("t").isNotNull()).join(o, "h").join(prod, "p").join(cust, "customer_uid")
+           .groupBy("customer_uid", "source_system", "product").agg(F.min("t").alias("acquired")))
+    return acq.join(duplicates(entity, triple), "customer_uid", "left_anti")
+
+
+def duplicates(entity, triple):
+    """uid khach se BO vi da co ban o nguon uu tien hon (cap fin:sameAs)."""
+    from pyspark.sql import functions as F
+
+    rank = F.create_map(*[x for i, s in enumerate(SOURCE_PRIORITY) for x in (F.lit(s), F.lit(i))])
+    src = entity.select("uid", "source_system")
+    pairs = (triple.where("predicate_iri = 'fin:sameAs'").select(F.col("subject_uid").alias("a"),
+                                                               F.col("object_uid").alias("b"))
+             .join(src.withColumnRenamed("uid", "a").withColumnRenamed("source_system", "sa"), "a")
+             .join(src.withColumnRenamed("uid", "b").withColumnRenamed("source_system", "sb"), "b")
+             .withColumn("ra", F.coalesce(rank[F.col("sa")], F.lit(99)))
+             .withColumn("rb", F.coalesce(rank[F.col("sb")], F.lit(99))))
+    # Bo ben co hang KEM hon (so lon hon); bang hang thi giu ca hai (khong doan)
+    return (pairs.where("ra < rb").select(F.col("b").alias("customer_uid"))
+            .union(pairs.where("rb < ra").select(F.col("a").alias("customer_uid"))).distinct())
 
 
 def cutoffs(acq, overrides: Dict[str, str]) -> Dict[str, str]:
