@@ -316,3 +316,29 @@ def test_aml_kieu_hinh_khong_tra_duoc_lam_job_that_bai(silver):
     with pytest.raises(B.InvariantError, match="mo coi"):
         B.check_invariants(spark, entity, triple, exp, tb)
     spark.sql("DELETE FROM glue_catalog.silver_aml.laundering_attempt WHERE attempt_id = 'HI-2'")
+
+
+def test_aml_vung_dieu_tra_cho_neptune(silver):
+    """--SCOPE aml_investigation: hạt giống = tài khoản trong vụ; +1 bước chuyển tiền; +cùng chủ sở hữu;
+    cạnh AML giữ khi cả hai đầu trong vùng; nguồn khác không đổi."""
+    from transforms.onto import export_neptune as X
+
+    spark = silver
+    spark.sql("INSERT INTO glue_catalog.silver_aml.transfer VALUES "
+              "('t6', DATE'2023-01-06', '003', 'C1', '004', 'D1', false), "   # D1: doi tac truc tiep -> giu
+              "('t7', DATE'2023-01-07', '004', 'D1', '009', 'E9', false)")    # E9: cach 2 buoc -> bo
+    tb = T.load()
+    entity, triple, _ = B.build(spark, M.load_all(["aml", "mbd"]), tb)
+    ent, tri = X.aml_investigation(entity, triple)
+    acc = lambda b, a: ids.make_uid("fin:Account", "aml", f"bank_id={b}|account_number={a}")  # noqa: E731
+    kept = {r.uid for r in ent.where("class_iri = 'fin:Account'").collect()}
+    assert {acc("1", "A1"), acc("2", "B1"), acc("3", "C1"), acc("4", "D1"), acc("1", "A2")} <= kept
+    assert acc("9", "E9") not in kept
+    pairs = {(r.subject_uid, r.object_uid) for r in tri.where("predicate_iri = 'fin:transfersTo'").collect()}
+    assert (acc("3", "C1"), acc("4", "D1")) in pairs and (acc("4", "D1"), acc("9", "E9")) not in pairs
+    # Khong canh mo coi trong ban cat; nguon khac (MBD) giu nguyen; kieu hinh van tro khai niem
+    uids = {r.uid for r in ent.select("uid").collect()}
+    assert all(r.subject_uid in uids and (r.object_uid is None or r.object_uid in uids) for r in tri.collect())
+    assert ent.where("source_system = 'mbd'").count() == entity.where("source_system = 'mbd'").count()
+    assert tri.where("predicate_iri = 'fin:hasTypology'").count() == 1
+    spark.sql("DELETE FROM glue_catalog.silver_aml.transfer WHERE txn_id IN ('t6', 't7')")
