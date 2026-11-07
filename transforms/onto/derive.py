@@ -39,9 +39,12 @@ def closure(triple, predicates=TRANSITIVE, max_depth: int = MAX_DEPTH):
 
     edges = (triple.where(F.col("predicate_iri").isin(*predicates) & F.col("object_uid").isNotNull())
              .select(F.col("subject_uid").alias("s"), F.col("object_uid").alias("o"), "predicate_iri").distinct())
+    edges = edges.localCheckpoint()
     reach = edges.select(F.col("s").alias("start_uid"), F.col("o").alias("node_uid"), "predicate_iri",
-                         F.lit(1).alias("depth"))
-    frontier = reach
+                         F.lit(1).alias("depth")).localCheckpoint()
+    # frontier, reach, new phai la cac checkpoint RIENG: cung lineage thi join frontier->reach bi
+    # "conflicting references in Join" (Spark tren Glue 5, gap 11-07; Spark local cho qua).
+    frontier = reach.localCheckpoint()
     for d in range(2, max_depth + 1):
         step = (frontier.alias("f").join(edges.alias("e"), (F.col("f.node_uid") == F.col("e.s"))
                                          & (F.col("f.predicate_iri") == F.col("e.predicate_iri")))
@@ -52,7 +55,7 @@ def closure(triple, predicates=TRANSITIVE, max_depth: int = MAX_DEPTH):
             ["start_uid", "node_uid", "predicate_iri"]).localCheckpoint()
         if new.isEmpty():
             break
-        reach = reach.unionByName(new)
+        reach = reach.unionByName(new).localCheckpoint()
         frontier = new
     return reach
 
@@ -92,8 +95,10 @@ def product_transition(acq, cut: Dict[str, str], horizons=HORIZONS):
         # A đủ sớm để còn quan sát trọn H tháng trước mốc cắt (chống censoring)
         a = (train.where(F.add_months("acquired", hz) <= F.col("cutoff"))
              .select("customer_uid", "source_system", F.col("product").alias("from_product"),
-                     F.col("acquired").alias("ta")))
-        b = train.select("customer_uid", F.col("product").alias("to_product"), F.col("acquired").alias("tb"))
+                     F.col("acquired").alias("ta"))).localCheckpoint()
+        # a, b, base tu cung `train`: checkpoint rieng de join khong "conflicting references" (xem closure)
+        b = train.select("customer_uid", F.col("product").alias("to_product"),
+                         F.col("acquired").alias("tb")).localCheckpoint()
         both = (a.join(b, "customer_uid")
                 .where((F.col("from_product") != F.col("to_product")) & (F.col("tb") > F.col("ta"))
                        & (F.col("tb") <= F.add_months("ta", hz))))
@@ -101,7 +106,7 @@ def product_transition(acq, cut: Dict[str, str], horizons=HORIZONS):
                                                F.array_sort(F.collect_set("source_system")).alias("sources"))
         n_both = both.groupBy("from_product", "to_product").agg(F.countDistinct("customer_uid").alias("n_both"))
         base = train.groupBy(F.col("product").alias("to_product")).agg(
-            (F.countDistinct("customer_uid") / F.lit(max(n_cust, 1))).alias("base_rate"))
+            (F.countDistinct("customer_uid") / F.lit(max(n_cust, 1))).alias("base_rate")).localCheckpoint()
         df = (n_both.join(n_from, "from_product").join(base, "to_product")
               .withColumn("horizon_months", F.lit(hz))
               .withColumn("p", F.col("n_both") / F.col("n_from"))
