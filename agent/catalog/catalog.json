@@ -1,0 +1,1238 @@
+{
+ "classes": [
+  {
+   "children": [],
+   "definition": "Tai khoan tien gui / thanh toan o mot ngan hang.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:Account",
+   "label_en": "Account",
+   "label_vi": "Tài khoản",
+   "materialized_in": [],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [
+    "fin:AnonymousProduct_1",
+    "fin:AnonymousProduct_2",
+    "fin:AnonymousProduct_3",
+    "fin:AnonymousProduct_4"
+   ],
+   "definition": "San pham bi an ten trong bo du lieu (MBD). Hoc duoc trong bo do, KHONG chuyen giao theo lop sang nguon khac.",
+   "graph_sources": [
+    "mbd"
+   ],
+   "iri": "fin:AnonymousProduct",
+   "label_en": "Anonymous product",
+   "label_vi": "Sản phẩm ẩn danh",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Product"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "MBD target_1.",
+   "graph_sources": [
+    "mbd"
+   ],
+   "iri": "fin:AnonymousProduct_1",
+   "label_en": "Anonymous product 1",
+   "label_vi": "Sản phẩm ẩn danh 1",
+   "materialized_in": [],
+   "notations": [
+    "mbd:target_1"
+   ],
+   "parents": [
+    "fin:AnonymousProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "MBD target_2.",
+   "graph_sources": [
+    "mbd"
+   ],
+   "iri": "fin:AnonymousProduct_2",
+   "label_en": "Anonymous product 2",
+   "label_vi": "Sản phẩm ẩn danh 2",
+   "materialized_in": [],
+   "notations": [
+    "mbd:target_2"
+   ],
+   "parents": [
+    "fin:AnonymousProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "MBD target_3.",
+   "graph_sources": [
+    "mbd"
+   ],
+   "iri": "fin:AnonymousProduct_3",
+   "label_en": "Anonymous product 3",
+   "label_vi": "Sản phẩm ẩn danh 3",
+   "materialized_in": [],
+   "notations": [
+    "mbd:target_3"
+   ],
+   "parents": [
+    "fin:AnonymousProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "MBD target_4.",
+   "graph_sources": [
+    "mbd"
+   ],
+   "iri": "fin:AnonymousProduct_4",
+   "label_en": "Anonymous product 4",
+   "label_vi": "Sản phẩm ẩn danh 4",
+   "materialized_in": [],
+   "notations": [
+    "mbd:target_4"
+   ],
+   "parents": [
+    "fin:AnonymousProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "To chuc tin dung giu tai khoan (ngan hang doi ung trong chuyen tien lien ngan hang).",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:Bank",
+   "label_en": "Bank",
+   "label_vi": "Ngân hàng",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Organization"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "The hang co ban.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:ClassicCard",
+   "label_en": "Classic card",
+   "label_vi": "Thẻ classic",
+   "materialized_in": [],
+   "notations": [
+    "berka:card_type=classic",
+    "corebank:card_type=classic"
+   ],
+   "parents": [
+    "fin:CreditCard"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Quoc gia (ISO 3166).",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:Country",
+   "label_en": "Country",
+   "label_vi": "Quốc gia",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Location"
+   ]
+  },
+  {
+   "children": [
+    "fin:ClassicCard",
+    "fin:GoldCard",
+    "fin:JuniorCard"
+   ],
+   "definition": "The co han muc chi tieu.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:CreditCard",
+   "label_en": "Credit card",
+   "label_vi": "Thẻ tín dụng",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_tjcr_fin_ult1"
+   ],
+   "parents": [
+    "fin:CreditProduct"
+   ]
+  },
+  {
+   "children": [
+    "fin:CreditCard",
+    "fin:Guarantee",
+    "fin:Loan"
+   ],
+   "definition": "San pham ngan hang cap von / han muc cho khach.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:CreditProduct",
+   "label_en": "Credit product",
+   "label_vi": "Sản phẩm tín dụng",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Product"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Tai khoan giao dich hang ngay.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:CurrentAccount",
+   "label_en": "Current account",
+   "label_vi": "Tài khoản thanh toán",
+   "materialized_in": [],
+   "notations": [
+    "berka:account",
+    "corebank:account",
+    "santander:ind_cco_fin_ult1",
+    "santander:ind_ctma_fin_ult1",
+    "santander:ind_ctop_fin_ult1",
+    "santander:ind_ctpp_fin_ult1"
+   ],
+   "parents": [
+    "fin:DepositProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Ben tham gia co quan he dich vu voi ngan hang (co tai khoan, san pham, hoac duoc tiep thi).",
+   "graph_sources": [
+    "bank_marketing",
+    "berka",
+    "corebank",
+    "mbd"
+   ],
+   "iri": "fin:Customer",
+   "label_en": "Customer",
+   "label_vi": "Khách hàng",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Party"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Bang lakehouse sinh ra node / canh (nguon goc, kiem toan).",
+   "graph_sources": [],
+   "iri": "fin:Dataset",
+   "label_en": "Dataset",
+   "label_vi": "Bộ dữ liệu",
+   "materialized_in": [],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [
+    "fin:CurrentAccount",
+    "fin:EAccount",
+    "fin:JuniorAccount",
+    "fin:PayrollAccount",
+    "fin:SavingsAccount",
+    "fin:TermDeposit"
+   ],
+   "definition": "San pham ngan hang nhan tien cua khach.",
+   "graph_sources": [
+    "bank_marketing",
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:DepositProduct",
+   "label_en": "Deposit product",
+   "label_vi": "Sản phẩm tiền gửi",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Product"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Hop dong phai sinh.",
+   "graph_sources": [],
+   "iri": "fin:Derivative",
+   "label_en": "Derivative",
+   "label_vi": "Phái sinh",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_cder_fin_ult1"
+   ],
+   "parents": [
+    "fin:InvestmentProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Quan / huyen (Berka district).",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:District",
+   "label_en": "District",
+   "label_vi": "Quận huyện",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Location"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Tai khoan chi giao dich tren kenh so.",
+   "graph_sources": [],
+   "iri": "fin:EAccount",
+   "label_en": "e-account",
+   "label_vi": "Tài khoản điện tử",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_ecue_fin_ult1"
+   ],
+   "parents": [
+    "fin:DepositProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Chung chi quy.",
+   "graph_sources": [],
+   "iri": "fin:Fund",
+   "label_en": "Fund",
+   "label_vi": "Quỹ đầu tư",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_fond_fin_ult1"
+   ],
+   "parents": [
+    "fin:InvestmentProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "O geohash (MBD).",
+   "graph_sources": [],
+   "iri": "fin:GeoCell",
+   "label_en": "Geo cell",
+   "label_vi": "Ô địa lý",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Location"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "The hang cao.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:GoldCard",
+   "label_en": "Gold card",
+   "label_vi": "Thẻ vàng",
+   "materialized_in": [],
+   "notations": [
+    "berka:card_type=gold",
+    "corebank:card_type=gold"
+   ],
+   "parents": [
+    "fin:CreditCard"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Cam ket thanh toan thay khach.",
+   "graph_sources": [],
+   "iri": "fin:Guarantee",
+   "label_en": "Guarantee",
+   "label_vi": "Bảo lãnh",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_aval_fin_ult1"
+   ],
+   "parents": [
+    "fin:CreditProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Bao hiem ban qua ngan hang (suy tu khoan tru dinh ky).",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:InsuranceProduct",
+   "label_en": "Insurance product",
+   "label_vi": "Bảo hiểm",
+   "materialized_in": [],
+   "notations": [
+    "berka:k_symbol=POJISTNE",
+    "corebank:k_symbol=POJISTNE"
+   ],
+   "parents": [
+    "fin:Product"
+   ]
+  },
+  {
+   "children": [
+    "fin:Derivative",
+    "fin:Fund",
+    "fin:PensionPlan",
+    "fin:Securities"
+   ],
+   "definition": "San pham dau tu cua khach qua ngan hang.",
+   "graph_sources": [],
+   "iri": "fin:InvestmentProduct",
+   "label_en": "Investment product",
+   "label_vi": "Sản phẩm đầu tư",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Product"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Tai khoan cho nguoi chua thanh nien.",
+   "graph_sources": [],
+   "iri": "fin:JuniorAccount",
+   "label_en": "Junior account",
+   "label_vi": "Tài khoản trẻ em",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_ctju_fin_ult1"
+   ],
+   "parents": [
+    "fin:DepositProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "The cho khach tre.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:JuniorCard",
+   "label_en": "Junior card",
+   "label_vi": "Thẻ junior",
+   "materialized_in": [],
+   "notations": [
+    "berka:card_type=junior",
+    "corebank:card_type=junior"
+   ],
+   "parents": [
+    "fin:CreditCard"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Mot vu rua tien gom nhieu giao dich theo mot kieu hinh (ground truth IBM AML).",
+   "graph_sources": [],
+   "iri": "fin:LaunderingAttempt",
+   "label_en": "Laundering attempt",
+   "label_vi": "Vụ rửa tiền",
+   "materialized_in": [],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [
+    "fin:Mortgage"
+   ],
+   "definition": "Khoan vay tra gop.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:Loan",
+   "label_en": "Loan",
+   "label_vi": "Khoản vay",
+   "materialized_in": [],
+   "notations": [
+    "berka:loan",
+    "corebank:loan",
+    "santander:ind_pres_fin_ult1"
+   ],
+   "parents": [
+    "fin:CreditProduct"
+   ]
+  },
+  {
+   "children": [
+    "fin:Country",
+    "fin:District",
+    "fin:GeoCell",
+    "fin:Region"
+   ],
+   "definition": "Don vi dia ly.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:Location",
+   "label_en": "Location",
+   "label_vi": "Vị trí",
+   "materialized_in": [],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [],
+   "definition": "Tien gui co ky han dai.",
+   "graph_sources": [],
+   "iri": "fin:LongTermDeposit",
+   "label_en": "Long-term deposit",
+   "label_vi": "Tiền gửi dài hạn",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_dela_fin_ult1"
+   ],
+   "parents": [
+    "fin:TermDeposit"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Tien gui co ky han trung binh.",
+   "graph_sources": [],
+   "iri": "fin:MediumTermDeposit",
+   "label_en": "Medium-term deposit",
+   "label_vi": "Tiền gửi trung hạn",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_deme_fin_ult1"
+   ],
+   "parents": [
+    "fin:TermDeposit"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Nhom nganh cua don vi chap nhan the (grocery_pos, shopping_net, ...).",
+   "graph_sources": [],
+   "iri": "fin:MerchantCategory",
+   "label_en": "Merchant category",
+   "label_vi": "Nhóm merchant",
+   "materialized_in": [],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [],
+   "definition": "Khoan vay co the chap bat dong san.",
+   "graph_sources": [],
+   "iri": "fin:Mortgage",
+   "label_en": "Mortgage",
+   "label_vi": "Vay thế chấp",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_hip_fin_ult1"
+   ],
+   "parents": [
+    "fin:Loan"
+   ]
+  },
+  {
+   "children": [
+    "fin:Bank"
+   ],
+   "definition": "Phap nhan: doanh nghiep, ho kinh doanh, to chuc.",
+   "graph_sources": [
+    "berka",
+    "corebank",
+    "mbd"
+   ],
+   "iri": "fin:Organization",
+   "label_en": "Organization",
+   "label_vi": "Tổ chức",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Party"
+   ]
+  },
+  {
+   "children": [
+    "fin:Customer",
+    "fin:Organization",
+    "fin:Person",
+    "fin:SanctionedEntity"
+   ],
+   "definition": "Nguoi hoac to chuc co vai tro trong mot quan he tai chinh.",
+   "graph_sources": [
+    "bank_marketing",
+    "berka",
+    "corebank",
+    "mbd"
+   ],
+   "iri": "fin:Party",
+   "label_en": "Party",
+   "label_vi": "Bên tham gia",
+   "materialized_in": [],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [
+    "fin:PayrollService",
+    "fin:PensionReceipt",
+    "fin:RecurringPayment",
+    "fin:TaxPayment"
+   ],
+   "definition": "Dich vu chuyen / thu tien dinh ky.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:PaymentService",
+   "label_en": "Payment service",
+   "label_vi": "Dịch vụ thanh toán",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Product"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Tai khoan nhan luong.",
+   "graph_sources": [],
+   "iri": "fin:PayrollAccount",
+   "label_en": "Payroll account",
+   "label_vi": "Tài khoản nhận lương",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_cno_fin_ult1"
+   ],
+   "parents": [
+    "fin:DepositProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Nhan luong qua ngan hang.",
+   "graph_sources": [],
+   "iri": "fin:PayrollService",
+   "label_en": "Payroll service",
+   "label_vi": "Dịch vụ chi lương",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_nomina_ult1"
+   ],
+   "parents": [
+    "fin:PaymentService"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Quy huu tri tu nguyen.",
+   "graph_sources": [],
+   "iri": "fin:PensionPlan",
+   "label_en": "Pension plan",
+   "label_vi": "Kế hoạch hưu trí",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_plan_fin_ult1"
+   ],
+   "parents": [
+    "fin:InvestmentProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Nhan luong huu qua ngan hang.",
+   "graph_sources": [
+    "berka"
+   ],
+   "iri": "fin:PensionReceipt",
+   "label_en": "Pension receipt",
+   "label_vi": "Nhận lương hưu",
+   "materialized_in": [],
+   "notations": [
+    "berka:k_symbol=DUCHOD",
+    "santander:ind_nom_pens_ult1"
+   ],
+   "parents": [
+    "fin:PaymentService"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Con nguoi tu nhien.",
+   "graph_sources": [
+    "bank_marketing",
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:Person",
+   "label_en": "Person",
+   "label_vi": "Cá nhân",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Party"
+   ]
+  },
+  {
+   "children": [
+    "fin:AnonymousProduct",
+    "fin:CreditProduct",
+    "fin:DepositProduct",
+    "fin:InsuranceProduct",
+    "fin:InvestmentProduct",
+    "fin:PaymentService"
+   ],
+   "definition": "Goc cua taxonomy san pham tai chinh dung chung cho moi bo du lieu.",
+   "graph_sources": [
+    "bank_marketing",
+    "berka",
+    "corebank",
+    "mbd"
+   ],
+   "iri": "fin:Product",
+   "label_en": "Product",
+   "label_vi": "Sản phẩm",
+   "materialized_in": [],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [],
+   "definition": "Su kien mot khach giu mot san pham trong mot khoang thoi gian (n-ary: ngay bat dau, ket thuc, tai khoan, so tien, trang thai).",
+   "graph_sources": [
+    "bank_marketing",
+    "berka",
+    "corebank",
+    "mbd"
+   ],
+   "iri": "fin:ProductHolding",
+   "label_en": "Product holding",
+   "label_vi": "Việc giữ sản phẩm",
+   "materialized_in": [
+    "track_a_gold.berka_product_event",
+    "track_a_onto.triple"
+   ],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [],
+   "definition": "Diem model goi y mot san pham cho mot khach, kem phien ban model va thoi diem cham.",
+   "graph_sources": [],
+   "iri": "fin:Recommendation",
+   "label_en": "Recommendation",
+   "label_vi": "Gợi ý sản phẩm",
+   "materialized_in": [],
+   "notations": [],
+   "parents": []
+  },
+  {
+   "children": [],
+   "definition": "Thanh toan hoa don ho gia dinh dinh ky.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:RecurringPayment",
+   "label_en": "Recurring payment",
+   "label_vi": "Thanh toán định kỳ",
+   "materialized_in": [],
+   "notations": [
+    "berka:k_symbol=SIPO",
+    "corebank:k_symbol=SIPO",
+    "santander:ind_recibo_ult1"
+   ],
+   "parents": [
+    "fin:PaymentService"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Vung / tinh.",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:Region",
+   "label_en": "Region",
+   "label_vi": "Vùng",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Location"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Thuc the co trong danh sach cam van / theo doi (OpenSanctions).",
+   "graph_sources": [],
+   "iri": "fin:SanctionedEntity",
+   "label_en": "Sanctioned entity",
+   "label_vi": "Đối tượng bị cấm vận",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "fin:Party"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Tai khoan tiet kiem khong ky han.",
+   "graph_sources": [],
+   "iri": "fin:SavingsAccount",
+   "label_en": "Savings account",
+   "label_vi": "Tài khoản tiết kiệm",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_ahor_fin_ult1",
+    "santander:ind_viv_fin_ult1"
+   ],
+   "parents": [
+    "fin:DepositProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Co phieu, trai phieu luu ky qua ngan hang.",
+   "graph_sources": [],
+   "iri": "fin:Securities",
+   "label_en": "Securities",
+   "label_vi": "Chứng khoán",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_valo_fin_ult1"
+   ],
+   "parents": [
+    "fin:InvestmentProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Tien gui co ky han ngan.",
+   "graph_sources": [],
+   "iri": "fin:ShortTermDeposit",
+   "label_en": "Short-term deposit",
+   "label_vi": "Tiền gửi ngắn hạn",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_deco_fin_ult1"
+   ],
+   "parents": [
+    "fin:TermDeposit"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Nop thue qua ngan hang.",
+   "graph_sources": [],
+   "iri": "fin:TaxPayment",
+   "label_en": "Tax payment",
+   "label_vi": "Nộp thuế",
+   "materialized_in": [],
+   "notations": [
+    "santander:ind_reca_fin_ult1"
+   ],
+   "parents": [
+    "fin:PaymentService"
+   ]
+  },
+  {
+   "children": [
+    "fin:LongTermDeposit",
+    "fin:MediumTermDeposit",
+    "fin:ShortTermDeposit"
+   ],
+   "definition": "Tien gui co ky han, lai suat co dinh.",
+   "graph_sources": [
+    "bank_marketing"
+   ],
+   "iri": "fin:TermDeposit",
+   "label_en": "Term deposit",
+   "label_vi": "Tiền gửi có kỳ hạn",
+   "materialized_in": [],
+   "notations": [
+    "bank_marketing:y"
+   ],
+   "parents": [
+    "fin:DepositProduct"
+   ]
+  },
+  {
+   "children": [],
+   "definition": "Mau cau truc chuyen tien rua tien: FAN-OUT, FAN-IN, CYCLE, SCATTER-GATHER, GATHER-SCATTER, BIPARTITE, STACK, RANDOM.",
+   "graph_sources": [],
+   "iri": "fin:Typology",
+   "label_en": "Laundering typology",
+   "label_vi": "Kiểu hình rửa tiền",
+   "materialized_in": [],
+   "notations": [],
+   "parents": [
+    "skos:Concept"
+   ]
+  }
+ ],
+ "ontology_version": "1.0.0",
+ "properties": [
+  {
+   "definition": "So tien goc cua san pham / canh.",
+   "domain": "",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:amount",
+   "kind": "datatype",
+   "label_vi": "số tiền",
+   "range": "xsd:decimal",
+   "transitive": false
+  },
+  {
+   "definition": "Ngan hang giu tai khoan.",
+   "domain": "fin:Account",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:atBank",
+   "kind": "object",
+   "label_vi": "mở tại ngân hàng",
+   "range": "fin:Bank",
+   "transitive": false
+  },
+  {
+   "definition": "Nam sinh (khong luu ngay sinh day du tren do thi).",
+   "domain": "fin:Person",
+   "graph_sources": [],
+   "iri": "fin:birthYear",
+   "kind": "datatype",
+   "label_vi": "năm sinh",
+   "range": "xsd:integer",
+   "transitive": false
+  },
+  {
+   "definition": "Node / canh sinh tu bo du lieu nao (khop prov:wasDerivedFrom).",
+   "domain": "",
+   "graph_sources": [],
+   "iri": "fin:derivedFrom",
+   "kind": "object",
+   "label_vi": "lấy từ",
+   "range": "fin:Dataset",
+   "transitive": false
+  },
+  {
+   "definition": "Khach nhan goi y.",
+   "domain": "fin:Recommendation",
+   "graph_sources": [],
+   "iri": "fin:forCustomer",
+   "kind": "object",
+   "label_vi": "cho khách",
+   "range": "fin:Customer",
+   "transitive": false
+  },
+  {
+   "definition": "Canh SUY DIEN giua hai lop san pham: khach giu A hay mua B trong H thang (weight = lift, tinh tren tap train).",
+   "domain": "",
+   "graph_sources": [],
+   "iri": "fin:frequentlyFollowedBy",
+   "kind": "object",
+   "label_vi": "thường được mua sau bởi",
+   "range": "",
+   "transitive": false
+  },
+  {
+   "definition": "F | M.",
+   "domain": "fin:Person",
+   "graph_sources": [],
+   "iri": "fin:gender",
+   "kind": "datatype",
+   "label_vi": "giới tính",
+   "range": "xsd:string",
+   "transitive": false
+  },
+  {
+   "definition": "Khach co mot su kien giu san pham.",
+   "domain": "fin:Customer",
+   "graph_sources": [
+    "bank_marketing",
+    "berka",
+    "corebank",
+    "mbd"
+   ],
+   "iri": "fin:hasHolding",
+   "kind": "object",
+   "label_vi": "có việc giữ sản phẩm",
+   "range": "fin:ProductHolding",
+   "transitive": false
+  },
+  {
+   "definition": "Kieu hinh cua vu rua tien.",
+   "domain": "fin:LaunderingAttempt",
+   "graph_sources": [],
+   "iri": "fin:hasTypology",
+   "kind": "object",
+   "label_vi": "có kiểu hình",
+   "range": "fin:Typology",
+   "transitive": false
+  },
+  {
+   "definition": "Trang thai su kien giu san pham (vd khoan vay RUNNING_OVERDUE).",
+   "domain": "fin:ProductHolding",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:holdingStatus",
+   "kind": "datatype",
+   "label_vi": "trạng thái",
+   "range": "xsd:string",
+   "transitive": false
+  },
+  {
+   "definition": "Khach la chu so huu tai khoan (Berka disp OWNER).",
+   "domain": "fin:Customer",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:holdsAccount",
+   "kind": "object",
+   "label_vi": "là chủ tài khoản",
+   "range": "fin:Account",
+   "transitive": false
+  },
+  {
+   "definition": "Tai khoan gui hoac nhan tien trong mot vu rua tien.",
+   "domain": "fin:Account",
+   "graph_sources": [],
+   "iri": "fin:involvedIn",
+   "kind": "object",
+   "label_vi": "tham gia vụ",
+   "range": "fin:LaunderingAttempt",
+   "transitive": false
+  },
+  {
+   "definition": "Khach duoc uy quyen giao dich tren tai khoan (Berka disp DISPONENT).",
+   "domain": "fin:Customer",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:isAuthorizedOn",
+   "kind": "object",
+   "label_vi": "được uỷ quyền trên",
+   "range": "fin:Account",
+   "transitive": false
+  },
+  {
+   "definition": "So huu phap nhan truc tiep (weight = ty le so huu). Bac cau tinh san o track_a_onto.closure.",
+   "domain": "fin:Party",
+   "graph_sources": [],
+   "iri": "fin:isDirectlyOwnedBy",
+   "kind": "object",
+   "label_vi": "được sở hữu trực tiếp bởi",
+   "range": "fin:Party",
+   "transitive": false
+  },
+  {
+   "definition": "Tai khoan thuoc mot ben tham gia (IBM AML account -> entity_id).",
+   "domain": "fin:Account",
+   "graph_sources": [],
+   "iri": "fin:isHeldBy",
+   "kind": "object",
+   "label_vi": "thuộc về bên",
+   "range": "fin:Party",
+   "transitive": false
+  },
+  {
+   "definition": "Ben tham gia / tai khoan thuoc mot don vi dia ly.",
+   "domain": "",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:locatedIn",
+   "kind": "object",
+   "label_vi": "ở tại",
+   "range": "fin:Location",
+   "transitive": false
+  },
+  {
+   "definition": "Phien ban model sinh diem.",
+   "domain": "fin:Recommendation",
+   "graph_sources": [],
+   "iri": "fin:modelVersion",
+   "kind": "datatype",
+   "label_vi": "phiên bản model",
+   "range": "xsd:string",
+   "transitive": false
+  },
+  {
+   "definition": "Nghe nghiep.",
+   "domain": "fin:Person",
+   "graph_sources": [
+    "bank_marketing"
+   ],
+   "iri": "fin:occupation",
+   "kind": "datatype",
+   "label_vi": "nghề nghiệp",
+   "range": "xsd:string",
+   "transitive": false
+  },
+  {
+   "definition": "San pham (LOP trong taxonomy, punning OWL 2) cua su kien giu san pham.",
+   "domain": "fin:ProductHolding",
+   "graph_sources": [
+    "bank_marketing",
+    "berka",
+    "corebank",
+    "mbd"
+   ],
+   "iri": "fin:ofProduct",
+   "kind": "object",
+   "label_vi": "thuộc sản phẩm",
+   "range": "",
+   "transitive": false
+  },
+  {
+   "definition": "Don vi dia ly nam trong don vi lon hon (bac cau: District -> Region -> Country).",
+   "domain": "fin:Location",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:partOf",
+   "kind": "object",
+   "label_vi": "thuộc",
+   "range": "fin:Location",
+   "transitive": true
+  },
+  {
+   "definition": "Lop san pham duoc goi y.",
+   "domain": "fin:Recommendation",
+   "graph_sources": [],
+   "iri": "fin:recommends",
+   "kind": "object",
+   "label_vi": "gợi ý sản phẩm",
+   "range": "",
+   "transitive": false
+  },
+  {
+   "definition": "Hai node la cung mot thuc the o hai nguon, KEM do tin cay. Khong dung owl:sameAs: gop cung sai thi khong go duoc.",
+   "domain": "fin:Party",
+   "graph_sources": [],
+   "iri": "fin:sameAs",
+   "kind": "object",
+   "label_vi": "cùng là",
+   "range": "fin:Party",
+   "transitive": false
+  },
+  {
+   "definition": "Diem model (xac suat mua).",
+   "domain": "fin:Recommendation",
+   "graph_sources": [],
+   "iri": "fin:score",
+   "kind": "datatype",
+   "label_vi": "điểm",
+   "range": "xsd:double",
+   "transitive": false
+  },
+  {
+   "definition": "Phan khuc khach hang theo nguon.",
+   "domain": "fin:Customer",
+   "graph_sources": [],
+   "iri": "fin:segment",
+   "kind": "datatype",
+   "label_vi": "phân khúc",
+   "range": "xsd:string",
+   "transitive": false
+  },
+  {
+   "definition": "Canh TONG HOP theo thang: khach chi tieu bang the o nhom merchant (weight = tong tien).",
+   "domain": "fin:Customer",
+   "graph_sources": [],
+   "iri": "fin:spendsAt",
+   "kind": "object",
+   "label_vi": "chi tiêu ở nhóm",
+   "range": "fin:MerchantCategory",
+   "transitive": false
+  },
+  {
+   "definition": "Canh TONG HOP: tai khoan chuyen tien toi tai khoan khac trong mot ky (weight = tong tien). Tung giao dich o silver.",
+   "domain": "fin:Account",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:transfersTo",
+   "kind": "object",
+   "label_vi": "chuyển tiền tới",
+   "range": "fin:Account",
+   "transitive": false
+  },
+  {
+   "definition": "Ngay nghiep vu bat dau hieu luc (cot valid_from cua triple/entity). Moc chong ro ri tuong lai.",
+   "domain": "",
+   "graph_sources": [],
+   "iri": "fin:validFrom",
+   "kind": "datatype",
+   "label_vi": "hiệu lực từ",
+   "range": "xsd:date",
+   "transitive": false
+  },
+  {
+   "definition": "Ngay nghiep vu het hieu luc; khong co = con hieu luc (cot valid_to).",
+   "domain": "",
+   "graph_sources": [],
+   "iri": "fin:validTo",
+   "kind": "datatype",
+   "label_vi": "hiệu lực đến",
+   "range": "xsd:date",
+   "transitive": false
+  },
+  {
+   "definition": "Tai khoan gan voi su kien giu san pham (khoan vay, bao hiem tru tu tai khoan nao).",
+   "domain": "fin:ProductHolding",
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
+   "iri": "fin:viaAccount",
+   "kind": "object",
+   "label_vi": "qua tài khoản",
+   "range": "fin:Account",
+   "transitive": false
+  }
+ ],
+ "sources": [
+  "bank_marketing",
+  "berka",
+  "corebank",
+  "mbd"
+ ]
+}

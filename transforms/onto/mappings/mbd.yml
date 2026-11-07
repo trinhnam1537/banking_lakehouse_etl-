@@ -1,0 +1,54 @@
+# Mapping MBD-mini (silver_mbd) -> FinGraph. Buoc O5; thiet ke: docs/ONTOLOGY.md muc 5.3.
+#
+# Khach doanh nghiep (Sber, client_id da bam): fin:Customer + fin:Organization.
+# target_k = true tai report_month = khach MUA san pham an danh k trong THANG SAU.
+#
+# Mot holding moi (khach, san pham), valid_from = ngay dau thang mua DAU TIEN — cung dinh nghia
+# "lan dau so huu" voi gold Berka (berka_product_event), de nhan UC2 thong nhat giua cac nguon.
+# So lan mua ghi o thuoc tinh purchase_months.
+#
+# Chua dua vao do thi: geo (fin:GeoCell) va dialog (embedding) — silver_mbd hien chi co
+# target_month + client_split. Embedding hoi thoai khong bao gio vao do thi (ONTOLOGY.md 5.3).
+
+source_system: mbd
+database: silver_mbd
+reviewed_by: "namth (cho duyet)"
+
+entities:
+  - id: customer
+    class: fin:Customer
+    also: [fin:Organization]
+    sql: |
+      SELECT client_id, min(report_month) AS first_month, max(fold) AS fold
+      FROM {silver_mbd.target_month}
+      GROUP BY client_id
+    key: [client_id]
+    # client_id la hash 64 ky tu: 10 ky tu dau du phan biet de doc, uid moi la dinh danh
+    label: "concat('Doanh nghiệp ', substr(client_id, 1, 10))"
+    valid_from: "trunc(first_month, 'MM')"
+    attributes:
+      fold: fold
+
+holdings:
+  - id: anonymous_product
+    product_notation: "concat('target_', k)"
+    sql: |
+      SELECT client_id, k, date_add(min(report_month), 1) AS first_purchase, count(*) AS purchase_months
+      FROM (
+        SELECT client_id, report_month,
+               stack(4, 1, target_1, 2, target_2, 3, target_3, 4, target_4) AS (k, flag)
+        FROM {silver_mbd.target_month}
+      ) t
+      WHERE flag
+      GROUP BY client_id, k
+    key: [client_id, k]
+    customer: {entity: customer, key: [client_id]}
+    valid_from: first_purchase
+    attributes:
+      purchase_months: purchase_months
+    expect_rows: |
+      SELECT count(*) FROM (
+        SELECT DISTINCT client_id, k FROM (
+          SELECT client_id, stack(4, 1, target_1, 2, target_2, 3, target_3, 4, target_4) AS (k, flag)
+          FROM {silver_mbd.target_month}) t
+        WHERE flag)

@@ -1,0 +1,255 @@
+# Mapping Berka (silver_berka) -> FinGraph. Buoc O5, docs/ONTOLOGY-BUILD.md; thiet ke: docs/ONTOLOGY.md muc 5.1.
+#
+# Quy tac bat buoc (O5):
+#   - Nhan (label) KHONG chua PII: nhan di vao prompt agent. "Khach 2", khong ho ten.
+#   - Dinh nghia san pham TRUNG track_a_gold.berka_product_event (transforms/gold/berka_uc2.py):
+#     vay qua chu tai khoan, the qua disp, bao hiem / ho gia dinh = giao dich k_symbol dau tien.
+#   - {silver_berka.x} = ban hien hanh cua bang (job loc san).
+#
+# Truc thoi gian: Berka goc 1993-1998 (corebank.yml dung truc da doi +24 nam cua simulator).
+
+source_system: berka
+database: silver_berka
+reviewed_by: "namth (cho duyet)"
+
+entities:
+  - id: country
+    class: fin:Country
+    sql: "SELECT DISTINCT 'CZ' AS code FROM {silver_berka.district}"
+    key: [code]
+    label: "'Cộng hoà Séc'"
+
+  - id: region
+    class: fin:Region
+    sql: "SELECT DISTINCT region FROM {silver_berka.district}"
+    key: [region]
+    label: "concat('Vùng ', region)"
+
+  - id: district
+    class: fin:District
+    from: district
+    key: [district_id]
+    label: "district_name"
+    attributes:
+      inhabitants: inhabitants
+      avg_salary_czk: avg_salary
+      urban_ratio: urban_ratio
+      unemployment_96: unemployment_96
+
+  # Khach: Person + Customer. Khach "tu" ngay mo tai khoan dau tien ma ho dung ten (OWNER/DISPONENT).
+  - id: customer
+    class: fin:Customer
+    also: [fin:Person]
+    sql: |
+      SELECT c.client_id, c.gender, c.birth_date, min(a.opened_date) AS since
+      FROM {silver_berka.client} c
+      LEFT JOIN {silver_berka.disp} d ON d.client_id = c.client_id
+      LEFT JOIN {silver_berka.account} a ON a.account_id = d.account_id
+      GROUP BY c.client_id, c.gender, c.birth_date
+    key: [client_id]
+    label: "concat('Khách ', client_id)"
+    valid_from: since
+    attributes:
+      gender: gender
+      birth_year: "year(birth_date)"
+
+  - id: account
+    class: fin:Account
+    from: account
+    key: [account_id]
+    label: "concat('Tài khoản ', account_id)"
+    valid_from: opened_date
+    attributes:
+      statement_frequency: statement_frequency
+
+  # Doi tac ngoai ngan hang tren giao dich chuyen khoan: ngan hang (ma 2 chu) + tai khoan
+  - id: bank
+    class: fin:Bank
+    sql: "SELECT DISTINCT counterparty_bank FROM {silver_berka.trans} WHERE counterparty_bank IS NOT NULL"
+    key: {bank_code: counterparty_bank}
+    label: "concat('Ngân hàng ', counterparty_bank)"
+
+  - id: external_account
+    class: fin:Account
+    sql: |
+      SELECT counterparty_bank, counterparty_account, min(trans_date) AS first_seen
+      FROM {silver_berka.trans}
+      WHERE counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL
+      GROUP BY counterparty_bank, counterparty_account
+    key: {bank_code: counterparty_bank, account_no: counterparty_account}
+    label: "concat('Tài khoản ngoài ', counterparty_bank, '-', counterparty_account)"
+    valid_from: first_seen
+    attributes:
+      external: "'true'"
+
+edges:
+  - id: region_in_country
+    predicate: fin:partOf
+    sql: "SELECT DISTINCT region, 'CZ' AS code FROM {silver_berka.district}"
+    subject: {entity: region, key: [region]}
+    object: {entity: country, key: [code]}
+
+  - id: district_in_region
+    predicate: fin:partOf
+    from: district
+    subject: {entity: district, key: [district_id]}
+    object: {entity: region, key: [region]}
+    source_key: "concat('district_id=', district_id)"
+    expect_rows: "SELECT count(*) FROM {silver_berka.district}"
+
+  - id: customer_located_in
+    predicate: fin:locatedIn
+    sql: |
+      SELECT c.client_id, c.district_id, min(a.opened_date) AS since
+      FROM {silver_berka.client} c
+      LEFT JOIN {silver_berka.disp} d ON d.client_id = c.client_id
+      LEFT JOIN {silver_berka.account} a ON a.account_id = d.account_id
+      WHERE c.district_id IS NOT NULL
+      GROUP BY c.client_id, c.district_id
+    subject: {entity: customer, key: [client_id]}
+    object: {entity: district, key: [district_id]}
+    valid_from: since
+    source_key: "concat('client_id=', client_id)"
+    expect_rows: "SELECT count(*) FROM {silver_berka.client} WHERE district_id IS NOT NULL"
+
+  - id: account_located_in
+    predicate: fin:locatedIn
+    from: account
+    where: "district_id IS NOT NULL"
+    subject: {entity: account, key: [account_id]}
+    object: {entity: district, key: [district_id]}
+    valid_from: opened_date
+    source_key: "concat('account_id=', account_id)"
+    expect_rows: "SELECT count(*) FROM {silver_berka.account} WHERE district_id IS NOT NULL"
+
+  # So holdsAccount = so disp OWNER (bat bien doi soat O7)
+  - id: holds_account
+    predicate: fin:holdsAccount
+    sql: |
+      SELECT d.disp_id, d.client_id, d.account_id, a.opened_date
+      FROM {silver_berka.disp} d JOIN {silver_berka.account} a ON a.account_id = d.account_id
+      WHERE d.is_owner
+    subject: {entity: customer, key: [client_id]}
+    object: {entity: account, key: [account_id]}
+    valid_from: opened_date
+    source_key: "concat('disp_id=', disp_id)"
+    expect_rows: "SELECT count(*) FROM {silver_berka.disp} WHERE is_owner"
+
+  - id: authorized_on
+    predicate: fin:isAuthorizedOn
+    sql: |
+      SELECT d.disp_id, d.client_id, d.account_id, a.opened_date
+      FROM {silver_berka.disp} d JOIN {silver_berka.account} a ON a.account_id = d.account_id
+      WHERE d.disp_type = 'DISPONENT'
+    subject: {entity: customer, key: [client_id]}
+    object: {entity: account, key: [account_id]}
+    valid_from: opened_date
+    source_key: "concat('disp_id=', disp_id)"
+    expect_rows: "SELECT count(*) FROM {silver_berka.disp} WHERE disp_type = 'DISPONENT'"
+
+  - id: external_at_bank
+    predicate: fin:atBank
+    sql: |
+      SELECT counterparty_bank, counterparty_account, min(trans_date) AS first_seen
+      FROM {silver_berka.trans}
+      WHERE counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL
+      GROUP BY counterparty_bank, counterparty_account
+    subject: {entity: external_account, key: [counterparty_bank, counterparty_account]}
+    object: {entity: bank, key: [counterparty_bank]}
+    valid_from: first_seen
+
+  # transfersTo GOP theo (tu, toi, thang): do thi giu cau truc, tung giao dich o lai silver.
+  # weight = tong tien trong thang; valid_from/valid_to = dau/cuoi thang.
+  - id: transfers_out
+    predicate: fin:transfersTo
+    sql: |
+      SELECT account_id, counterparty_bank, counterparty_account,
+             trunc(trans_date, 'MM') AS month, sum(amount) AS total, count(*) AS n
+      FROM {silver_berka.trans}
+      WHERE direction = 'DEBIT' AND counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL
+      GROUP BY account_id, counterparty_bank, counterparty_account, trunc(trans_date, 'MM')
+    subject: {entity: account, key: [account_id]}
+    object: {entity: external_account, key: [counterparty_bank, counterparty_account]}
+    weight: total
+    valid_from: month
+    valid_to: "last_day(month)"
+    source_key: "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)"
+
+  - id: transfers_in
+    predicate: fin:transfersTo
+    sql: |
+      SELECT account_id, counterparty_bank, counterparty_account,
+             trunc(trans_date, 'MM') AS month, sum(amount) AS total, count(*) AS n
+      FROM {silver_berka.trans}
+      WHERE direction = 'CREDIT' AND counterparty_bank IS NOT NULL AND counterparty_account IS NOT NULL
+      GROUP BY account_id, counterparty_bank, counterparty_account, trunc(trans_date, 'MM')
+    subject: {entity: external_account, key: [counterparty_bank, counterparty_account]}
+    object: {entity: account, key: [account_id]}
+    weight: total
+    valid_from: month
+    valid_to: "last_day(month)"
+    source_key: "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)"
+
+holdings:
+  # Tai khoan thanh toan: chu tai khoan giu fin:CurrentAccount tu ngay mo (khop Santander ind_cco)
+  - id: current_account
+    product: fin:CurrentAccount
+    sql: |
+      SELECT d.client_id, d.account_id, a.opened_date
+      FROM {silver_berka.disp} d JOIN {silver_berka.account} a ON a.account_id = d.account_id
+      WHERE d.is_owner
+    key: [account_id]
+    customer: {entity: customer, key: [client_id]}
+    account: {entity: account, key: [account_id]}
+    valid_from: opened_date
+    expect_rows: "SELECT count(*) FROM {silver_berka.disp} WHERE is_owner"
+
+  # Vay: qua chu tai khoan (giong gold ev_loan). valid_to = ngay dao han (ke hoach).
+  - id: loan
+    product: fin:Loan
+    sql: |
+      SELECT l.*, d.client_id
+      FROM {silver_berka.loan} l
+      JOIN {silver_berka.disp} d ON d.account_id = l.account_id AND d.is_owner
+    key: [loan_id]
+    customer: {entity: customer, key: [client_id]}
+    account: {entity: account, key: [account_id]}
+    valid_from: granted_date
+    valid_to: maturity_date
+    status: loan_status
+    amount: amount
+    expect_rows: "SELECT count(*) FROM {silver_berka.loan}"
+
+  # The: qua disp (ca OWNER lan DISPONENT, giong gold ev_card). Lop the tra theo skos:notation
+  # 'berka:card_type=classic|junior|gold' -> fin:ClassicCard / JuniorCard / GoldCard.
+  - id: card
+    product_notation: "concat('card_type=', lower(trim(card_type)))"
+    sql: |
+      SELECT c.*, d.client_id, d.account_id
+      FROM {silver_berka.card} c JOIN {silver_berka.disp} d ON d.disp_id = c.disp_id
+    key: [card_id]
+    customer: {entity: customer, key: [client_id]}
+    account: {entity: account, key: [account_id]}
+    valid_from: issued_date
+    expect_rows: "SELECT count(*) FROM {silver_berka.card}"
+
+  # Bao hiem (POJISTNE) / thanh toan ho gia dinh (SIPO): giao dich DAU TIEN cua chu tai khoan,
+  # mot holding moi (khach, san pham) — dung dinh nghia gold ev_so.
+  - id: standing_payment
+    product_notation: "concat('k_symbol=', ks)"
+    sql: |
+      SELECT d.client_id, upper(trim(t.k_symbol)) AS ks,
+             min(t.trans_date) AS first_date, min_by(t.account_id, t.trans_date) AS account_id
+      FROM {silver_berka.trans} t
+      JOIN {silver_berka.disp} d ON d.account_id = t.account_id AND d.is_owner
+      WHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')
+      GROUP BY d.client_id, upper(trim(t.k_symbol))
+    key: [client_id, ks]
+    customer: {entity: customer, key: [client_id]}
+    account: {entity: account, key: [account_id]}
+    valid_from: first_date
+    expect_rows: |
+      SELECT count(DISTINCT d.client_id, upper(trim(t.k_symbol)))
+      FROM {silver_berka.trans} t
+      JOIN {silver_berka.disp} d ON d.account_id = t.account_id AND d.is_owner
+      WHERE upper(trim(t.k_symbol)) IN ('POJISTNE', 'SIPO')

@@ -20,6 +20,10 @@ from typing import Dict, List, Optional
 REGISTRY = {
     "gold.berka_uc2": "transforms.gold.berka_uc2",
     "pretrain.uc2_next_product": "transforms.pretrain.uc2_next_product",
+    # Tang ontology (docs/ONTOLOGY-BUILD.md): job onto-spark, --LAYER onto
+    "onto.load_schema": "transforms.onto.load_schema",
+    "onto.build_graph": "transforms.onto.build_graph",
+    "onto.export_neptune": "transforms.onto.export_neptune",
 }
 
 

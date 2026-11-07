@@ -5,3 +5,7 @@ pytest>=8.0
 openpyxl==3.1.5
 # moto gia lap DynamoDB/S3/SQS/Secrets Manager trong bo nho — test khong cham AWS that
 moto[dynamodb,s3,sqs,secretsmanager]>=5.0
+# Hop dong ontology (tests/ontology): cu phap TTL, SHACL, reasoner HermiT (can Java; khong co thi bo qua)
+rdflib==7.1.1
+pyshacl==0.29.1
+owlready2==0.47

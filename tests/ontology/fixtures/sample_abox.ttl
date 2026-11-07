@@ -1,0 +1,30 @@
+# Do thi mau HOP LE (ABox) cho test SHACL — hinh dang ma job build_graph (O7) se sinh.
+@prefix fin: <https://fingraph.hust.edu.vn/ontology#> .
+@prefix fid: <https://fingraph.hust.edu.vn/id/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+fid:c2 a fin:Customer , fin:Person ; fin:gender "F" ; fin:birthYear 1970 ; fin:locatedIn fid:d1 .
+fid:c3 a fin:Customer , fin:Person .
+fid:a2 a fin:Account ; fin:locatedIn fid:d1 .
+fid:a9 a fin:Account .
+
+fid:c2 fin:holdsAccount fid:a2 .
+fid:c3 fin:isAuthorizedOn fid:a2 .
+fid:a2 fin:transfersTo fid:a9 .
+
+fid:d1 a fin:District ; fin:partOf fid:r1 .
+fid:r1 a fin:Region ; fin:partOf fid:cz .
+fid:cz a fin:Country .
+
+fid:h1 a fin:ProductHolding ; fin:ofProduct fin:ClassicCard ; fin:viaAccount fid:a2 ;
+    fin:validFrom "2017-03-01"^^xsd:date ; fin:validTo "2019-03-01"^^xsd:date .
+fid:c2 fin:hasHolding fid:h1 .
+
+fid:at1 a fin:LaunderingAttempt ; fin:hasTypology fin:FanOut .
+fid:a9 fin:involvedIn fid:at1 .
+
+fid:s1 a fin:SanctionedEntity .
+fid:c2 fin:sameAs fid:s1 .
+
+fid:rec1 a fin:Recommendation ; fin:forCustomer fid:c2 ; fin:recommends fin:Loan ;
+    fin:modelVersion "uc2-lgbm-0.1" ; fin:score "0.73"^^xsd:double .

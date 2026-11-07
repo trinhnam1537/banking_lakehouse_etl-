@@ -1,0 +1,130 @@
+# Cau hoi nang luc (competency questions) — buoc O1, docs/ONTOLOGY-BUILD.md.
+# Ontology "xong" khi tra loi duoc cac cau duoi day (bo test nghiem thu O12).
+#   purpose: M = model goi y san pham, A = AI agent
+#   concepts: lop / quan he PHAI co trong ontology/fingraph.ttl (pytest kiem)
+#   answer_sql: dap an tham chieu tren silver/gold de cham (dien dan khi co du lieu)
+#   phase: giai doan trong docs/ONTOLOGY.md muc 11
+
+- id: CQ1
+  question: "Khách X đang giữ những sản phẩm nào tại ngày D?"
+  purpose: [M, A]
+  phase: 2
+  concepts: [fin:Customer, fin:ProductHolding, fin:hasHolding, fin:ofProduct, fin:Product]
+  answer_sql: "track_a_gold.berka_product_event: client_id = X AND acquired_month <= D"
+
+- id: CQ2
+  question: "Bao nhiêu khách giữ sản phẩm tín dụng (mọi loại thẻ, khoản vay) ở vùng R?"
+  purpose: [A]
+  phase: 3
+  concepts: [fin:CreditProduct, fin:Location, fin:locatedIn, fin:partOf, fin:Region]
+
+- id: CQ3
+  question: "Sau khi có thẻ classic, khách thường mua sản phẩm gì tiếp trong 3 tháng?"
+  purpose: [M]
+  phase: 3
+  concepts: [fin:ClassicCard, fin:frequentlyFollowedBy, fin:ProductHolding]
+
+- id: CQ4
+  question: "Vì sao hệ thống gợi ý Khoản vay cho khách X?"
+  purpose: [M, A]
+  phase: 4
+  concepts: [fin:Recommendation, fin:recommends, fin:forCustomer, fin:frequentlyFollowedBy, fin:Loan]
+
+- id: CQ5
+  question: "Tiền gửi có kỳ hạn ở Bank Marketing và ở Santander có phải cùng một sản phẩm?"
+  purpose: [M, A]
+  phase: 1
+  concepts: [fin:TermDeposit, fin:ShortTermDeposit]
+
+- id: CQ6
+  question: "Ai được uỷ quyền giao dịch trên tài khoản của khách X?"
+  purpose: [A]
+  phase: 2
+  concepts: [fin:isAuthorizedOn, fin:holdsAccount, fin:Account]
+
+- id: CQ7
+  question: "Khách X chi tiêu bằng thẻ chủ yếu ở nhóm merchant nào?"
+  purpose: [A, M]
+  phase: 5
+  concepts: [fin:spendsAt, fin:MerchantCategory]
+
+- id: CQ8
+  question: "Khách X có khả năng trùng với đối tượng bị cấm vận nào, độ tin cậy bao nhiêu?"
+  purpose: [A]
+  phase: 5
+  concepts: [fin:SanctionedEntity, fin:sameAs, fin:isDirectlyOwnedBy]
+
+- id: CQ9
+  question: "Tài khoản Y có tham gia vụ rửa tiền kiểu FAN-OUT nào không?"
+  purpose: [A]
+  phase: 5
+  concepts: [fin:LaunderingAttempt, fin:involvedIn, fin:hasTypology, fin:Typology, fin:transfersTo]
+  answer_sql: "silver_aml.laundering_attempt WHERE from_account = Y OR to_account = Y"
+
+- id: CQ10
+  question: "Pháp nhân sở hữu tài khoản Y còn có những tài khoản nào, ở ngân hàng nào?"
+  purpose: [A]
+  phase: 5
+  concepts: [fin:isHeldBy, fin:atBank, fin:Bank, fin:Party]
+  answer_sql: "silver_aml.account WHERE entity_id = (SELECT entity_id ... WHERE account_number = Y)"
+
+- id: CQ11
+  question: "Dữ liệu về lớp Khoản vay đến từ bảng nguồn nào, cập nhật lần cuối khi nào?"
+  purpose: [A]
+  phase: 4
+  concepts: [fin:Dataset, fin:derivedFrom, fin:Loan]
+
+- id: CQ12
+  question: "Tỉ lệ đăng ký tiền gửi có kỳ hạn theo nghề nghiệp?"
+  purpose: [A]
+  phase: 2
+  concepts: [fin:TermDeposit, fin:occupation, fin:Customer]
+  answer_sql: "silver_bank_marketing.contact_full GROUP BY job"
+
+- id: CQ13
+  question: "Khách X là cá nhân hay tổ chức, năm sinh, giới tính?"
+  purpose: [A, M]
+  phase: 2
+  concepts: [fin:Person, fin:Organization, fin:birthYear, fin:gender]
+
+- id: CQ14
+  question: "Khoản vay nào của khách X đang quá hạn?"
+  purpose: [A, M]
+  phase: 2
+  concepts: [fin:Loan, fin:holdingStatus, fin:viaAccount]
+
+- id: CQ15
+  question: "Những sản phẩm nào thuộc nhóm thanh toán?"
+  purpose: [A]
+  phase: 1
+  concepts: [fin:PaymentService, fin:RecurringPayment, fin:PensionReceipt]
+
+- id: CQ16
+  question: "Mã Santander ind_tjcr_fin_ult1 là sản phẩm gì?"
+  purpose: [A, M]
+  phase: 1
+  concepts: [fin:CreditCard]
+
+- id: CQ17
+  question: "Tài khoản Y chuyển tiền tới những tài khoản nào, tổng bao nhiêu?"
+  purpose: [A]
+  phase: 5
+  concepts: [fin:transfersTo, fin:amount, fin:Account]
+
+- id: CQ18
+  question: "Sản phẩm ẩn danh của MBD có học chéo được với các bộ khác không?"
+  purpose: [M]
+  phase: 1
+  concepts: [fin:AnonymousProduct, fin:AnonymousProduct_1]
+
+- id: CQ19
+  question: "Gợi ý cho khách X được sinh bởi phiên bản model nào, lúc nào?"
+  purpose: [A]
+  phase: 4
+  concepts: [fin:Recommendation, fin:modelVersion, fin:score]
+
+- id: CQ20
+  question: "Quận huyện D thuộc vùng nào, quốc gia nào?"
+  purpose: [A]
+  phase: 2
+  concepts: [fin:District, fin:Region, fin:Country, fin:partOf]
