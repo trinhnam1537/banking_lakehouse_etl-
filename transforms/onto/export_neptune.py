@@ -91,10 +91,15 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
     opts = {"header": "true", "escape": '"', "quoteAll": "false", "emptyValue": ""}
     # Bulk loader nap MOI file duoi prefix: khong de Spark ghi file rong _SUCCESS
     spark.sparkContext._jsc.hadoopConfiguration().set("mapreduce.fileoutputcommitter.marksuccessfuljobs", "false")
-    vertices.write.mode("overwrite").options(**opts).csv(f"{out}/vertices")
-    edges.write.mode("overwrite").options(**opts).csv(f"{out}/edges")
+    # File DEU va NHO: bang triple phan vung theo predicate nen Spark ra file lech (0,15 -> 28 MB);
+    # bulk loader tren db.t4g.medium (4 GB) het bo nho o file 28 MB (11-07). Chia ~ROWS_PER_FILE dong/file.
+    rows = int(args.get("ROWS_PER_FILE", "20000"))
+    n_files = lambda n: max(1, -(-n // rows))  # noqa: E731
+    vertices.repartition(n_files(ent.count())).write.mode("overwrite").options(**opts).csv(f"{out}/vertices")
+    n_edge_files = n_files(tri.where("object_uid IS NOT NULL").count())
+    edges.repartition(n_edge_files).write.mode("overwrite").options(**opts).csv(f"{out}/edges")
     n_v, n_e = spark.read.option("header", "true").csv(f"{out}/vertices").count(), \
         spark.read.option("header", "true").csv(f"{out}/edges").count()
     print(f"  xuat {out}: {n_v} dinh, {n_e} canh (graph run_id {run_id})")
     return {"path": out, "graph_run_id": run_id, "vertices": n_v, "edges": n_e,
-            "loader_hint": {"source": out + "/", "format": "opencypher", "parallelism": "HIGH"}}
+            "loader_hint": {"source": out + "/", "format": "opencypher", "parallelism": "LOW"}}
