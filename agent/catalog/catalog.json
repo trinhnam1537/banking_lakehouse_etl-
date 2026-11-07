@@ -4,6 +4,7 @@
    "children": [],
    "definition": "Tai khoan tien gui / thanh toan o mot ngan hang.",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank"
    ],
@@ -106,6 +107,7 @@
    "children": [],
    "definition": "To chuc tin dung giu tai khoan (ngan hang doi ung trong chuyen tien lien ngan hang).",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank"
    ],
@@ -453,7 +455,9 @@
   {
    "children": [],
    "definition": "Mot vu rua tien gom nhieu giao dich theo mot kieu hinh (ground truth IBM AML).",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:LaunderingAttempt",
    "label_en": "Laundering attempt",
    "label_vi": "Vụ rửa tiền",
@@ -564,6 +568,7 @@
    ],
    "definition": "Phap nhan: doanh nghiep, ho kinh doanh, to chuc.",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank",
     "mbd"
@@ -586,6 +591,7 @@
    ],
    "definition": "Nguoi hoac to chuc co vai tro trong mot quan he tai chinh.",
    "graph_sources": [
+    "aml",
     "bank_marketing",
     "berka",
     "corebank",
@@ -886,7 +892,9 @@
   {
    "children": [],
    "definition": "Mau cau truc chuyen tien rua tien: FAN-OUT, FAN-IN, CYCLE, SCATTER-GATHER, GATHER-SCATTER, BIPARTITE, STACK, RANDOM.",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:Typology",
    "label_en": "Laundering typology",
    "label_vi": "Kiểu hình rửa tiền",
@@ -916,6 +924,7 @@
    "definition": "Ngan hang giu tai khoan.",
    "domain": "fin:Account",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank"
    ],
@@ -993,7 +1002,9 @@
   {
    "definition": "Kieu hinh cua vu rua tien.",
    "domain": "fin:LaunderingAttempt",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:hasTypology",
    "kind": "object",
    "label_vi": "có kiểu hình",
@@ -1029,7 +1040,9 @@
   {
    "definition": "Tai khoan gui hoac nhan tien trong mot vu rua tien.",
    "domain": "fin:Account",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:involvedIn",
    "kind": "object",
    "label_vi": "tham gia vụ",
@@ -1062,7 +1075,9 @@
   {
    "definition": "Tai khoan thuoc mot ben tham gia (IBM AML account -> entity_id).",
    "domain": "fin:Account",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:isHeldBy",
    "kind": "object",
    "label_vi": "thuộc về bên",
@@ -1186,6 +1201,7 @@
    "definition": "Canh TONG HOP: tai khoan chuyen tien toi tai khoan khac trong mot ky (weight = tong tien). Tung giao dich o silver.",
    "domain": "fin:Account",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank"
    ],
@@ -1230,6 +1246,7 @@
   }
  ],
  "sources": [
+  "aml",
   "bank_marketing",
   "berka",
   "corebank",

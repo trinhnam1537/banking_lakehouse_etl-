@@ -256,3 +256,59 @@ def test_chieu_sang_neptune_nhan_theo_cay_lop_va_khong_lo_khoa_goc(graph):
     _, e95 = X.frames(entity, triple, sub, as_of="1996-01-01")
     assert e95.where("`valid_from:Date` >= '1996-01-01'").count() == 0
     assert e95.where("`:TYPE` = 'transfersTo'").count() == 2
+
+
+def test_aml_vong_tien_kieu_hinh_va_chu_so_huu(silver):
+    """O5 lượt 2 (IBM AML): vòng A->B->C->A thuộc một vụ CYCLE, tài khoản C chỉ có trong giao dịch,
+    giao dịch tự chuyển bị loại, kiểu hình trỏ vào khái niệm SKOS fin:Cycle của TBox."""
+    spark = silver
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS glue_catalog.silver_aml")
+    _table(spark, "silver_aml.account", [
+        ("001", "Bank 1", "A1", "E1", "Corporation #1", "Corporation"),
+        ("001", "Bank 1", "A2", "E1", "Corporation #1", "Corporation"),   # E1 so huu 2 tai khoan
+        ("002", "Bank 2", "B1", "E2", "Partnership #2", "Partnership"),
+    ], "bank_id string, bank_name string, account_number string, entity_id string, entity_name string, "
+       "entity_type string")
+    t = "txn_id string, event_date date, from_bank string, from_account string, to_bank string, " \
+        "to_account string, is_self_transfer boolean"
+    _table(spark, "silver_aml.transfer", [
+        ("t1", D(2023, 1, 2), "001", "A1", "002", "B1", False),
+        ("t2", D(2023, 1, 3), "002", "B1", "003", "C1", False),   # C1 khong co trong bang account
+        ("t3", D(2023, 1, 4), "003", "C1", "001", "A1", False),
+        ("t4", D(2023, 1, 5), "001", "A1", "002", "B1", False),   # cung cap A1->B1 -> gop, weight 2
+        ("t5", D(2023, 1, 5), "001", "A2", "001", "A2", True),    # tu chuyen -> loai
+    ], t)
+    _table(spark, "silver_aml.laundering_attempt", [
+        ("HI-1", "CYCLE", "cycle 3", "t1", "001", "A1", "002", "B1"),
+        ("HI-1", "CYCLE", "cycle 3", "t2", "002", "B1", "003", "C1"),
+        ("HI-1", "CYCLE", "cycle 3", "t3", "003", "C1", "001", "A1"),
+    ], "attempt_id string, typology string, typology_detail string, txn_id string, from_bank string, "
+       "from_account string, to_bank string, to_account string")
+    tb = T.load()
+    entity, triple, exp = B.build(spark, M.load_all(["aml"]), tb)
+    report = B.check_invariants(spark, entity, triple, exp, tb)
+    assert all(r["expected"] == r["got"] for r in report["reconciliation"])
+    acc = lambda b, a: ids.make_uid("fin:Account", "aml", f"bank_id={b}|account_number={a}")  # noqa: E731
+    assert entity.where(f"uid = '{acc('003', 'C1')}'").count() == 1       # tu giao dich
+    tr = {(r.subject_uid, r.object_uid): r.weight for r in triple.where("predicate_iri = 'fin:transfersTo'").collect()}
+    assert tr == {(acc("001", "A1"), acc("002", "B1")): 2.0, (acc("002", "B1"), acc("003", "C1")): 1.0,
+                  (acc("003", "C1"), acc("001", "A1")): 1.0}
+    typ = triple.where("predicate_iri = 'fin:hasTypology'").first()
+    assert typ.object_uid == ids.product_uid("fin:Cycle")
+    assert entity.where(f"uid = '{typ.object_uid}'").first().class_iri == "fin:Typology"
+    # CQ9: A1 tham gia vu HI-1; CQ10: chu so huu cua A1 (E1) co 2 tai khoan
+    assert triple.where(f"predicate_iri = 'fin:involvedIn' AND subject_uid = '{acc('001', 'A1')}'").count() == 1
+    owner = ids.make_uid("fin:Party", "aml", "entity_id=E1")
+    assert triple.where(f"predicate_iri = 'fin:isHeldBy' AND object_uid = '{owner}'").count() == 2
+
+
+def test_aml_kieu_hinh_khong_tra_duoc_lam_job_that_bai(silver):
+    """Mã kiểu hình lạ (không có skos:notation) phải bị chặn, không được thành cạnh trỏ NULL."""
+    spark = silver
+    spark.sql("INSERT INTO glue_catalog.silver_aml.laundering_attempt VALUES "
+              "('HI-2', 'SPIRAL', 'la', 't4', '001', 'A1', '002', 'B1')")
+    tb = T.load()
+    entity, triple, exp = B.build(spark, M.load_all(["aml"]), tb)
+    with pytest.raises(B.InvariantError, match="mo coi"):
+        B.check_invariants(spark, entity, triple, exp, tb)
+    spark.sql("DELETE FROM glue_catalog.silver_aml.laundering_attempt WHERE attempt_id = 'HI-2'")

@@ -60,6 +60,9 @@ def build(tb: Optional[Dict[str, Any]] = None, mappings: Optional[List[M.Mapping
     for m in mappings:
         for e in m.edges:
             preds.setdefault(e.predicate, set()).add(m.source_system)
+            if e.obj is not None and e.obj.concept is not None:   # node khai niem (kieu hinh AML)
+                for cls in M.SCHEME_CLASS.values():
+                    sources.setdefault(cls, set()).add(m.source_system)
         for h in m.holdings:
             for p in ("fin:hasHolding", "fin:ofProduct"):
                 preds.setdefault(p, set()).add(m.source_system)

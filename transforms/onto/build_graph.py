@@ -96,7 +96,15 @@ def _null_key(exprs):
     return F.greatest(*[F.expr(x).isNull() for x in exprs]) if len(exprs) > 1 else F.expr(exprs[0]).isNull()
 
 
-def _ref_uid(m: M.Mapping, ref: M.Ref):
+def _ref_uid(m: M.Mapping, ref: M.Ref, concepts=None):
+    if ref.concept is not None:
+        # notation -> IRI khái niệm -> uid node khái niệm. Không tra được thì trỏ vào IRI không tồn tại
+        # để bất biến "cạnh mồ côi" chặn lại (NULL sẽ lọt vì cạnh literal có object_uid NULL).
+        from pyspark.sql import functions as F
+
+        lookup = F.create_map(*[x for k, v in (concepts or {}).items() for x in (F.lit(k), F.lit(v))])
+        iri = F.coalesce(lookup[F.upper(F.trim(F.expr(ref.concept)))], F.lit("fin:UNRESOLVED_CONCEPT"))
+        return _product_uid_col(iri)
     e = m.entities[ref.entity]
     return ids.uid_col(e.cls, m.source_system, _nkey(e.key.keys(), ref.key))
 
@@ -140,6 +148,20 @@ def product_entities(spark, tb: Dict[str, Any]):
                     F.lit(False).alias("_null_key"), F.lit("ontology.product").alias("_entity_id")))
 
 
+def concept_entities(spark, tb: Dict[str, Any]):
+    """Node cho khái niệm SKOS của TBox (8 kiểu hình rửa tiền): hasTypology trỏ vào đây."""
+    from pyspark.sql import functions as F
+
+    rows = [(ids.product_uid(c["iri"]), M.SCHEME_CLASS[c["scheme"]], c["pref_label"], f"iri={c['iri']}",
+             c["notation"]) for c in tb["concepts"] if c["scheme"] in M.SCHEME_CLASS]
+    return (spark.createDataFrame(rows, "uid string, class_iri string, label string, natural_key string, notation string")
+            .select("uid", "class_iri", F.array().cast("array<string>").alias("also_types"), "label",
+                    F.lit(ids.PRODUCT_SYSTEM).alias("source_system"), F.lit("ontology/fingraph.ttl").alias("source_dataset"),
+                    "natural_key", F.create_map(F.lit("notation"), F.col("notation")).alias("attributes"),
+                    F.lit(None).cast("date").alias("valid_from"), F.lit(None).cast("date").alias("valid_to"),
+                    F.lit(False).alias("_null_key"), F.lit("ontology.concept").alias("_entity_id")))
+
+
 def _triple(subject, predicate, obj_uid, literal, datatype, weight, vf, vt, dataset, skey, mapping_id):
     from pyspark.sql import functions as F
 
@@ -151,7 +173,7 @@ def _triple(subject, predicate, obj_uid, literal, datatype, weight, vf, vt, data
             F.lit(1.0).alias("confidence"), F.lit(False).alias("is_inferred"), F.lit(mapping_id).alias("mapping_id")]
 
 
-def edge_frame(spark, m: M.Mapping, e: M.Edge):
+def edge_frame(spark, m: M.Mapping, e: M.Edge, concepts=None):
     from pyspark.sql import functions as F
 
     df = source_df(spark, e.source)
@@ -159,7 +181,7 @@ def edge_frame(spark, m: M.Mapping, e: M.Edge):
     skey = F.expr(e.source_key) if e.source_key else _nkey(m.entities[e.subject.entity].key.keys(), e.subject.key)
     weight = F.expr(e.weight) if e.weight else F.lit(None)
     if e.obj is not None:
-        cols = _triple(subj, e.predicate, _ref_uid(m, e.obj), F.lit(None), F.lit(None), weight,
+        cols = _triple(subj, e.predicate, _ref_uid(m, e.obj, concepts), F.lit(None), F.lit(None), weight,
                        _date(e.valid_from), _date(e.valid_to), e.source.dataset, skey, f"{m.source_system}.{e.id}")
     else:
         cols = _triple(subj, e.predicate, F.lit(None), F.expr(e.literal["expr"]), F.lit(e.literal["datatype"]),
@@ -304,14 +326,15 @@ def build(spark, mappings: List[M.Mapping], tb: Dict[str, Any]):
     notations = M.resolve_notations(tb)
     labels = {c["iri"]: c["label_vi"] for c in tb["classes"]}
 
-    ents = [product_entities(spark, tb)]
+    ents = [product_entities(spark, tb), concept_entities(spark, tb)]
+    concepts = {c["notation"].upper(): c["iri"] for c in tb["concepts"] if c["scheme"] in M.SCHEME_CLASS}
     tris = []
     expectations = []
     for m in mappings:
         for e in m.entities.values():
             ents.append(entity_frame(spark, m, e))
         for e in m.edges:
-            tris.append(edge_frame(spark, m, e))
+            tris.append(edge_frame(spark, m, e, concepts))
             if e.expect_rows:
                 expectations.append({"id": f"{m.source_system}.{e.id}", "sql": e.expect_rows})
         for h in m.holdings:

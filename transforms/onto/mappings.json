@@ -1,4 +1,160 @@
 {
+ "aml": {
+  "source_system": "aml",
+  "database": "silver_aml",
+  "reviewed_by": "namth (cho duyet)",
+  "entities": [
+   {
+    "id": "bank",
+    "class": "fin:Bank",
+    "sql": "SELECT bank_id, max(bank_name) AS bank_name FROM (\n  SELECT bank_id, bank_name FROM {silver_aml.account}\n  UNION ALL SELECT from_bank, CAST(NULL AS string) FROM {silver_aml.transfer}\n  UNION ALL SELECT to_bank, CAST(NULL AS string) FROM {silver_aml.transfer}) b\nWHERE bank_id IS NOT NULL\nGROUP BY bank_id\n",
+    "key": [
+     "bank_id"
+    ],
+    "label": "concat('Ngân hàng AML ', bank_id)"
+   },
+   {
+    "id": "party",
+    "class": "fin:Party",
+    "sql": "SELECT entity_id, max(entity_name) AS entity_name, max(entity_type) AS entity_type,\n       count(*) AS n_accounts\nFROM {silver_aml.account} WHERE entity_id IS NOT NULL GROUP BY entity_id\n",
+    "key": [
+     "entity_id"
+    ],
+    "label": "entity_name",
+    "attributes": {
+     "entity_type": "entity_type",
+     "n_accounts": "n_accounts"
+    }
+   },
+   {
+    "id": "account",
+    "class": "fin:Account",
+    "sql": "WITH ep AS (\n  SELECT from_bank AS b, from_account AS a, event_date AS d FROM {silver_aml.transfer}\n  UNION ALL\n  SELECT to_bank, to_account, event_date FROM {silver_aml.transfer}),\nseen AS (SELECT b, a, min(d) AS first_seen FROM ep GROUP BY b, a),\nk AS (SELECT bank_id AS b, account_number AS a FROM {silver_aml.account}\n      UNION SELECT b, a FROM seen)\nSELECT k.b AS bank_id, k.a AS account_number, s.first_seen\nFROM k LEFT JOIN seen s ON s.b = k.b AND s.a = k.a\nWHERE k.b IS NOT NULL AND k.a IS NOT NULL\n",
+    "key": {
+     "bank_id": "bank_id",
+     "account_number": "account_number"
+    },
+    "label": "concat('TK AML ', bank_id, '-', account_number)",
+    "valid_from": "first_seen"
+   },
+   {
+    "id": "attempt",
+    "class": "fin:LaunderingAttempt",
+    "sql": "SELECT la.attempt_id, max(la.typology) AS typology, max(la.typology_detail) AS typology_detail,\n       count(*) AS n_txn, min(t.event_date) AS first_date, max(t.event_date) AS last_date\nFROM {silver_aml.laundering_attempt} la\nLEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id\nGROUP BY la.attempt_id\n",
+    "key": [
+     "attempt_id"
+    ],
+    "label": "concat('Vụ rửa tiền ', attempt_id)",
+    "valid_from": "first_date",
+    "valid_to": "last_date",
+    "attributes": {
+     "typology_detail": "typology_detail",
+     "n_txn": "n_txn"
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "account_at_bank",
+    "predicate": "fin:atBank",
+    "sql": "WITH ep AS (\n  SELECT from_bank AS b, from_account AS a FROM {silver_aml.transfer}\n  UNION SELECT to_bank, to_account FROM {silver_aml.transfer}\n  UNION SELECT bank_id, account_number FROM {silver_aml.account})\nSELECT b, a FROM ep WHERE b IS NOT NULL AND a IS NOT NULL\n",
+    "subject": {
+     "entity": "account",
+     "key": [
+      "b",
+      "a"
+     ]
+    },
+    "object": {
+     "entity": "bank",
+     "key": [
+      "b"
+     ]
+    },
+    "source_key": "concat(b, '-', a)"
+   },
+   {
+    "id": "held_by",
+    "predicate": "fin:isHeldBy",
+    "sql": "SELECT bank_id, account_number, entity_id FROM {silver_aml.account}\nWHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL\n",
+    "subject": {
+     "entity": "account",
+     "key": [
+      "bank_id",
+      "account_number"
+     ]
+    },
+    "object": {
+     "entity": "party",
+     "key": [
+      "entity_id"
+     ]
+    },
+    "source_key": "concat(bank_id, '-', account_number)",
+    "expect_rows": "SELECT count(DISTINCT bank_id, account_number) FROM {silver_aml.account}\nWHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL\n"
+   },
+   {
+    "id": "transfers",
+    "predicate": "fin:transfersTo",
+    "sql": "SELECT from_bank, from_account, to_bank, to_account,\n       min(event_date) AS first_date, max(event_date) AS last_date, count(*) AS n_txn\nFROM {silver_aml.transfer}\nWHERE NOT coalesce(is_self_transfer, false)\n  AND from_bank IS NOT NULL AND from_account IS NOT NULL AND to_bank IS NOT NULL AND to_account IS NOT NULL\nGROUP BY from_bank, from_account, to_bank, to_account\n",
+    "subject": {
+     "entity": "account",
+     "key": [
+      "from_bank",
+      "from_account"
+     ]
+    },
+    "object": {
+     "entity": "account",
+     "key": [
+      "to_bank",
+      "to_account"
+     ]
+    },
+    "weight": "n_txn",
+    "valid_from": "first_date",
+    "valid_to": "last_date",
+    "source_key": "concat(from_bank, '-', from_account, '>', to_bank, '-', to_account)"
+   },
+   {
+    "id": "involved_in",
+    "predicate": "fin:involvedIn",
+    "sql": "SELECT attempt_id, b, a, min(event_date) AS first_date FROM (\n  SELECT la.attempt_id, la.from_bank AS b, la.from_account AS a, t.event_date\n  FROM {silver_aml.laundering_attempt} la LEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id\n  UNION ALL\n  SELECT la.attempt_id, la.to_bank, la.to_account, t.event_date\n  FROM {silver_aml.laundering_attempt} la LEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id) x\nWHERE b IS NOT NULL AND a IS NOT NULL\nGROUP BY attempt_id, b, a\n",
+    "subject": {
+     "entity": "account",
+     "key": [
+      "b",
+      "a"
+     ]
+    },
+    "object": {
+     "entity": "attempt",
+     "key": [
+      "attempt_id"
+     ]
+    },
+    "valid_from": "first_date",
+    "source_key": "concat(attempt_id, '|', b, '-', a)",
+    "expect_rows": "SELECT count(*) FROM (\n  SELECT DISTINCT attempt_id, from_bank, from_account FROM {silver_aml.laundering_attempt}\n  WHERE from_bank IS NOT NULL AND from_account IS NOT NULL\n  UNION\n  SELECT DISTINCT attempt_id, to_bank, to_account FROM {silver_aml.laundering_attempt}\n  WHERE to_bank IS NOT NULL AND to_account IS NOT NULL)\n"
+   },
+   {
+    "id": "attempt_typology",
+    "predicate": "fin:hasTypology",
+    "sql": "SELECT attempt_id, max(typology) AS typology FROM {silver_aml.laundering_attempt}\nWHERE typology IS NOT NULL GROUP BY attempt_id\n",
+    "subject": {
+     "entity": "attempt",
+     "key": [
+      "attempt_id"
+     ]
+    },
+    "object": {
+     "concept": "typology"
+    },
+    "source_key": "attempt_id",
+    "expect_rows": "SELECT count(DISTINCT attempt_id) FROM {silver_aml.laundering_attempt} WHERE typology IS NOT NULL"
+   }
+  ]
+ },
  "bank_marketing": {
   "source_system": "bank_marketing",
   "database": "silver_bank_marketing",

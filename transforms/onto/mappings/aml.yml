@@ -1,0 +1,158 @@
+# Mapping IBM AML HI-Medium (silver_aml) -> FinGraph. Buoc O5 luot 2; thiet ke: docs/ONTOLOGY.md muc 5.5,
+# use case B (dieu tra AML) cua agent, ung dung chinh cua Neptune (docs/NEPTUNE.md muc 3.1).
+#
+# Vu tru rieng: KHONG noi thuc the voi corebank/Berka (khong co khoa chung). Chung TBox thoi.
+#
+# Quy mo: 31,9 trieu giao dich, ~2,09 trieu tai khoan, 2.756 vu rua tien co nhan.
+# transfersTo GOP THEO CAP tai khoan tren CA KY (du lieu ~16 ngay): weight = so giao dich,
+# valid_from / valid_to = ngay dau / cuoi. Tung giao dich o lai silver_aml.transfer (do thi giu cau truc).
+# Bo tu chuyen (is_self_transfer, thuong la Reinvestment): self-loop vo nghia tren do thi.
+#
+# Thoi gian: event_date (truc chung SIM_EPOCH). laundering_attempt.source_ts la gio GOC 09/2022 nen
+# KHONG dung; ngay cua vu lay tu giao dich (join transfer).
+#
+# Nhan rua tien tung giao dich (silver_aml.label) den tre 14 ngay -> KHONG dua vao do thi lam thuoc tinh
+# (ro ri nhan cho model). Vu rua tien (LaunderingAttempt) la ground truth cho agent / danh gia.
+
+source_system: aml
+database: silver_aml
+reviewed_by: "namth (cho duyet)"
+
+entities:
+  # Ngan hang: tu bang tai khoan VA hai dau giao dich (tranh canh mo coi)
+  - id: bank
+    class: fin:Bank
+    sql: |
+      SELECT bank_id, max(bank_name) AS bank_name FROM (
+        SELECT bank_id, bank_name FROM {silver_aml.account}
+        UNION ALL SELECT from_bank, CAST(NULL AS string) FROM {silver_aml.transfer}
+        UNION ALL SELECT to_bank, CAST(NULL AS string) FROM {silver_aml.transfer}) b
+      WHERE bank_id IS NOT NULL
+      GROUP BY bank_id
+    key: [bank_id]
+    label: "concat('Ngân hàng AML ', bank_id)"
+
+  # Phap nhan so huu tai khoan. Ten la nhan tong hop ('Corporation #33520'), khong phai PII.
+  - id: party
+    class: fin:Party
+    sql: |
+      SELECT entity_id, max(entity_name) AS entity_name, max(entity_type) AS entity_type,
+             count(*) AS n_accounts
+      FROM {silver_aml.account} WHERE entity_id IS NOT NULL GROUP BY entity_id
+    key: [entity_id]
+    label: "entity_name"
+    attributes:
+      entity_type: entity_type
+      n_accounts: n_accounts
+
+  # Tai khoan: bang tham chieu + moi dau giao dich; valid_from = ngay giao dich dau tien
+  - id: account
+    class: fin:Account
+    sql: |
+      WITH ep AS (
+        SELECT from_bank AS b, from_account AS a, event_date AS d FROM {silver_aml.transfer}
+        UNION ALL
+        SELECT to_bank, to_account, event_date FROM {silver_aml.transfer}),
+      seen AS (SELECT b, a, min(d) AS first_seen FROM ep GROUP BY b, a),
+      k AS (SELECT bank_id AS b, account_number AS a FROM {silver_aml.account}
+            UNION SELECT b, a FROM seen)
+      SELECT k.b AS bank_id, k.a AS account_number, s.first_seen
+      FROM k LEFT JOIN seen s ON s.b = k.b AND s.a = k.a
+      WHERE k.b IS NOT NULL AND k.a IS NOT NULL
+    key: {bank_id: bank_id, account_number: account_number}
+    label: "concat('TK AML ', bank_id, '-', account_number)"
+    valid_from: first_seen
+
+  - id: attempt
+    class: fin:LaunderingAttempt
+    sql: |
+      SELECT la.attempt_id, max(la.typology) AS typology, max(la.typology_detail) AS typology_detail,
+             count(*) AS n_txn, min(t.event_date) AS first_date, max(t.event_date) AS last_date
+      FROM {silver_aml.laundering_attempt} la
+      LEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id
+      GROUP BY la.attempt_id
+    key: [attempt_id]
+    label: "concat('Vụ rửa tiền ', attempt_id)"
+    valid_from: first_date
+    valid_to: last_date
+    attributes:
+      typology_detail: typology_detail
+      n_txn: n_txn
+
+edges:
+  - id: account_at_bank
+    predicate: fin:atBank
+    sql: |
+      WITH ep AS (
+        SELECT from_bank AS b, from_account AS a FROM {silver_aml.transfer}
+        UNION SELECT to_bank, to_account FROM {silver_aml.transfer}
+        UNION SELECT bank_id, account_number FROM {silver_aml.account})
+      SELECT b, a FROM ep WHERE b IS NOT NULL AND a IS NOT NULL
+    subject: {entity: account, key: [b, a]}
+    object: {entity: bank, key: [b]}
+    source_key: "concat(b, '-', a)"
+
+  # CQ10: phap nhan so huu tai khoan Y con so huu tai khoan nao
+  - id: held_by
+    predicate: fin:isHeldBy
+    sql: |
+      SELECT bank_id, account_number, entity_id FROM {silver_aml.account}
+      WHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL
+    subject: {entity: account, key: [bank_id, account_number]}
+    object: {entity: party, key: [entity_id]}
+    source_key: "concat(bank_id, '-', account_number)"
+    expect_rows: |
+      SELECT count(DISTINCT bank_id, account_number) FROM {silver_aml.account}
+      WHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL
+
+  # Chuyen tien gop theo cap tren ca ky (weight = so giao dich)
+  - id: transfers
+    predicate: fin:transfersTo
+    sql: |
+      SELECT from_bank, from_account, to_bank, to_account,
+             min(event_date) AS first_date, max(event_date) AS last_date, count(*) AS n_txn
+      FROM {silver_aml.transfer}
+      WHERE NOT coalesce(is_self_transfer, false)
+        AND from_bank IS NOT NULL AND from_account IS NOT NULL AND to_bank IS NOT NULL AND to_account IS NOT NULL
+      GROUP BY from_bank, from_account, to_bank, to_account
+    subject: {entity: account, key: [from_bank, from_account]}
+    object: {entity: account, key: [to_bank, to_account]}
+    weight: n_txn
+    valid_from: first_date
+    valid_to: last_date
+    source_key: "concat(from_bank, '-', from_account, '>', to_bank, '-', to_account)"
+
+  # CQ9: tai khoan Y co trong vu rua tien nao (ca ben gui lan ben nhan)
+  - id: involved_in
+    predicate: fin:involvedIn
+    sql: |
+      SELECT attempt_id, b, a, min(event_date) AS first_date FROM (
+        SELECT la.attempt_id, la.from_bank AS b, la.from_account AS a, t.event_date
+        FROM {silver_aml.laundering_attempt} la LEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id
+        UNION ALL
+        SELECT la.attempt_id, la.to_bank, la.to_account, t.event_date
+        FROM {silver_aml.laundering_attempt} la LEFT JOIN {silver_aml.transfer} t ON t.txn_id = la.txn_id) x
+      WHERE b IS NOT NULL AND a IS NOT NULL
+      GROUP BY attempt_id, b, a
+    subject: {entity: account, key: [b, a]}
+    object: {entity: attempt, key: [attempt_id]}
+    valid_from: first_date
+    source_key: "concat(attempt_id, '|', b, '-', a)"
+    expect_rows: |
+      SELECT count(*) FROM (
+        SELECT DISTINCT attempt_id, from_bank, from_account FROM {silver_aml.laundering_attempt}
+        WHERE from_bank IS NOT NULL AND from_account IS NOT NULL
+        UNION
+        SELECT DISTINCT attempt_id, to_bank, to_account FROM {silver_aml.laundering_attempt}
+        WHERE to_bank IS NOT NULL AND to_account IS NOT NULL)
+
+  # Kieu hinh: tra ma nguon ('FAN-OUT') -> khai niem SKOS fin:FanOut cua TBox
+  - id: attempt_typology
+    predicate: fin:hasTypology
+    sql: |
+      SELECT attempt_id, max(typology) AS typology FROM {silver_aml.laundering_attempt}
+      WHERE typology IS NOT NULL GROUP BY attempt_id
+    subject: {entity: attempt, key: [attempt_id]}
+    object: {concept: typology}
+    source_key: "attempt_id"
+    expect_rows: "SELECT count(DISTINCT attempt_id) FROM {silver_aml.laundering_attempt} WHERE typology IS NOT NULL"

@@ -1,13 +1,13 @@
 # Ontology FinGraph 1.0.0 (namespace fin:)
-Nguon da len do thi: bank_marketing, berka, corebank, mbd.
+Nguon da len do thi: aml, bank_marketing, berka, corebank, mbd.
 Lop | nhan | cha | nguon co du lieu:
-- fin:Account | Tài khoản / Account | - | berka,corebank
+- fin:Account | Tài khoản / Account | - | aml,berka,corebank
 - fin:AnonymousProduct | Sản phẩm ẩn danh / Anonymous product | fin:Product | mbd
 - fin:AnonymousProduct_1 | Sản phẩm ẩn danh 1 / Anonymous product 1 | fin:AnonymousProduct | mbd
 - fin:AnonymousProduct_2 | Sản phẩm ẩn danh 2 / Anonymous product 2 | fin:AnonymousProduct | mbd
 - fin:AnonymousProduct_3 | Sản phẩm ẩn danh 3 / Anonymous product 3 | fin:AnonymousProduct | mbd
 - fin:AnonymousProduct_4 | Sản phẩm ẩn danh 4 / Anonymous product 4 | fin:AnonymousProduct | mbd
-- fin:Bank | Ngân hàng / Bank | fin:Organization | berka,corebank
+- fin:Bank | Ngân hàng / Bank | fin:Organization | aml,berka,corebank
 - fin:ClassicCard | Thẻ classic / Classic card | fin:CreditCard | berka,corebank
 - fin:Country | Quốc gia / Country | fin:Location | berka,corebank
 - fin:CreditCard | Thẻ tín dụng / Credit card | fin:CreditProduct | berka,corebank
@@ -27,15 +27,15 @@ Lop | nhan | cha | nguon co du lieu:
 - fin:InvestmentProduct | Sản phẩm đầu tư / Investment product | fin:Product | (chua co du lieu)
 - fin:JuniorAccount | Tài khoản trẻ em / Junior account | fin:DepositProduct | (chua co du lieu)
 - fin:JuniorCard | Thẻ junior / Junior card | fin:CreditCard | berka,corebank
-- fin:LaunderingAttempt | Vụ rửa tiền / Laundering attempt | - | (chua co du lieu)
+- fin:LaunderingAttempt | Vụ rửa tiền / Laundering attempt | - | aml
 - fin:Loan | Khoản vay / Loan | fin:CreditProduct | berka,corebank
 - fin:Location | Vị trí / Location | - | berka,corebank
 - fin:LongTermDeposit | Tiền gửi dài hạn / Long-term deposit | fin:TermDeposit | (chua co du lieu)
 - fin:MediumTermDeposit | Tiền gửi trung hạn / Medium-term deposit | fin:TermDeposit | (chua co du lieu)
 - fin:MerchantCategory | Nhóm merchant / Merchant category | - | (chua co du lieu)
 - fin:Mortgage | Vay thế chấp / Mortgage | fin:Loan | (chua co du lieu)
-- fin:Organization | Tổ chức / Organization | fin:Party | berka,corebank,mbd
-- fin:Party | Bên tham gia / Party | - | bank_marketing,berka,corebank,mbd
+- fin:Organization | Tổ chức / Organization | fin:Party | aml,berka,corebank,mbd
+- fin:Party | Bên tham gia / Party | - | aml,bank_marketing,berka,corebank,mbd
 - fin:PaymentService | Dịch vụ thanh toán / Payment service | fin:Product | berka,corebank
 - fin:PayrollAccount | Tài khoản nhận lương / Payroll account | fin:DepositProduct | (chua co du lieu)
 - fin:PayrollService | Dịch vụ chi lương / Payroll service | fin:PaymentService | (chua co du lieu)
@@ -53,23 +53,23 @@ Lop | nhan | cha | nguon co du lieu:
 - fin:ShortTermDeposit | Tiền gửi ngắn hạn / Short-term deposit | fin:TermDeposit | (chua co du lieu)
 - fin:TaxPayment | Nộp thuế / Tax payment | fin:PaymentService | (chua co du lieu)
 - fin:TermDeposit | Tiền gửi có kỳ hạn / Term deposit | fin:DepositProduct | bank_marketing
-- fin:Typology | Kiểu hình rửa tiền / Laundering typology | skos:Concept | (chua co du lieu)
+- fin:Typology | Kiểu hình rửa tiền / Laundering typology | skos:Concept | aml
 Quan he | nhan | domain -> range | nguon:
 - fin:amount | số tiền | - -> xsd:decimal | berka,corebank
-- fin:atBank | mở tại ngân hàng | fin:Account -> fin:Bank | berka,corebank
+- fin:atBank | mở tại ngân hàng | fin:Account -> fin:Bank | aml,berka,corebank
 - fin:birthYear | năm sinh | fin:Person -> xsd:integer | (chua co du lieu)
 - fin:derivedFrom | lấy từ | - -> fin:Dataset | (chua co du lieu)
 - fin:forCustomer | cho khách | fin:Recommendation -> fin:Customer | (chua co du lieu)
 - fin:frequentlyFollowedBy | thường được mua sau bởi | - -> - | (chua co du lieu)
 - fin:gender | giới tính | fin:Person -> xsd:string | (chua co du lieu)
 - fin:hasHolding | có việc giữ sản phẩm | fin:Customer -> fin:ProductHolding | bank_marketing,berka,corebank,mbd
-- fin:hasTypology | có kiểu hình | fin:LaunderingAttempt -> fin:Typology | (chua co du lieu)
+- fin:hasTypology | có kiểu hình | fin:LaunderingAttempt -> fin:Typology | aml
 - fin:holdingStatus | trạng thái | fin:ProductHolding -> xsd:string | berka,corebank
 - fin:holdsAccount | là chủ tài khoản | fin:Customer -> fin:Account | berka,corebank
-- fin:involvedIn | tham gia vụ | fin:Account -> fin:LaunderingAttempt | (chua co du lieu)
+- fin:involvedIn | tham gia vụ | fin:Account -> fin:LaunderingAttempt | aml
 - fin:isAuthorizedOn | được uỷ quyền trên | fin:Customer -> fin:Account | berka,corebank
 - fin:isDirectlyOwnedBy | được sở hữu trực tiếp bởi | fin:Party -> fin:Party | (chua co du lieu)
-- fin:isHeldBy | thuộc về bên | fin:Account -> fin:Party | (chua co du lieu)
+- fin:isHeldBy | thuộc về bên | fin:Account -> fin:Party | aml
 - fin:locatedIn | ở tại | - -> fin:Location | berka,corebank
 - fin:modelVersion | phiên bản model | fin:Recommendation -> xsd:string | (chua co du lieu)
 - fin:occupation | nghề nghiệp | fin:Person -> xsd:string | bank_marketing
@@ -80,7 +80,7 @@ Quan he | nhan | domain -> range | nguon:
 - fin:score | điểm | fin:Recommendation -> xsd:double | (chua co du lieu)
 - fin:segment | phân khúc | fin:Customer -> xsd:string | (chua co du lieu)
 - fin:spendsAt | chi tiêu ở nhóm | fin:Customer -> fin:MerchantCategory | (chua co du lieu)
-- fin:transfersTo | chuyển tiền tới | fin:Account -> fin:Account | berka,corebank
+- fin:transfersTo | chuyển tiền tới | fin:Account -> fin:Account | aml,berka,corebank
 - fin:validFrom | hiệu lực từ | - -> xsd:date | (chua co du lieu)
 - fin:validTo | hiệu lực đến | - -> xsd:date | (chua co du lieu)
 - fin:viaAccount | qua tài khoản | fin:ProductHolding -> fin:Account | berka,corebank
