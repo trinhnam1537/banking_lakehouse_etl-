@@ -121,8 +121,13 @@ def test_berka_va_corebank_cung_luc_doi_soat_rieng_tung_nguon(silver):
     report = B.check_invariants(spark, entity, triple, exp, tb)
     recon = {r["mapping_id"]: (r["expected"], r["got"]) for r in report["reconciliation"]}
     assert recon["berka.holds_account"] == (2, 2) and recon["corebank.holds_account"] == (3, 3)
-    # cung khach 1 o hai nguon = hai uid (same_as o buoc O8), khong gop
+    # cung khach 1 o hai nguon = hai uid, KHONG gop; noi bang canh fin:sameAs (O8)
     assert entity.where("natural_key = 'client_id=1' AND class_iri = 'fin:Customer'").count() == 2
+    same = triple.where("predicate_iri = 'fin:sameAs'").collect()
+    assert len(same) == 3                     # khach 1, 2, 3 co o ca hai nguon; khach 4 chi corebank
+    assert all(r.confidence == 1.0 and r.is_inferred and r.subject_uid < r.object_uid for r in same)
+    pair = {ids.make_uid("fin:Customer", "berka", "client_id=2"), ids.make_uid("fin:Customer", "corebank", "client_id=2")}
+    assert pair in [{r.subject_uid, r.object_uid} for r in same]
 
 
 def test_so_node_va_canh_dung_dap_an(graph):
