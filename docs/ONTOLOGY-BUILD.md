@@ -21,8 +21,17 @@ Ký hiệu ở cột "Phục vụ": **M** model, **A** agent, **M+A** cả hai.
 
 Còn chờ: quyền SELECT `track_a_onto` cho persona analyst (cần duyệt cấp quyền).
 
-**Trạng thái (06-11-2026):** giai đoạn 2 (O5 lượt 1, O6, O7) **xong trên dev**. Mapping nằm ở
-`transforms/onto/mappings/{berka,corebank,bank_marketing,mbd}.yml`.
+**Trạng thái (07-11-2026):** thêm O5 lượt 2 (IBM AML), O8 (`same_as`, luật khoá chung) và O9 lượt 1
+(`closure`, `product_transition`), tất cả **chạy trên dev**. Đồ thị đầy đủ: **3.146.477 node, 7.993.580 cạnh**.
+
+| Phần mới | Kết quả trên dev | Ghi chú |
+|---|---|---|
+| AML (`mappings/aml.yml`) | 2.113.810 tài khoản, 668.138 pháp nhân, 122.359 ngân hàng, 2.756 vụ; `transfersTo` AML ~3,0 triệu cặp; đối soát `isHeldBy` 2.087.786, `involvedIn` 26.424, `hasTypology` 2.756 đều khớp | `transfersTo` gộp theo cặp trên cả kỳ (weight = số giao dịch). **Lỗi dữ liệu nguồn:** file giao dịch IBM ghi mã ngân hàng có số 0 đầu (`020`), file tài khoản không (`20`) → chuẩn hoá trong mapping; nên chuẩn hoá ở silver |
+| O8 `same_as` | 5.369 cặp khách corebank ↔ Berka (confidence 1.0), cạnh `fin:sameAs` `is_inferred` | `transforms/onto/resolve.py`. Khớp mờ OpenSanctions: chưa (chưa có mapping OpenSanctions) |
+| O9 `closure` | 324 cặp `partOf*` | Lặp join, cắt lineage bằng `localCheckpoint` (Glue báo "conflicting references") |
+| O9 `product_transition` | 89 dòng, mốc cắt train theo nguồn (corebank 2021-07-10, MBD 2022-11-01) | Hai thiên lệch đã sửa: đếm khách trùng hai lần (n gấp đôi) và `base_rate` chia cả khách MBD (lift thổi phồng 3,2). Sau sửa lift ≈ 1,0: Berka gần như không có quy luật "mua A rồi mua B" mạnh hơn nền |
+
+Giai đoạn 2 (O5 lượt 1, O6, O7), 06-11: mapping `transforms/onto/mappings/{berka,corebank,bank_marketing,mbd}.yml`.
 
 Lần chạy release `498af33` (`jr_1dff…`) **SUCCEEDED** trong 267 s:
 - `track_a_onto.entity` có **265.456 node**, `track_a_onto.triple` có **788.338 cạnh**.

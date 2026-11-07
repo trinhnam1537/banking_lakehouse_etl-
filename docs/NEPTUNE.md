@@ -179,6 +179,21 @@ RETURN p
 
 Mọi kết quả trả về `triple_id` của từng cạnh, đúng hợp đồng grounding của agent ([agent/README.md A5](../agent/README.md)).
 
+**Vùng điều tra (đang dùng trên dev, 07-11).** Đồ thị AML đầy đủ có 2,1 triệu tài khoản và khoảng 3 triệu cặp
+chuyển tiền, quá nặng cho `db.t4g.medium`: lần nạp 0,7 triệu cạnh mất 19 phút, và truy vấn gộp lớn đã hết bộ nhớ.
+Vì vậy Neptune chỉ nhận **vùng điều tra** (`onto.export_neptune --SCOPE aml_investigation`):
+
+| Bước | Lấy gì |
+|---|---|
+| Hạt giống | Mọi tài khoản có cạnh `involvedIn` tới một vụ rửa tiền |
+| Mở 1 bước | Đối tác chuyển tiền trực tiếp của hạt giống (hai chiều), và tài khoản **cùng chủ sở hữu** với hạt giống (CQ10) |
+| Đỉnh phụ | Ngân hàng, chủ sở hữu của tài khoản trong vùng; mọi vụ rửa tiền; khái niệm kiểu hình |
+| Cạnh AML | Chỉ giữ khi **cả hai đầu** nằm trong vùng (không có cạnh mồ côi) |
+| Nguồn khác | Corebank, Berka, UC2 giữ nguyên |
+
+Kết quả: **719.324 đỉnh, 1.580.836 cạnh**, so với đồ thị đầy đủ 3,15 triệu đỉnh và 8 triệu cạnh. Đồ thị đầy đủ vẫn ở
+Iceberg (Athena). Khi cần toàn bộ AML trên Neptune: `-Scope full` với `db.r6g.large` trở lên.
+
 ### 3.2 Agent (A): tool cần duyệt nhiều bước
 
 Hợp đồng tool không đổi, chỉ đổi backend ([agent/tools.py](../agent/tools.py) tách `Backend` cho việc này):
