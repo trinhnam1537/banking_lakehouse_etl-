@@ -403,6 +403,14 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
                                comment="O8: ung vien [0.6, 0.9) cho nguoi duyet, KHONG thanh canh (evidence khong chua ten)")
         for r in review.groupBy("rule_id").count().collect():
             print(f"    cho duyet {r[0]}: {r[1]}")
+        # Danh sách chờ duyệt theo KHOÁ KỸ THUẬT (client_id, mã OpenSanctions) — không tên — để đối chiếu đáp
+        # án gieo (data/ground_truth/sanction_hits.csv) mà không cần quyền đọc bảng dưới persona dữ liệu
+        nk = entity.select("uid", "natural_key")
+        detail = (review.join(nk.withColumnRenamed("uid", "uid_a").withColumnRenamed("natural_key", "key_a"), "uid_a")
+                  .join(nk.withColumnRenamed("uid", "uid_b").withColumnRenamed("natural_key", "key_b"), "uid_b")
+                  .orderBy(F.col("confidence").desc()).limit(50).collect())
+        for r in detail:
+            print(f"    duyet: {r.key_a} ~ {r.key_b} conf={r.confidence:.2f} {r.evidence}")
     by_class = {r[0]: r[1] for r in entity.groupBy("class_iri").count().collect()}
     by_pred = {r[0]: r[1] for r in triple.groupBy("predicate_iri").count().collect()}
     for k in sorted(by_class):
