@@ -11,7 +11,9 @@ Mục 8 là khuyến nghị và lộ trình.
 Tài liệu liên quan:
 - [ONTOLOGY.md](ONTOLOGY.md) (thiết kế ontology, mục 10 so sánh nơi lưu đồ thị);
 - [ONTOLOGY-BUILD.md](ONTOLOGY-BUILD.md) (các bước dựng đồ thị);
-- [agent/README.md](../agent/README.md) (AI agent).
+- [agent/README.md](../agent/README.md) và [AI-AGENT.md](AI-AGENT.md) (AI agent);
+- **[NEPTUNE-GUIDE.md](NEPTUNE-GUIDE.md): sổ tay chi tiết**, gồm lý thuyết bên trong Neptune (lưu trữ, chỉ mục,
+  openCypher, bulk loader), cách dùng từng lệnh, truy vấn mẫu, sự cố đã gặp và số đo thật trên dev.
 
 **Kết luận ngắn:** đồ thị hiện tại (nhóm A + UC2) vẫn chạy tốt trên Iceberg + Athena với chi phí cố định khoảng 0
 USD, nên **chưa cần Neptune**. Neptune đáng tiền khi đưa **IBM AML** (2 triệu tài khoản, hàng triệu cạnh chuyển
@@ -165,19 +167,21 @@ WITH a, count(DISTINCT b) AS n WHERE n >= 5
 RETURN a.uid, a.label, n ORDER BY n DESC LIMIT 20
 
 // CYCLE: tiền quay về chính tài khoản xuất phát trong 3..6 bước
-MATCH p = (a:Account {uid: $uid})-[:transfersTo*3..6]->(a)
-RETURN [r IN relationships(p) | r.triple_id] AS cite, length(p) LIMIT 10
+MATCH p = (a:Account)-[:transfersTo*3..6]->(a) WHERE id(a) = $uid
+RETURN [r IN relationships(p) | id(r)] AS cite, length(p) LIMIT 10
 
-// Đường đi từ tài khoản nghi vấn tới tài khoản đã gắn nhãn rửa tiền (giải thích cho điều tra viên)
-MATCH p = shortestPath((a:Account {uid: $uid})-[:transfersTo*..6]-(b:Account)-[:involvedIn]->(:LaunderingAttempt))
-RETURN [n IN nodes(p) | n.label], [r IN relationships(p) | r.triple_id]
+// Đường từ tài khoản nghi vấn tới tài khoản đã gắn nhãn rửa tiền. Neptune KHÔNG có shortestPath:
+// thử độ dài 1, 2, 3... và dừng ở độ dài đầu tiên có kết quả (cách tool explain_link làm)
+MATCH p = (a:Account)-[:transfersTo*2]-(b:Account)-[:involvedIn]->(:LaunderingAttempt) WHERE id(a) = $uid
+RETURN [n IN nodes(p) | n.label], [r IN relationships(p) | id(r)] LIMIT 1
 
 // Chuỗi sở hữu tới đối tượng bị cấm vận (OpenSanctions)
-MATCH p = (c:Party {uid: $uid})-[:isDirectlyOwnedBy*1..4]->(s:SanctionedEntity)
-RETURN p
+MATCH p = (c:Party)-[:isDirectlyOwnedBy*1..4]->(s:SanctionedEntity) WHERE id(c) = $uid
+RETURN [n IN nodes(p) | n.label], [r IN relationships(p) | id(r)]
 ```
 
-Mọi kết quả trả về `triple_id` của từng cạnh, đúng hợp đồng grounding của agent ([agent/README.md A5](../agent/README.md)).
+Đỉnh và cạnh định danh bằng `id(n)` = `uid`, `id(r)` = `triple_id` (không phải thuộc tính). Mọi kết quả trả về
+`triple_id` của từng cạnh, đúng hợp đồng grounding của agent ([agent/README.md A5](../agent/README.md)).
 
 **Vùng điều tra (đang dùng trên dev, 07-11).** Đồ thị AML đầy đủ có 2,1 triệu tài khoản và khoảng 3 triệu cặp
 chuyển tiền, quá nặng cho `db.t4g.medium`: lần nạp 0,7 triệu cạnh mất 19 phút, và truy vấn gộp lớn đã hết bộ nhớ.
@@ -202,8 +206,8 @@ Hợp đồng tool không đổi, chỉ đổi backend ([agent/tools.py](../agen
 |---|---|---|
 | `customer_360`, `count_holders`, `describe` | Athena / catalog | Giữ nguyên (đã đủ nhanh) |
 | `neighborhood` | Athena | Neptune (dưới 100 ms) |
-| `explain_link(uid_a, uid_b)` (mới) | Chỉ làm được khi có closure tính sẵn | Neptune `shortestPath` |
-| `aml_subgraph(uid, hops)` (mới) | Không làm | Neptune |
+| `explain_link(uid_a, uid_b)` (đã có) | Chỉ làm được khi có closure tính sẵn | Neptune: tăng dần độ dài đường đi (Neptune không có `shortestPath`) |
+| `aml_subgraph(uid, hops)` (đã có) | Không làm | Neptune |
 
 ### 3.3 Model gợi ý (M): đặc trưng đồ thị
 
