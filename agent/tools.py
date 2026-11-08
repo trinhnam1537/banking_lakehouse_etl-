@@ -190,6 +190,28 @@ def cypher_aml_transfers(hops: int) -> str:
             "ORDER BY n_txn DESC LIMIT $limit")
 
 
+def sql_sanctions_review(uid: Optional[str], min_confidence: Optional[float], limit: int) -> str:
+    """Hàng đợi người duyệt O8 (track_a_onto.same_as_review): cặp khách nội bộ ~ thực thể OpenSanctions có
+    confidence [0.6, 0.9) — CHƯA thành cạnh sameAs. evidence là cờ (name=exact|fuzzy:0.91; birth=...; country=...),
+    không chứa tên; nhãn khách là 'Khách N' (không PII), nhãn bên cấm vận là tên công khai của OpenSanctions."""
+    try:
+        lo = 0.6 if min_confidence is None else float(min_confidence)
+    except (TypeError, ValueError):
+        raise ToolError("min_confidence phai la so") from None
+    if not 0.0 <= lo <= 1.0:
+        raise ToolError("min_confidence phai trong [0, 1]")
+    who = f" AND (r.uid_a = '{_uid(uid)}' OR r.uid_b = '{uid}')" if uid else ""
+    return f"""
+SELECT r.uid_a, ea.class_iri AS class_a, ea.label AS label_a, ea.source_system AS source_a,
+       r.uid_b, eb.class_iri AS class_b, eb.label AS label_b, eb.source_system AS source_b,
+       r.confidence, r.rule_id, r.evidence
+FROM {DB}.same_as_review r
+JOIN {DB}.entity ea ON ea.uid = r.uid_a
+JOIN {DB}.entity eb ON eb.uid = r.uid_b
+WHERE r.confidence >= {lo:.4f}{who}
+ORDER BY r.confidence DESC, r.uid_a LIMIT {max(1, min(int(limit), 100))}""".strip()
+
+
 def check_readonly_sql(sql: str) -> str:
     s = sql.strip().rstrip(";")
     if ";" in s:
@@ -242,8 +264,9 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "tuy chon loc theo vung (nhan vung) va ngay as_of. Chia theo lop la va nguon du lieu.",
      "input_schema": _obj({"product_class": _S, "region": _NS, "as_of": _NS}, ["product_class", "region", "as_of"])},
     {"name": "query", "strict": True,
-     "description": "SQL CHI DOC (Athena/Trino) tren track_a_onto (entity, triple, class, property, subclass, concept) "
-                    "va track_a_gold. Chi dung khi cac tool tren khong du. Toi da 200 dong.",
+     "description": "SQL CHI DOC (Athena/Trino) tren track_a_onto (entity, triple, class, property, subclass, concept, "
+                    "same_as, same_as_review, closure, product_transition) va track_a_gold. Chi dung khi cac tool "
+                    "tren khong du. Toi da 200 dong.",
      "input_schema": _obj({"sql": _S}, ["sql"])},
     {"name": "explain_link", "strict": True,
      "description": "Duong di NGAN NHAT giua hai node (uid_a, uid_b) tren do thi Neptune, qua chuyen tien, so huu, "
@@ -257,6 +280,13 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "trong vu nao.",
      "input_schema": _obj({"uid": _S, "hops": {"type": ["integer", "null"]}, "limit": {"type": ["integer", "null"]}},
                           ["uid", "hops", "limit"])},
+    {"name": "sanctions_review", "strict": True,
+     "description": "Ung vien TRUNG TEN khach noi bo ~ doi tuong cam van (OpenSanctions) DANG CHO NGUOI DUYET "
+                    "(confidence 0.6-0.9, CHUA xac nhan, chua thanh canh sameAs). uid (tuy chon) loc theo mot "
+                    "khach/thuc the; evidence cho biet ten khop chinh xac hay gan dung, nam sinh, quoc gia. "
+                    "Bat buoc noi 'kha nang trung X%', khong ket luan khach la doi tuong cam van.",
+     "input_schema": _obj({"uid": _NS, "min_confidence": {"type": ["number", "null"]},
+                           "limit": {"type": ["integer", "null"]}}, ["uid", "min_confidence", "limit"])},
 ]
 
 
@@ -326,6 +356,10 @@ class Tools:
             return {"rows": self._rows(sql_count_holders(a["product_class"], a.get("region"), a.get("as_of")))}
         if name == "query":
             return {"rows": self._rows(check_readonly_sql(a["sql"]))}
+        if name == "sanctions_review":
+            rows = self._rows(sql_sanctions_review(a.get("uid"), a.get("min_confidence"), a.get("limit") or 20))
+            self._collect(rows)
+            return {"rows": rows, "note": "ung vien CHUA duyet: chi la kha nang trung, khong phai ket luan"}
         if name == "explain_link":
             ua, ub = _uid(a["uid_a"]), _uid(a["uid_b"])
             top = max(1, min(int(a.get("max_hops") or 4), MAX_LINK_HOPS))

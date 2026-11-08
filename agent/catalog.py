@@ -20,6 +20,7 @@ import argparse
 import json
 import pathlib
 import sys
+import unicodedata
 from typing import Any, Dict, List, Optional
 
 from transforms.onto import mapping as M
@@ -110,16 +111,23 @@ def prompt_text(cat: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _fold(s: str) -> str:
+    """Chữ thường, bỏ dấu tiếng Việt: 'thẻ tín dụng' và 'the tin dung' tra ra cùng lớp."""
+    s = unicodedata.normalize("NFKD", s.replace("đ", "d").replace("Đ", "D"))
+    return "".join(ch for ch in s if not unicodedata.combining(ch)).lower().strip()
+
+
 def describe(cat: Dict[str, Any], term: str) -> List[Dict[str, Any]]:
-    """Tra một khái niệm theo IRI, nhãn vi/en (không phân biệt hoa thường) hoặc mã nguồn."""
-    t = term.strip().lower()
+    """Tra một khái niệm theo IRI, nhãn vi/en (không phân biệt hoa thường, có dấu hay không) hoặc mã nguồn."""
+    t = _fold(term)
     hits = []
     for c in cat["classes"]:
-        keys = {c["iri"].lower(), c["label_vi"].lower(), c["label_en"].lower(), *[n.lower() for n in c["notations"]]}
-        if t in keys or (len(t) >= 3 and any(t in k for k in (c["label_vi"].lower(), c["label_en"].lower()))):
+        labels = (_fold(c["label_vi"]), _fold(c["label_en"]))
+        keys = {_fold(c["iri"]), *labels, *[_fold(n) for n in c["notations"]]}
+        if t in keys or (len(t) >= 3 and any(t in k for k in labels)):
             hits.append({"type": "class", **c})
     for p in cat["properties"]:
-        if t in {p["iri"].lower(), p["label_vi"].lower()}:
+        if t in {_fold(p["iri"]), _fold(p["label_vi"])}:
             hits.append({"type": "property", **p})
     return hits[:10]
 

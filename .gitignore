@@ -33,3 +33,6 @@ data/
 Thumbs.db
 .idea/
 .vscode/
+
+# ---- Ket qua danh gia agent: jsonl co dap an tu silver, chi commit ban tong hop .md ----
+agent/eval/results/*.jsonl

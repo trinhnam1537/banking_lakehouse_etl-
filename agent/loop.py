@@ -50,7 +50,10 @@ Quy tac:
    aml_subgraph / explain_link (Neptune). Neptune chi co VUNG DIEU TRA; khong thay thi noi "khong thay trong vung
    dieu tra", KHONG ket luan la khong co lien he.
 9. Lien ket trung thuc the (sameAs) confidence < 1 hoac ung vien cho duyet: phai noi "kha nang trung X%".
+   Ung vien trung ten voi doi tuong cam van (sanctions_review) CHUA duoc duyet: khong ket luan khach bi cam van.
 """
+
+USAGE_KEYS = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
 
 
 def system_blocks(cat: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -67,6 +70,8 @@ class Answer:
     tool_log: List[Dict[str, Any]] = field(default_factory=list)
     turns: int = 0
     stop_reason: str = ""
+    retried: bool = False             # bi chan grounding mot lan roi moi qua (A7: ti le co can cu lan dau)
+    usage: Dict[str, int] = field(default_factory=lambda: dict.fromkeys(USAGE_KEYS, 0))
 
 
 def make_client(provider: str, region: str = "ap-southeast-1"):
@@ -94,13 +99,21 @@ def ask(question: str, tools: Tools, client, model: str, provider: str = "anthro
     system = system_blocks(tools.cat)
     messages: List[Dict[str, Any]] = [{"role": "user", "content": question}]
     retried = False
+    usage = dict.fromkeys(USAGE_KEYS, 0)
+
+    def done(text, grounded, rep, turn, stop):
+        return Answer(text, grounded, rep, log, turn, stop, retried, usage)
+
     for turn in range(1, max_turns + 1):
         resp = _create(client, provider, model=model, max_tokens=16000, system=system, tools=TOOL_SPECS,
                        messages=messages, output_config={"effort": "medium"}, cache_control={"type": "ephemeral"})
+        u = getattr(resp, "usage", None)
+        for k in USAGE_KEYS:
+            usage[k] += int(getattr(u, k, 0) or 0)
         if resp.stop_reason == "refusal":
-            return Answer("Yeu cau bi model tu choi; khong co cau tra loi.", False, None, log, turn, "refusal")
+            return done("Yeu cau bi model tu choi; khong co cau tra loi.", False, None, turn, "refusal")
         if resp.stop_reason == "max_tokens":
-            return Answer("Cau tra loi bi cat (max_tokens); hay thu hep cau hoi.", False, None, log, turn, "max_tokens")
+            return done("Cau tra loi bi cat (max_tokens); hay thu hep cau hoi.", False, None, turn, "max_tokens")
         messages.append({"role": "assistant", "content": resp.content})   # nguyen khoi, ke ca thinking
         if resp.stop_reason == "tool_use":
             results = []
@@ -116,14 +129,13 @@ def ask(question: str, tools: Tools, client, model: str, provider: str = "anthro
         text = "".join(b.text for b in resp.content if b.type == "text")
         rep = G.check(text, tools.seen_ids)
         if rep.ok:
-            return Answer(text, True, rep, log, turn, resp.stop_reason)
+            return done(text, True, rep, turn, resp.stop_reason)
         if retried:
-            return Answer("Khong du can cu de tra loi (kiem tra trich dan khong dat).", False, rep, log, turn,
-                          "ungrounded")
+            return done("Khong du can cu de tra loi (kiem tra trich dan khong dat).", False, rep, turn, "ungrounded")
         retried = True
         messages.append({"role": "user", "content": f"[Kiem tra tu dong] Cau tra loi bi chan: {rep.reason}. "
                                                     "Chi trich id co trong ket qua tool; thieu thi goi tool hoac noi khong du can cu."})
-    return Answer("Vuot so buoc toi da.", False, None, log, max_turns, "max_turns")
+    return done("Vuot so buoc toi da.", False, None, max_turns, "max_turns")
 
 
 def main(argv=None) -> int:
