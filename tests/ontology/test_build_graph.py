@@ -100,9 +100,9 @@ def _count(spark, sql):
     return spark.sql(sql).first()[0]
 
 
-def test_berka_va_corebank_cung_luc_doi_soat_rieng_tung_nguon(silver):
-    """Hai nguồn cùng id mục (holds_account...) nhưng số dòng khác nhau: corebank có thêm chủ tài khoản
-    do simulator mở. Lỗi gặp trên dev (04-11): đối soát gộp theo id mục -> lệch 4.500 / 4.534."""
+@pytest.fixture(scope="module")
+def corebank(silver):
+    """silver_corebank = bản sao Berka + một khách (4) và tài khoản (30) do simulator mở thêm."""
     spark = silver
     spark.sql("CREATE NAMESPACE IF NOT EXISTS glue_catalog.silver_corebank")
     for t in ("district", "account", "disp", "card", "loan", "trans"):
@@ -116,13 +116,25 @@ def test_berka_va_corebank_cung_luc_doi_soat_rieng_tung_nguon(silver):
     ], "client_id int, gender string, birth_date date, district_id int, status string")
     spark.sql("INSERT INTO glue_catalog.silver_corebank.account VALUES (30, 2, DATE'2023-01-05', 'MONTHLY')")
     spark.sql("INSERT INTO glue_catalog.silver_corebank.disp VALUES (300, 4, 30, 'OWNER', true)")
+    return spark
+
+
+def test_berka_va_corebank_cung_luc_doi_soat_rieng_tung_nguon(corebank):
+    """Hai nguồn cùng id mục (holds_account...) nhưng số dòng khác nhau: corebank có thêm chủ tài khoản
+    do simulator mở. Lỗi gặp trên dev (04-11): đối soát gộp theo id mục -> lệch 4.500 / 4.534."""
+    spark = corebank
     tb = T.load()
     entity, triple, exp = B.build(spark, M.load_all(["berka", "corebank"]), tb)
     report = B.check_invariants(spark, entity, triple, exp, tb)
     recon = {r["mapping_id"]: (r["expected"], r["got"]) for r in report["reconciliation"]}
     assert recon["berka.holds_account"] == (2, 2) and recon["corebank.holds_account"] == (3, 3)
-    # cung khach 1 o hai nguon = hai uid (same_as o buoc O8), khong gop
+    # cung khach 1 o hai nguon = hai uid, KHONG gop; noi bang canh fin:sameAs (O8)
     assert entity.where("natural_key = 'client_id=1' AND class_iri = 'fin:Customer'").count() == 2
+    same = triple.where("predicate_iri = 'fin:sameAs'").collect()
+    assert len(same) == 3                     # khach 1, 2, 3 co o ca hai nguon; khach 4 chi corebank
+    assert all(r.confidence == 1.0 and r.is_inferred and r.subject_uid < r.object_uid for r in same)
+    pair = {ids.make_uid("fin:Customer", "berka", "client_id=2"), ids.make_uid("fin:Customer", "corebank", "client_id=2")}
+    assert pair in [{r.subject_uid, r.object_uid} for r in same]
 
 
 def test_so_node_va_canh_dung_dap_an(graph):
@@ -256,3 +268,194 @@ def test_chieu_sang_neptune_nhan_theo_cay_lop_va_khong_lo_khoa_goc(graph):
     _, e95 = X.frames(entity, triple, sub, as_of="1996-01-01")
     assert e95.where("`valid_from:Date` >= '1996-01-01'").count() == 0
     assert e95.where("`:TYPE` = 'transfersTo'").count() == 2
+
+
+def test_aml_vong_tien_kieu_hinh_va_chu_so_huu(silver):
+    """O5 lượt 2 (IBM AML): vòng A->B->C->A thuộc một vụ CYCLE, tài khoản C chỉ có trong giao dịch,
+    giao dịch tự chuyển bị loại, kiểu hình trỏ vào khái niệm SKOS fin:Cycle của TBox."""
+    spark = silver
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS glue_catalog.silver_aml")
+    _table(spark, "silver_aml.account", [
+        # File tai khoan KHONG co so 0 dau, file giao dich CO ('001') -> phai ve cung mot khoa
+        ("1", "Bank 1", "A1", "E1", "Corporation #1", "Corporation"),
+        ("1", "Bank 1", "A2", "E1", "Corporation #1", "Corporation"),   # E1 so huu 2 tai khoan
+        ("2", "Bank 2", "B1", "E2", "Partnership #2", "Partnership"),
+    ], "bank_id string, bank_name string, account_number string, entity_id string, entity_name string, "
+       "entity_type string")
+    t = "txn_id string, event_date date, from_bank string, from_account string, to_bank string, " \
+        "to_account string, is_self_transfer boolean"
+    _table(spark, "silver_aml.transfer", [
+        ("t1", D(2023, 1, 2), "001", "A1", "002", "B1", False),
+        ("t2", D(2023, 1, 3), "002", "B1", "003", "C1", False),   # C1 khong co trong bang account
+        ("t3", D(2023, 1, 4), "003", "C1", "001", "A1", False),
+        ("t4", D(2023, 1, 5), "001", "A1", "002", "B1", False),   # cung cap A1->B1 -> gop, weight 2
+        ("t5", D(2023, 1, 5), "001", "A2", "001", "A2", True),    # tu chuyen -> loai
+    ], t)
+    _table(spark, "silver_aml.laundering_attempt", [
+        ("HI-1", "CYCLE", "cycle 3", "t1", "001", "A1", "002", "B1"),
+        ("HI-1", "CYCLE", "cycle 3", "t2", "002", "B1", "003", "C1"),
+        ("HI-1", "CYCLE", "cycle 3", "t3", "003", "C1", "001", "A1"),
+    ], "attempt_id string, typology string, typology_detail string, txn_id string, from_bank string, "
+       "from_account string, to_bank string, to_account string")
+    tb = T.load()
+    entity, triple, exp = B.build(spark, M.load_all(["aml"]), tb)
+    report = B.check_invariants(spark, entity, triple, exp, tb)
+    assert all(r["expected"] == r["got"] for r in report["reconciliation"])
+    acc = lambda b, a: ids.make_uid("fin:Account", "aml", f"bank_id={b}|account_number={a}")  # noqa: E731
+    assert entity.where(f"uid = '{acc('3', 'C1')}'").count() == 1          # chi co trong giao dich
+    # 3 tai khoan bang tham chieu + C1 = 4: KHONG nhan doi vi '001' / '1'
+    assert entity.where("class_iri = 'fin:Account'").count() == 4
+    assert entity.where("class_iri = 'fin:Bank'").count() == 3
+    tr = {(r.subject_uid, r.object_uid): r.weight for r in triple.where("predicate_iri = 'fin:transfersTo'").collect()}
+    assert tr == {(acc("1", "A1"), acc("2", "B1")): 2.0, (acc("2", "B1"), acc("3", "C1")): 1.0,
+                  (acc("3", "C1"), acc("1", "A1")): 1.0}
+    typ = triple.where("predicate_iri = 'fin:hasTypology'").first()
+    assert typ.object_uid == ids.product_uid("fin:Cycle")
+    assert entity.where(f"uid = '{typ.object_uid}'").first().class_iri == "fin:Typology"
+    # CQ9: A1 tham gia vu HI-1; CQ10: chu so huu cua A1 (E1) co 2 tai khoan
+    assert triple.where(f"predicate_iri = 'fin:involvedIn' AND subject_uid = '{acc('1', 'A1')}'").count() == 1
+    owner = ids.make_uid("fin:Party", "aml", "entity_id=E1")
+    assert triple.where(f"predicate_iri = 'fin:isHeldBy' AND object_uid = '{owner}'").count() == 2
+
+
+def test_aml_kieu_hinh_khong_tra_duoc_lam_job_that_bai(silver):
+    """Mã kiểu hình lạ (không có skos:notation) phải bị chặn, không được thành cạnh trỏ NULL."""
+    spark = silver
+    spark.sql("INSERT INTO glue_catalog.silver_aml.laundering_attempt VALUES "
+              "('HI-2', 'SPIRAL', 'la', 't4', '001', 'A1', '002', 'B1')")
+    tb = T.load()
+    entity, triple, exp = B.build(spark, M.load_all(["aml"]), tb)
+    with pytest.raises(B.InvariantError, match="mo coi"):
+        B.check_invariants(spark, entity, triple, exp, tb)
+    spark.sql("DELETE FROM glue_catalog.silver_aml.laundering_attempt WHERE attempt_id = 'HI-2'")
+
+
+def test_aml_vung_dieu_tra_cho_neptune(silver):
+    """--SCOPE aml_investigation: hạt giống = tài khoản trong vụ; +1 bước chuyển tiền; +cùng chủ sở hữu;
+    cạnh AML giữ khi cả hai đầu trong vùng; nguồn khác không đổi."""
+    from transforms.onto import export_neptune as X
+
+    spark = silver
+    spark.sql("INSERT INTO glue_catalog.silver_aml.transfer VALUES "
+              "('t6', DATE'2023-01-06', '003', 'C1', '004', 'D1', false), "   # D1: doi tac truc tiep -> giu
+              "('t7', DATE'2023-01-07', '004', 'D1', '009', 'E9', false)")    # E9: cach 2 buoc -> bo
+    tb = T.load()
+    entity, triple, _ = B.build(spark, M.load_all(["aml", "mbd"]), tb)
+    ent, tri = X.aml_investigation(entity, triple)
+    acc = lambda b, a: ids.make_uid("fin:Account", "aml", f"bank_id={b}|account_number={a}")  # noqa: E731
+    kept = {r.uid for r in ent.where("class_iri = 'fin:Account'").collect()}
+    assert {acc("1", "A1"), acc("2", "B1"), acc("3", "C1"), acc("4", "D1"), acc("1", "A2")} <= kept
+    assert acc("9", "E9") not in kept
+    pairs = {(r.subject_uid, r.object_uid) for r in tri.where("predicate_iri = 'fin:transfersTo'").collect()}
+    assert (acc("3", "C1"), acc("4", "D1")) in pairs and (acc("4", "D1"), acc("9", "E9")) not in pairs
+    # Khong canh mo coi trong ban cat; nguon khac (MBD) giu nguyen; kieu hinh van tro khai niem
+    uids = {r.uid for r in ent.select("uid").collect()}
+    assert all(r.subject_uid in uids and (r.object_uid is None or r.object_uid in uids) for r in tri.collect())
+    assert ent.where("source_system = 'mbd'").count() == entity.where("source_system = 'mbd'").count()
+    assert tri.where("predicate_iri = 'fin:hasTypology'").count() == 1
+    spark.sql("DELETE FROM glue_catalog.silver_aml.transfer WHERE txn_id IN ('t6', 't7')")
+
+
+def test_o9_closure_vi_tri(graph):
+    from transforms.onto import derive as DV
+
+    _, entity, triple, _ = graph
+    clo = DV.closure(triple).collect()
+    district = ids.make_uid("fin:District", "berka", "district_id=1")
+    country = ids.make_uid("fin:Country", "berka", "code=CZ")
+    assert (district, country, 2) in {(r.start_uid, r.node_uid, r.depth) for r in clo}
+    assert max(r.depth for r in clo) == 2
+
+
+def test_o9_product_transition_va_khong_ro_ri(graph, silver):
+    """P(B | A, H) đúng đáp án tính tay; thêm sự kiện SAU mốc cắt không đổi bất kỳ giá trị nào (O9)."""
+    import datetime as dt
+
+    from transforms.onto import derive as DV
+
+    spark, entity, triple, _ = graph
+    acq = DV.acquisitions(entity, triple).cache()
+    cut = {"berka": "1997-12-31", "mbd": "2022-12-31"}
+    pt = {(r.from_product, r.to_product, r.horizon_months): (r.n_from, r.n_both, r.p)
+          for r in DV.product_transition(acq, cut, horizons=(3,)).collect()}
+    # Khach 1: TK thanh toan 1995-01-10 -> bao hiem 02-03, dinh ky 02-20 (trong 3 thang)
+    # Khach 2: TK thanh toan 1996-03-01 -> vay 1996-06-01 (dung 3 thang) => 2 khach co CurrentAccount
+    assert pt[("fin:CurrentAccount", "fin:InsuranceProduct", 3)] == (2, 1, 0.5)
+    assert pt[("fin:CurrentAccount", "fin:Loan", 3)] == (2, 1, 0.5)
+    assert ("fin:ClassicCard", "fin:Loan", 3) not in pt          # the sau vay: khong phai A -> B
+    # base_rate chi tren nguon CO san pham: bao hiem chi o Berka (3 khach) -> 1/3, KHONG chia them khach MBD
+    row = next(r for r in DV.product_transition(acq, cut, horizons=(3,)).collect()
+               if (r.from_product, r.to_product) == ("fin:CurrentAccount", "fin:InsuranceProduct"))
+    assert abs(row.base_rate - 1 / 3) < 1e-9 and abs(row.lift - 1.5) < 1e-9
+    # Ro ri: them luot mua SAU moc cat -> bang khong doi
+    extra = spark.createDataFrame(
+        [(ids.make_uid("fin:Customer", "berka", "client_id=1"), "berka", "fin:Loan", dt.date(1998, 3, 1))],
+        acq.schema)
+    pt2 = {(r.from_product, r.to_product, r.horizon_months): (r.n_from, r.n_both, r.p)
+           for r in DV.product_transition(acq.unionByName(extra), cut, horizons=(3,)).collect()}
+    assert pt2 == pt
+
+
+def test_o9_khach_trung_sameas_chi_dem_mot_lan(corebank):
+    """Berka và corebank là cùng người (sameAs): product_transition chỉ đếm bản corebank (nguồn ưu tiên)."""
+    from transforms.onto import derive as DV
+
+    tb = T.load()
+    entity, triple, _ = B.build(corebank, M.load_all(["berka", "corebank"]), tb)
+    acq = DV.acquisitions(entity, triple)
+    assert {r.source_system for r in acq.select("source_system").distinct().collect()} == {"corebank"}
+    n_cust = acq.select("customer_uid").distinct().count()
+    assert n_cust == entity.where("source_system = 'corebank' AND class_iri = 'fin:Customer'").join(
+        acq.select(acq.customer_uid.alias("uid")).distinct(), "uid").count()
+
+
+def test_opensanctions_so_huu_va_khop_ten_vao_hang_doi_duyet(corebank):
+    """OpenSanctions lên đồ thị (Party + SanctionedEntity, isDirectlyOwnedBy) và khớp mờ khách <-> cấm vận:
+    tên trùng (như corebank.seed --sanction-hits) phải vào HÀNG ĐỢI DUYỆT, không tự thành cạnh sameAs."""
+    from transforms.onto import derive as DV
+    from transforms.onto import resolve as R
+
+    spark = corebank
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS glue_catalog.silver_opensanctions")
+    if "full_name" not in spark.table("glue_catalog.silver_corebank.client").columns:
+        spark.sql("ALTER TABLE glue_catalog.silver_corebank.client ADD COLUMN full_name string")
+    for cid, nm in [(1, "Jana Nováková"), (2, "Ivan Aleksandrovich TYRYSHKIN"), (3, "Petr Svoboda"),
+                    (4, "Tyryshkin Ivan Aleksandrovic")]:
+        spark.sql(f"UPDATE glue_catalog.silver_corebank.client SET full_name = '{nm}' WHERE client_id = {cid}")
+    _table(spark, "silver_opensanctions.target", [
+        ("NK-1", "Person", "Ivan Aleksandrovich TYRYSHKIN", "1961-03-05", ["Иван Тырышкин"], ["ru"]),
+        ("NK-2", "Company", "Sanctioned Holding LLC", None, [], ["ru"]),
+    ], "entity_id string, entity_schema string, name string, birth_date string, aliases array<string>, "
+       "countries array<string>")
+    import datetime as dt
+    ts = dt.datetime(2026, 10, 1)
+    _table(spark, "silver_opensanctions.entity", [
+        ("NK-1", "Person", "Ivan TYRYSHKIN", True, {"name": ["Ivan Aleksandrovich TYRYSHKIN"], "country": ["ru"]}, ts),
+        ("NK-2", "Company", "Sanctioned Holding", True, {"name": ["Sanctioned Holding LLC"]}, ts),
+        ("NK-3", "Company", "Shell s.r.o.", False, {"name": ["Shell s.r.o."]}, ts),
+        ("OWN-1", "Ownership", "own", False, {"asset": ["NK-3"], "owner": ["NK-1"], "percentage": ["50%"]}, ts),
+        ("OWN-2", "Ownership", "own", False, {"asset": ["VESSEL-9"], "owner": ["NK-1"]}, ts),  # tau: bo
+        ("OWN-3", "Ownership", "own", False, {"asset": ["NK-3"], "owner": ["NK-1"], "percentage": ["40"]}, ts),  # trung -> gop
+    ], "entity_id string, entity_schema string, caption string, is_target boolean, "
+       "properties map<string,array<string>>, first_seen timestamp")
+    tb = T.load()
+    entity, triple, exp = B.build(spark, M.load_all(["corebank", "opensanctions"]), tb)
+    B.check_invariants(spark, entity, triple, exp, tb)
+    nk1 = ids.make_uid("fin:Party", "opensanctions", "entity_id=NK-1")
+    nk3 = ids.make_uid("fin:Party", "opensanctions", "entity_id=NK-3")
+    assert set(entity.where(f"uid = '{nk1}'").first().also_types) == {"fin:SanctionedEntity", "fin:Person"}
+    own = triple.where("predicate_iri = 'fin:isDirectlyOwnedBy'").collect()
+    assert [(r.subject_uid, r.object_uid, r.weight) for r in own] == [(nk3, nk1, 0.5)]
+    # Khop: KHONG tu thanh canh (ten trung nhung nam sinh / nuoc khong khop -> < 0.9)
+    assert triple.where("predicate_iri = 'fin:sameAs'").count() == 0
+    auto, review = R.all_links(spark, entity)
+    rv = {r.uid_a if r.uid_b == nk1 else r.uid_b: (r.confidence, r.evidence) for r in review.collect()}
+    c2 = ids.make_uid("fin:Customer", "corebank", "client_id=2")
+    c4 = ids.make_uid("fin:Customer", "corebank", "client_id=4")
+    assert rv[c2] == (0.8, "name=exact;birth=no;country=no")
+    assert rv[c4][1].startswith("name=fuzzy:") and 0.6 <= rv[c4][0] < 0.8
+    assert ids.make_uid("fin:Customer", "corebank", "client_id=1") not in rv
+    assert not any("TYRYSHKIN" in e or "Ivan" in e for _, e in rv.values())   # evidence khong chua ten
+    # O9: bao dong so huu
+    clo = DV.closure(triple).where("predicate_iri = 'fin:isDirectlyOwnedBy'").collect()
+    assert [(r.start_uid, r.node_uid, r.depth) for r in clo] == [(nk3, nk1, 1)]

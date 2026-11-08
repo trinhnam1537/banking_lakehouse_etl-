@@ -24,6 +24,7 @@ REGISTRY = {
     "onto.load_schema": "transforms.onto.load_schema",
     "onto.build_graph": "transforms.onto.build_graph",
     "onto.export_neptune": "transforms.onto.export_neptune",
+    "onto.derive": "transforms.onto.derive",
 }
 
 

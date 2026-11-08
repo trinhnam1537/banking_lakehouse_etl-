@@ -3,11 +3,17 @@
 Tài liệu này hướng dẫn **bắt đầu xây AI agent** hỏi đáp trên knowledge graph FinGraph: làm gì, theo thứ tự nào,
 vì sao, và kiểm gì thì coi là xong. Nó là bước O11–O12 của [docs/ONTOLOGY-BUILD.md](../docs/ONTOLOGY-BUILD.md),
 kiến trúc tổng ở [docs/ONTOLOGY.md mục 9](../docs/ONTOLOGY.md). Khi nào cần Amazon Neptune thì xem
-[docs/NEPTUNE.md](../docs/NEPTUNE.md).
+[docs/NEPTUNE.md](../docs/NEPTUNE.md). **Mô tả chi tiết agent đang xây** (từng tool, grounding, đánh giá, MCP,
+hiện trạng): [docs/AI-AGENT.md](../docs/AI-AGENT.md).
 
-**Trạng thái (06-11-2026):** đã có khung chạy được và 17 test (không cần AWS):
-catalog sinh tự động, 6 tool, kiểm grounding, vòng lặp với Claude, bộ 15 câu hỏi đánh giá đầu tiên.
-**Chưa** chạy với Claude thật và Athena thật (bước A2, A8).
+**Trạng thái (08-11-2026):** 36 test (không cần AWS):
+- catalog sinh tự động;
+- 9 tool, trong đó 2 tool chạy trên Neptune, đã thử với Neptune thật;
+- kiểm grounding và vòng lặp có đếm token;
+- 23 câu hỏi đánh giá (use case A và B), bộ chạy và chấm tự động;
+- MCP server cho demo.
+
+**Chưa** chạy với Claude thật, vì cần bật Bedrock model access (bước A2).
 
 ---
 
@@ -96,7 +102,9 @@ Ba nguyên tắc định hình kiến trúc:
 | [tools.py](tools.py) | 6 tool: định nghĩa cho Claude + SQL + kiểm tham số + backend Athena |
 | [grounding.py](grounding.py) | Kiểm trích dẫn sau khi sinh |
 | [loop.py](loop.py) | Vòng lặp agent, CLI |
+| [mcp_server.py](mcp_server.py) | MCP server stdio cho demo (A8) |
 | [eval/questions.yml](eval/questions.yml) | Bộ câu hỏi đánh giá (A7) |
+| [eval/run.py](eval/run.py) | Chạy bộ câu, chấm tự động, báo cáo (A7) |
 
 ---
 
@@ -170,9 +178,19 @@ Hai lỗi đã gặp và test đang chặn:
 | `neighborhood(uid, predicate?, direction)` | Cạnh một bước quanh node | `triple` hai chiều | CQ6, CQ10 |
 | `count_holders(product_class, region?, as_of?)` | "Bao nhiêu khách giữ sản phẩm tín dụng ở Prague?" | `subclass` + `locatedIn → partOf` | CQ2 |
 | `query(sql)` | Câu không tool nào trả lời được | SQL chỉ đọc trên `track_a_onto`, `track_a_gold` | CQ12 |
+| `aml_subgraph(uid, hops)` | "Tài khoản này dính vụ nào, kiểu gì, ai sở hữu, chuyển cho ai?" | **Neptune**: `involvedIn → hasTypology`, `isHeldBy`, `transfersTo*1..2` | CQ9, CQ10 |
+| `explain_link(uid_a, uid_b, max_hops)` | "Hai thực thể này liên hệ thế nào?" | **Neptune**: đường ngắn nhất qua chuyển tiền / sở hữu / vụ / `sameAs` (tăng dần độ dài, Neptune không có `shortestPath`) | CQ8, CQ10 |
 
-**Thứ tự thêm tool tiếp theo:** `recommend(uid)` (sau O10: đọc `fin:Recommendation`), `explain_link(uid_a, uid_b)`
-(đường đi ngắn nhất, cần O9 closure hoặc Neptune), `aml_subgraph(uid, hops)` (use case B, xem NEPTUNE.md).
+Hai tool Neptune gọi openCypher qua Lambda `fingraph-dev-neptune-ops` (agent ở ngoài VPC vẫn dùng được), bật bằng
+`python -m agent.loop ... --neptune fingraph-dev-neptune-ops`. Mọi giá trị vào truy vấn đi qua `parameters`; độ dài
+đường đi là số nguyên đã kẹp biên. Neptune chỉ chứa **vùng điều tra AML**: tool trả "không thấy trong vùng điều
+tra" thay vì kết luận "không có liên hệ" (quy tắc 8 của system prompt). Đã chạy thử trên Neptune thật (07-11):
+vụ CYCLE `HI-Medium-01062`, chủ sở hữu, lưới chuyển tiền, đường 1 bước giữa hai tài khoản trong vòng.
+
+`sanctions_review(uid?, min_confidence?)` (Athena) đọc hàng đợi `same_as_review`: ứng viên khách trùng tên đối
+tượng cấm vận **chưa duyệt**, kèm cờ bằng chứng (không tên). Quy tắc 9 cấm kết luận khách bị cấm vận từ đây.
+
+**Tool tiếp theo:** `recommend(uid)` (sau O10: đọc `fin:Recommendation`).
 
 **Hợp đồng vòng lặp** ([loop.py](loop.py)), mỗi điểm có test:
 - Chỉ **append** vào lịch sử, không sửa lượt cũ (giữ cache, hợp lệ với cơ chế thinking của model mới).
@@ -248,10 +266,16 @@ Có 4 câu `refuse` có chủ đích:
 **Đối chứng (bắt buộc cho luận văn):** cùng bộ câu, cùng model, một agent chỉ có tool `query` trên schema silver
 thô (text-to-SQL). Chênh lệch giữa hai agent là đóng góp của ontology.
 
-**Việc còn làm:** viết `agent/eval/run.py` để chạy bộ câu, thay `{client_id}` bằng khách mẫu cố định (seed), chạy
-`truth_sql` dưới persona DE, chấm, và ghi bảng kết quả. Mở rộng lên ~50 câu (B: AML, C: phân tích, D: khách, E:
-quản trị). Mỗi lần chạy tốn tiền model, nên chạy theo đợt, có ghi phiên bản prompt, catalog và đồ thị (snapshot
-Iceberg).
+**Bộ chạy** [eval/run.py](eval/run.py) (chi tiết ở [AI-AGENT.md mục 9](../docs/AI-AGENT.md#9-đánh-giá)):
+- thay tham số từ `defaults`;
+- chạy `truth_sql` dưới workgroup DE;
+- hỏi agent, chấm tất định, ghi `results/<thời điểm>.md`;
+- không có `--yes` thì chỉ in kế hoạch và ước chi phí, không gọi model.
+
+Lượt 2 thêm 8 câu use case B (AML, cấm vận). **Việc còn làm:**
+- chạy thật;
+- chế độ `--baseline` (agent text-to-SQL đối chứng);
+- mở rộng lên khoảng 50 câu (C, D, E).
 
 ---
 
@@ -274,14 +298,15 @@ Agent **không** đóng gói trong `etl.zip`. Nó có vòng đời deploy riêng
 |---|---|---|
 | A0 | Phạm vi, use case, nguyên tắc | ✅ tài liệu này |
 | A3 | Catalog sinh tự động + `--check` | ✅ |
-| A4 | 6 tool, kiểm tham số, vòng lặp | ✅ code + test với client giả |
+| A4 | 9 tool (gồm 2 tool Neptune và `sanctions_review`), kiểm tham số, vòng lặp, đếm token | ✅ code + test; tool Neptune đã thử trên cụm thật |
 | A5 | Grounding | ✅ |
-| A7 | Bộ câu hỏi lượt 1 (15 câu use case A) | ✅ câu hỏi; ⏳ `eval/run.py` |
+| A7 | Bộ câu hỏi (15 câu A + 8 câu B) + `eval/run.py` | ✅ code + test; ⏳ chạy thật |
 | A2 | Bật Bedrock, quyền IAM, chạy câu đầu tiên, đo `usage` | ⏳ cần bật model access (console) |
 | A6 | Role agent-runtime + assume persona | ⏳ repo hạ tầng, cần duyệt |
 | A7 | Chạy bộ câu + agent đối chứng text-to-SQL | ⏳ sau A2 |
-| A4+ | `recommend` (sau O10), `explain_link` (sau O9), tool AML (sau O5 lượt 2) | ⏳ |
-| A8 | MCP server cho demo; Lambda khi có giao diện | ⏳ |
+| A4+ | `recommend` (sau O10) | ⏳ |
+| A8 | MCP server cho demo | ✅ `mcp_server.py`, đã khởi động thử qua stdio |
+| A8 | Lambda khi có giao diện | ⏳ |
 
 **Định nghĩa "xong" cho MVP (giai đoạn 4 của ONTOLOGY-BUILD):** 15 câu use case A chạy được trên dev với Claude
 thật; độ chính xác và tỉ lệ có căn cứ được ghi vào bảng và so với agent đối chứng; 4 câu `refuse` đều từ chối đúng.
@@ -292,7 +317,7 @@ thật; độ chính xác và tỉ lệ có căn cứ được ghi vào bảng v
 
 ```powershell
 cd banking_lakehouse_etl
-.\.venv\Scripts\python.exe -m pip install "anthropic>=1.1" boto3
+.\.venv\Scripts\python.exe -m pip install -r agentequirements.txt
 # Test (không cần AWS, không tốn tiền model)
 .\.venv\Scripts\python.exe -m pytest tests/agent -q
 # Sinh lại catalog sau khi sửa TBox / mapping

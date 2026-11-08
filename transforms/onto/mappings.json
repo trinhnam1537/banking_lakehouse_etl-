@@ -1,4 +1,160 @@
 {
+ "aml": {
+  "source_system": "aml",
+  "database": "silver_aml",
+  "reviewed_by": "namth (cho duyet)",
+  "entities": [
+   {
+    "id": "bank",
+    "class": "fin:Bank",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer}),\nac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account}),\nla AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt})\nSELECT bank_id, max(bank_name) AS bank_name FROM (\n  SELECT bank_id, bank_name FROM ac\n  UNION ALL SELECT from_bank, CAST(NULL AS string) FROM t\n  UNION ALL SELECT to_bank, CAST(NULL AS string) FROM t\n  UNION ALL SELECT from_bank, CAST(NULL AS string) FROM la\n  UNION ALL SELECT to_bank, CAST(NULL AS string) FROM la) b\nWHERE bank_id IS NOT NULL\nGROUP BY bank_id\n",
+    "key": [
+     "bank_id"
+    ],
+    "label": "concat('Ngân hàng AML ', bank_id)"
+   },
+   {
+    "id": "party",
+    "class": "fin:Party",
+    "sql": "SELECT entity_id, max(entity_name) AS entity_name, max(entity_type) AS entity_type,\n       count(*) AS n_accounts\nFROM {silver_aml.account} WHERE entity_id IS NOT NULL GROUP BY entity_id\n",
+    "key": [
+     "entity_id"
+    ],
+    "label": "entity_name",
+    "attributes": {
+     "entity_type": "entity_type",
+     "n_accounts": "n_accounts"
+    }
+   },
+   {
+    "id": "account",
+    "class": "fin:Account",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer}),\nac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account}),\nla AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt}),\nep AS (SELECT from_bank AS b, from_account AS a, event_date AS d FROM t\n       UNION ALL SELECT to_bank, to_account, event_date FROM t),\nseen AS (SELECT b, a, min(d) AS first_seen FROM ep GROUP BY b, a),\nk AS (SELECT bank_id AS b, account_number AS a FROM ac\n      UNION SELECT b, a FROM seen\n      UNION SELECT from_bank, from_account FROM la\n      UNION SELECT to_bank, to_account FROM la)\nSELECT k.b AS bank_id, k.a AS account_number, s.first_seen\nFROM k LEFT JOIN seen s ON s.b = k.b AND s.a = k.a\nWHERE k.b IS NOT NULL AND k.a IS NOT NULL\n",
+    "key": {
+     "bank_id": "bank_id",
+     "account_number": "account_number"
+    },
+    "label": "concat('TK AML ', bank_id, '-', account_number)",
+    "valid_from": "first_seen"
+   },
+   {
+    "id": "attempt",
+    "class": "fin:LaunderingAttempt",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer})\nSELECT la.attempt_id, max(la.typology) AS typology, max(la.typology_detail) AS typology_detail,\n       count(*) AS n_txn, min(t.event_date) AS first_date, max(t.event_date) AS last_date\nFROM {silver_aml.laundering_attempt} la\nLEFT JOIN t ON t.txn_id = la.txn_id\nGROUP BY la.attempt_id\n",
+    "key": [
+     "attempt_id"
+    ],
+    "label": "concat('Vụ rửa tiền ', attempt_id)",
+    "valid_from": "first_date",
+    "valid_to": "last_date",
+    "attributes": {
+     "typology_detail": "typology_detail",
+     "n_txn": "n_txn"
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "account_at_bank",
+    "predicate": "fin:atBank",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer}),\nac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account}),\nla AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt}),\nep AS (SELECT from_bank AS b, from_account AS a FROM t\n       UNION SELECT to_bank, to_account FROM t\n       UNION SELECT bank_id, account_number FROM ac\n       UNION SELECT from_bank, from_account FROM la\n       UNION SELECT to_bank, to_account FROM la)\nSELECT b, a FROM ep WHERE b IS NOT NULL AND a IS NOT NULL\n",
+    "subject": {
+     "entity": "account",
+     "key": [
+      "b",
+      "a"
+     ]
+    },
+    "object": {
+     "entity": "bank",
+     "key": [
+      "b"
+     ]
+    },
+    "source_key": "concat(b, '-', a)"
+   },
+   {
+    "id": "held_by",
+    "predicate": "fin:isHeldBy",
+    "sql": "WITH ac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account})\nSELECT bank_id, account_number, entity_id FROM ac\nWHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL\n",
+    "subject": {
+     "entity": "account",
+     "key": [
+      "bank_id",
+      "account_number"
+     ]
+    },
+    "object": {
+     "entity": "party",
+     "key": [
+      "entity_id"
+     ]
+    },
+    "source_key": "concat(bank_id, '-', account_number)",
+    "expect_rows": "WITH ac AS (SELECT regexp_replace(bank_id, '^0+(?=.)', '') AS bank_id, bank_name, account_number,\n              entity_id, entity_name, entity_type\n       FROM {silver_aml.account})\nSELECT count(DISTINCT bank_id, account_number) FROM ac\nWHERE entity_id IS NOT NULL AND bank_id IS NOT NULL AND account_number IS NOT NULL\n"
+   },
+   {
+    "id": "transfers",
+    "predicate": "fin:transfersTo",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer})\nSELECT from_bank, from_account, to_bank, to_account,\n       min(event_date) AS first_date, max(event_date) AS last_date, count(*) AS n_txn\nFROM t\nWHERE NOT coalesce(is_self_transfer, false)\n  AND NOT (from_bank = to_bank AND from_account = to_account)\n  AND from_bank IS NOT NULL AND from_account IS NOT NULL AND to_bank IS NOT NULL AND to_account IS NOT NULL\nGROUP BY from_bank, from_account, to_bank, to_account\n",
+    "subject": {
+     "entity": "account",
+     "key": [
+      "from_bank",
+      "from_account"
+     ]
+    },
+    "object": {
+     "entity": "account",
+     "key": [
+      "to_bank",
+      "to_account"
+     ]
+    },
+    "weight": "n_txn",
+    "valid_from": "first_date",
+    "valid_to": "last_date",
+    "source_key": "concat(from_bank, '-', from_account, '>', to_bank, '-', to_account)"
+   },
+   {
+    "id": "involved_in",
+    "predicate": "fin:involvedIn",
+    "sql": "WITH t AS (SELECT txn_id, event_date, is_self_transfer,\n             regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n             regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n      FROM {silver_aml.transfer}),\nla AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt})\nSELECT attempt_id, b, a, min(event_date) AS first_date FROM (\n  SELECT la.attempt_id, la.from_bank AS b, la.from_account AS a, t.event_date\n  FROM la LEFT JOIN t ON t.txn_id = la.txn_id\n  UNION ALL\n  SELECT la.attempt_id, la.to_bank, la.to_account, t.event_date\n  FROM la LEFT JOIN t ON t.txn_id = la.txn_id) x\nWHERE b IS NOT NULL AND a IS NOT NULL\nGROUP BY attempt_id, b, a\n",
+    "subject": {
+     "entity": "account",
+     "key": [
+      "b",
+      "a"
+     ]
+    },
+    "object": {
+     "entity": "attempt",
+     "key": [
+      "attempt_id"
+     ]
+    },
+    "valid_from": "first_date",
+    "source_key": "concat(attempt_id, '|', b, '-', a)",
+    "expect_rows": "WITH la AS (SELECT attempt_id, typology, typology_detail, txn_id,\n              regexp_replace(from_bank, '^0+(?=.)', '') AS from_bank, from_account,\n              regexp_replace(to_bank, '^0+(?=.)', '') AS to_bank, to_account\n       FROM {silver_aml.laundering_attempt})\nSELECT count(*) FROM (\n  SELECT DISTINCT attempt_id, from_bank, from_account FROM la\n  WHERE from_bank IS NOT NULL AND from_account IS NOT NULL\n  UNION\n  SELECT DISTINCT attempt_id, to_bank, to_account FROM la\n  WHERE to_bank IS NOT NULL AND to_account IS NOT NULL)\n"
+   },
+   {
+    "id": "attempt_typology",
+    "predicate": "fin:hasTypology",
+    "sql": "SELECT attempt_id, max(typology) AS typology FROM {silver_aml.laundering_attempt}\nWHERE typology IS NOT NULL GROUP BY attempt_id\n",
+    "subject": {
+     "entity": "attempt",
+     "key": [
+      "attempt_id"
+     ]
+    },
+    "object": {
+     "concept": "typology"
+    },
+    "source_key": "attempt_id",
+    "expect_rows": "SELECT count(DISTINCT attempt_id) FROM {silver_aml.laundering_attempt} WHERE typology IS NOT NULL"
+   }
+  ]
+ },
  "bank_marketing": {
   "source_system": "bank_marketing",
   "database": "silver_bank_marketing",
@@ -845,6 +1001,113 @@
      "purchase_months": "purchase_months"
     },
     "expect_rows": "SELECT count(*) FROM (\n  SELECT DISTINCT client_id, k FROM (\n    SELECT client_id, stack(4, 1, target_1, 2, target_2, 3, target_3, 4, target_4) AS (k, flag)\n    FROM {silver_mbd.target_month}) t\n  WHERE flag)\n"
+   }
+  ]
+ },
+ "opensanctions": {
+  "source_system": "opensanctions",
+  "database": "silver_opensanctions",
+  "reviewed_by": "namth (cho duyet)",
+  "entities": [
+   {
+    "id": "target_person",
+    "class": "fin:Party",
+    "also": [
+     "fin:SanctionedEntity",
+     "fin:Person"
+    ],
+    "sql": "SELECT entity_id, entity_schema,\n       coalesce(element_at(properties['name'], 1), caption) AS name,\n       element_at(properties['birthDate'], 1) AS birth_date,\n       array_join(properties['country'], ',') AS countries,\n       array_join(properties['topics'], ',') AS topics,\n       first_seen\nFROM {silver_opensanctions.entity}\nWHERE is_target AND entity_schema = 'Person'\n",
+    "key": [
+     "entity_id"
+    ],
+    "label": "name",
+    "valid_from": "to_date(first_seen)",
+    "attributes": {
+     "schema": "entity_schema",
+     "birth_date": "birth_date",
+     "countries": "countries",
+     "topics": "topics"
+    }
+   },
+   {
+    "id": "target_org",
+    "class": "fin:Party",
+    "also": [
+     "fin:SanctionedEntity",
+     "fin:Organization"
+    ],
+    "sql": "SELECT entity_id, entity_schema,\n       coalesce(element_at(properties['name'], 1), caption) AS name,\n       element_at(properties['birthDate'], 1) AS birth_date,\n       array_join(properties['country'], ',') AS countries,\n       array_join(properties['topics'], ',') AS topics,\n       first_seen\nFROM {silver_opensanctions.entity}\nWHERE is_target AND entity_schema IN ('Company', 'Organization', 'LegalEntity', 'PublicBody')\n",
+    "key": [
+     "entity_id"
+    ],
+    "label": "name",
+    "valid_from": "to_date(first_seen)",
+    "attributes": {
+     "schema": "entity_schema",
+     "birth_date": "birth_date",
+     "countries": "countries",
+     "topics": "topics"
+    }
+   },
+   {
+    "id": "related_person",
+    "class": "fin:Party",
+    "also": [
+     "fin:Person"
+    ],
+    "sql": "SELECT entity_id, entity_schema,\n       coalesce(element_at(properties['name'], 1), caption) AS name,\n       element_at(properties['birthDate'], 1) AS birth_date,\n       array_join(properties['country'], ',') AS countries,\n       array_join(properties['topics'], ',') AS topics,\n       first_seen\nFROM {silver_opensanctions.entity}\nWHERE NOT coalesce(is_target, false) AND entity_schema = 'Person'\n",
+    "key": [
+     "entity_id"
+    ],
+    "label": "name",
+    "valid_from": "to_date(first_seen)",
+    "attributes": {
+     "schema": "entity_schema",
+     "birth_date": "birth_date",
+     "countries": "countries",
+     "topics": "topics"
+    }
+   },
+   {
+    "id": "related_org",
+    "class": "fin:Party",
+    "also": [
+     "fin:Organization"
+    ],
+    "sql": "SELECT entity_id, entity_schema,\n       coalesce(element_at(properties['name'], 1), caption) AS name,\n       element_at(properties['birthDate'], 1) AS birth_date,\n       array_join(properties['country'], ',') AS countries,\n       array_join(properties['topics'], ',') AS topics,\n       first_seen\nFROM {silver_opensanctions.entity}\nWHERE NOT coalesce(is_target, false) AND entity_schema IN ('Company', 'Organization', 'LegalEntity', 'PublicBody')\n",
+    "key": [
+     "entity_id"
+    ],
+    "label": "name",
+    "valid_from": "to_date(first_seen)",
+    "attributes": {
+     "schema": "entity_schema",
+     "birth_date": "birth_date",
+     "countries": "countries",
+     "topics": "topics"
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "owned_by",
+    "predicate": "fin:isDirectlyOwnedBy",
+    "sql": "WITH le AS (\n  SELECT entity_id FROM {silver_opensanctions.entity}\n  WHERE entity_schema IN ('Person', 'Company', 'Organization', 'LegalEntity', 'PublicBody')),\nown AS (\n  SELECT entity_id AS ownership_id,\n         element_at(coalesce(properties['asset'], properties['assetId']), 1) AS asset_id,\n         element_at(coalesce(properties['owner'], properties['ownerId']), 1) AS owner_id,\n         try_cast(regexp_extract(element_at(properties['percentage'], 1), '([0-9.]+)', 1) AS double) AS pct,\n         to_date(element_at(properties['startDate'], 1)) AS start_date\n  FROM {silver_opensanctions.entity} WHERE entity_schema = 'Ownership')\n-- Nhieu ban ghi Ownership cho CUNG (tai san, chu, ngay) - cac danh sach nguon cung ghi mot quan he:\n-- gop lai, lay ty le lon nhat (gap tren dev 11-07: 8 triple_id trung, bat bien chan)\nSELECT own.asset_id, own.owner_id, own.start_date, max(own.pct) AS pct,\n       min(own.ownership_id) AS ownership_id, count(*) AS n_records\nFROM own\nJOIN le a ON a.entity_id = own.asset_id\nJOIN le o ON o.entity_id = own.owner_id\nWHERE own.asset_id <> own.owner_id\nGROUP BY own.asset_id, own.owner_id, own.start_date\n",
+    "subject": {
+     "entity": "target_person",
+     "key": [
+      "asset_id"
+     ]
+    },
+    "object": {
+     "entity": "target_person",
+     "key": [
+      "owner_id"
+     ]
+    },
+    "weight": "pct / 100",
+    "valid_from": "start_date",
+    "source_key": "concat('ownership=', ownership_id)"
    }
   ]
  }

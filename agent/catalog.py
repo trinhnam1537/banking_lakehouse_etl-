@@ -20,6 +20,7 @@ import argparse
 import json
 import pathlib
 import sys
+import unicodedata
 from typing import Any, Dict, List, Optional
 
 from transforms.onto import mapping as M
@@ -60,6 +61,9 @@ def build(tb: Optional[Dict[str, Any]] = None, mappings: Optional[List[M.Mapping
     for m in mappings:
         for e in m.edges:
             preds.setdefault(e.predicate, set()).add(m.source_system)
+            if e.obj is not None and e.obj.concept is not None:   # node khai niem (kieu hinh AML)
+                for cls in M.SCHEME_CLASS.values():
+                    sources.setdefault(cls, set()).add(m.source_system)
         for h in m.holdings:
             for p in ("fin:hasHolding", "fin:ofProduct"):
                 preds.setdefault(p, set()).add(m.source_system)
@@ -69,6 +73,13 @@ def build(tb: Optional[Dict[str, Any]] = None, mappings: Optional[List[M.Mapping
                 preds.setdefault("fin:holdingStatus", set()).add(m.source_system)
             if h.amount:
                 preds.setdefault("fin:amount", set()).add(m.source_system)
+    # Canh fin:sameAs sinh tu luat O8 (transforms/onto/resolve.py), khong tu mapping
+    from transforms.onto import resolve as R
+
+    present = {m.source_system for m in mappings}
+    for r in R.RULES:
+        if {r["a"]["source_system"], r["b"]["source_system"]} <= present:
+            preds.setdefault("fin:sameAs", set()).update({r["a"]["source_system"], r["b"]["source_system"]})
     classes = [{
         "iri": c["iri"], "label_vi": c["label_vi"], "label_en": c["label_en"], "definition": c["definition"],
         "parents": c["parents"], "children": sorted(children.get(c["iri"], [])), "notations": c["notations"],
@@ -100,16 +111,23 @@ def prompt_text(cat: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _fold(s: str) -> str:
+    """Chữ thường, bỏ dấu tiếng Việt: 'thẻ tín dụng' và 'the tin dung' tra ra cùng lớp."""
+    s = unicodedata.normalize("NFKD", s.replace("đ", "d").replace("Đ", "D"))
+    return "".join(ch for ch in s if not unicodedata.combining(ch)).lower().strip()
+
+
 def describe(cat: Dict[str, Any], term: str) -> List[Dict[str, Any]]:
-    """Tra một khái niệm theo IRI, nhãn vi/en (không phân biệt hoa thường) hoặc mã nguồn."""
-    t = term.strip().lower()
+    """Tra một khái niệm theo IRI, nhãn vi/en (không phân biệt hoa thường, có dấu hay không) hoặc mã nguồn."""
+    t = _fold(term)
     hits = []
     for c in cat["classes"]:
-        keys = {c["iri"].lower(), c["label_vi"].lower(), c["label_en"].lower(), *[n.lower() for n in c["notations"]]}
-        if t in keys or (len(t) >= 3 and any(t in k for k in (c["label_vi"].lower(), c["label_en"].lower()))):
+        labels = (_fold(c["label_vi"]), _fold(c["label_en"]))
+        keys = {_fold(c["iri"]), *labels, *[_fold(n) for n in c["notations"]]}
+        if t in keys or (len(t) >= 3 and any(t in k for k in labels)):
             hits.append({"type": "class", **c})
     for p in cat["properties"]:
-        if t in {p["iri"].lower(), p["label_vi"].lower()}:
+        if t in {_fold(p["iri"]), _fold(p["label_vi"])}:
             hits.append({"type": "property", **p})
     return hits[:10]
 

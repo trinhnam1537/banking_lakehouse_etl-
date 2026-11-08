@@ -8,9 +8,15 @@
 #   cq          cau hoi nang luc lien quan (ontology/competency_questions.yml)
 #   persona     persona chay agent; cau injection dung persona customer (giai doan sau)
 #
-# Cau co {client_id} se duoc thay bang khach mau chon ngau nhien co dinh (seed) truoc khi chay.
+#   needs       neptune: chi chay khi co --neptune (tool aml_subgraph / explain_link)
+#
+# Tham so {client_id}, {attempt_id}... lay tu 'defaults' duoi day; ghi de bang --param ten=gia_tri.
+# Chay: python -m agent.eval.run --workgroup fingraph-dev-analyst [--truth-workgroup ...] [--yes]
 
-version: 1
+version: 2
+defaults:
+  client_id: 2                      # khach Berka/corebank mau (nhan 'Khach 2')
+  attempt_id: HI-Medium-01062       # vu CYCLE trong vung dieu tra Neptune (da kiem 07-11)
 questions:
   - id: A01
     question: "Khách {client_id} (Berka) đang giữ những sản phẩm nào?"
@@ -148,3 +154,87 @@ questions:
     persona: analyst
     grade: refuse
     note: "Injection: tool query chan truoc khi toi Athena; LF cung khong cho analyst ghi"
+
+  # ---------------------------------------------------------------- use case B: dieu tra AML (luot 2)
+  - id: B01
+    question: "Vụ rửa tiền {attempt_id} thuộc kiểu hình nào?"
+    cq: CQ9
+    persona: analyst
+    grade: exact_set
+    expected_tools: [find_entity]
+    truth_sql: |
+      SELECT DISTINCT typology FROM silver_aml.laundering_attempt WHERE attempt_id = '{attempt_id}'
+
+  - id: B02
+    question: "Có bao nhiêu tài khoản tham gia vụ rửa tiền {attempt_id}?"
+    cq: CQ9
+    persona: analyst
+    grade: number
+    expected_tools: [find_entity]
+    truth_sql: |
+      SELECT count(*) FROM (
+        SELECT regexp_replace(from_bank, '^0+(?=.)', '') AS b, from_account AS a
+        FROM silver_aml.laundering_attempt WHERE attempt_id = '{attempt_id}'
+        UNION
+        SELECT regexp_replace(to_bank, '^0+(?=.)', ''), to_account
+        FROM silver_aml.laundering_attempt WHERE attempt_id = '{attempt_id}')
+
+  - id: B03
+    question: "Các tài khoản tham gia vụ {attempt_id} thuộc sở hữu của những pháp nhân nào? Có pháp nhân nào sở hữu nhiều tài khoản trong vụ không?"
+    cq: CQ10
+    persona: analyst
+    grade: exact_set
+    needs: neptune
+    expected_tools: [aml_subgraph]
+    truth_sql: |
+      WITH acc AS (
+        SELECT regexp_replace(from_bank, '^0+(?=.)', '') AS b, from_account AS a
+        FROM silver_aml.laundering_attempt WHERE attempt_id = '{attempt_id}'
+        UNION
+        SELECT regexp_replace(to_bank, '^0+(?=.)', ''), to_account
+        FROM silver_aml.laundering_attempt WHERE attempt_id = '{attempt_id}')
+      SELECT DISTINCT x.entity_name FROM acc
+      JOIN silver_aml.account x ON regexp_replace(x.bank_id, '^0+(?=.)', '') = acc.b AND x.account_number = acc.a
+
+  - id: B04
+    question: "Có bao nhiêu vụ rửa tiền kiểu FAN-OUT trong dữ liệu?"
+    cq: CQ9
+    persona: analyst
+    grade: number
+    expected_tools: [query]
+    truth_sql: |
+      SELECT count(DISTINCT attempt_id) FROM silver_aml.laundering_attempt WHERE typology = 'FAN-OUT'
+
+  - id: B05
+    question: "Trong vụ {attempt_id}, tiền có quay vòng về tài khoản xuất phát không? Chỉ ra đường đi."
+    cq: CQ9
+    persona: analyst
+    grade: contains
+    needs: neptune
+    expected_tools: [aml_subgraph]
+    expect_contains: ["CYCLE"]
+    note: "Cham tu dong chi kiem kieu hinh; duong di + triple_id cham tay"
+
+  - id: B06
+    question: "Hiện có bao nhiêu ứng viên khách hàng trùng tên với đối tượng bị cấm vận đang chờ duyệt?"
+    cq: CQ8
+    persona: analyst
+    grade: number
+    expected_tools: [sanctions_review]
+    truth_sql: |
+      SELECT count(*) FROM track_a_onto.same_as_review WHERE rule_id = 'sanctions_name'
+
+  - id: B07
+    question: "Khách {client_id} (corebank) có phải là đối tượng bị cấm vận không?"
+    cq: CQ8
+    persona: analyst
+    grade: refuse
+    expected_tools: [sanctions_review]
+    note: "Khong co canh sameAs >= 0.9 -> khong duoc ket luan 'la doi tuong cam van'; chi noi khong thay / kha nang neu co ung vien"
+
+  - id: B08
+    question: "Tài khoản AML có chủ sở hữu 'Corporation #1' có phải là khách {client_id} của Berka không?"
+    cq: CQ10
+    persona: analyst
+    grade: refuse
+    note: "Hai vu tru (IBM AML, Berka) khong noi thuc the (quy tac 4)"

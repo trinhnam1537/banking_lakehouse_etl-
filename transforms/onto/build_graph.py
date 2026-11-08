@@ -26,6 +26,7 @@ from typing import Any, Dict, List
 from ..common import CATALOG, write_table
 from . import ids
 from . import mapping as M
+from . import resolve as R
 from . import tbox as T
 
 DB = "track_a_onto"
@@ -96,7 +97,15 @@ def _null_key(exprs):
     return F.greatest(*[F.expr(x).isNull() for x in exprs]) if len(exprs) > 1 else F.expr(exprs[0]).isNull()
 
 
-def _ref_uid(m: M.Mapping, ref: M.Ref):
+def _ref_uid(m: M.Mapping, ref: M.Ref, concepts=None):
+    if ref.concept is not None:
+        # notation -> IRI khái niệm -> uid node khái niệm. Không tra được thì trỏ vào IRI không tồn tại
+        # để bất biến "cạnh mồ côi" chặn lại (NULL sẽ lọt vì cạnh literal có object_uid NULL).
+        from pyspark.sql import functions as F
+
+        lookup = F.create_map(*[x for k, v in (concepts or {}).items() for x in (F.lit(k), F.lit(v))])
+        iri = F.coalesce(lookup[F.upper(F.trim(F.expr(ref.concept)))], F.lit("fin:UNRESOLVED_CONCEPT"))
+        return _product_uid_col(iri)
     e = m.entities[ref.entity]
     return ids.uid_col(e.cls, m.source_system, _nkey(e.key.keys(), ref.key))
 
@@ -140,6 +149,20 @@ def product_entities(spark, tb: Dict[str, Any]):
                     F.lit(False).alias("_null_key"), F.lit("ontology.product").alias("_entity_id")))
 
 
+def concept_entities(spark, tb: Dict[str, Any]):
+    """Node cho khái niệm SKOS của TBox (8 kiểu hình rửa tiền): hasTypology trỏ vào đây."""
+    from pyspark.sql import functions as F
+
+    rows = [(ids.product_uid(c["iri"]), M.SCHEME_CLASS[c["scheme"]], c["pref_label"], f"iri={c['iri']}",
+             c["notation"]) for c in tb["concepts"] if c["scheme"] in M.SCHEME_CLASS]
+    return (spark.createDataFrame(rows, "uid string, class_iri string, label string, natural_key string, notation string")
+            .select("uid", "class_iri", F.array().cast("array<string>").alias("also_types"), "label",
+                    F.lit(ids.PRODUCT_SYSTEM).alias("source_system"), F.lit("ontology/fingraph.ttl").alias("source_dataset"),
+                    "natural_key", F.create_map(F.lit("notation"), F.col("notation")).alias("attributes"),
+                    F.lit(None).cast("date").alias("valid_from"), F.lit(None).cast("date").alias("valid_to"),
+                    F.lit(False).alias("_null_key"), F.lit("ontology.concept").alias("_entity_id")))
+
+
 def _triple(subject, predicate, obj_uid, literal, datatype, weight, vf, vt, dataset, skey, mapping_id):
     from pyspark.sql import functions as F
 
@@ -151,7 +174,7 @@ def _triple(subject, predicate, obj_uid, literal, datatype, weight, vf, vt, data
             F.lit(1.0).alias("confidence"), F.lit(False).alias("is_inferred"), F.lit(mapping_id).alias("mapping_id")]
 
 
-def edge_frame(spark, m: M.Mapping, e: M.Edge):
+def edge_frame(spark, m: M.Mapping, e: M.Edge, concepts=None):
     from pyspark.sql import functions as F
 
     df = source_df(spark, e.source)
@@ -159,7 +182,7 @@ def edge_frame(spark, m: M.Mapping, e: M.Edge):
     skey = F.expr(e.source_key) if e.source_key else _nkey(m.entities[e.subject.entity].key.keys(), e.subject.key)
     weight = F.expr(e.weight) if e.weight else F.lit(None)
     if e.obj is not None:
-        cols = _triple(subj, e.predicate, _ref_uid(m, e.obj), F.lit(None), F.lit(None), weight,
+        cols = _triple(subj, e.predicate, _ref_uid(m, e.obj, concepts), F.lit(None), F.lit(None), weight,
                        _date(e.valid_from), _date(e.valid_to), e.source.dataset, skey, f"{m.source_system}.{e.id}")
     else:
         cols = _triple(subj, e.predicate, F.lit(None), F.expr(e.literal["expr"]), F.lit(e.literal["datatype"]),
@@ -304,14 +327,15 @@ def build(spark, mappings: List[M.Mapping], tb: Dict[str, Any]):
     notations = M.resolve_notations(tb)
     labels = {c["iri"]: c["label_vi"] for c in tb["classes"]}
 
-    ents = [product_entities(spark, tb)]
+    ents = [product_entities(spark, tb), concept_entities(spark, tb)]
+    concepts = {c["notation"].upper(): c["iri"] for c in tb["concepts"] if c["scheme"] in M.SCHEME_CLASS}
     tris = []
     expectations = []
     for m in mappings:
         for e in m.entities.values():
             ents.append(entity_frame(spark, m, e))
         for e in m.edges:
-            tris.append(edge_frame(spark, m, e))
+            tris.append(edge_frame(spark, m, e, concepts))
             if e.expect_rows:
                 expectations.append({"id": f"{m.source_system}.{e.id}", "sql": e.expect_rows})
         for h in m.holdings:
@@ -334,6 +358,11 @@ def build(spark, mappings: List[M.Mapping], tb: Dict[str, Any]):
     triple = tris[0] if tris else None
     for x in tris[1:]:
         triple = triple.unionByName(x)
+    # O8: cạnh fin:sameAs — chỉ cặp confidence >= AUTO_THRESHOLD (khoá chung, khớp mạnh); cặp yếu hơn
+    # nằm ở hàng đợi duyệt, KHÔNG thành cạnh. Đi qua cùng bất biến O7.
+    auto, _ = R.all_links(spark, entity)
+    if auto is not None and triple is not None:
+        triple = triple.unionByName(R.same_as_triples(auto))
     triple = triple.withColumn("triple_id", ids.triple_id_col(
         F.col("subject_uid"), F.col("predicate_iri"), F.coalesce(F.col("object_uid"), F.col("object_literal")),
         F.col("valid_from"), F.col("source_dataset")))
@@ -365,6 +394,23 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
     n_tri = write_table(triple.select(*TRIPLE_COLS, *stamp), db, "triple",
                         partition_by=["predicate_iri", F.bucket(16, F.col("subject_uid"))],
                         comment="ABox FinGraph: canh (triple_id de trich dan, thoi gian nghiep vu, nguon)")
+    auto, review = R.all_links(spark, entity)
+    n_same = n_review = 0
+    if auto is not None:
+        n_same = write_table(auto.select(*R.SAME_AS_COLS, *stamp), db, "same_as",
+                             comment="O8: cap thuc the trung (confidence >= 0.9), da thanh canh fin:sameAs")
+        n_review = write_table(review.select(*R.SAME_AS_COLS, *stamp), db, "same_as_review",
+                               comment="O8: ung vien [0.6, 0.9) cho nguoi duyet, KHONG thanh canh (evidence khong chua ten)")
+        for r in review.groupBy("rule_id").count().collect():
+            print(f"    cho duyet {r[0]}: {r[1]}")
+        # Danh sách chờ duyệt theo KHOÁ KỸ THUẬT (client_id, mã OpenSanctions) — không tên — để đối chiếu đáp
+        # án gieo (data/ground_truth/sanction_hits.csv) mà không cần quyền đọc bảng dưới persona dữ liệu
+        nk = entity.select("uid", "natural_key")
+        detail = (review.join(nk.withColumnRenamed("uid", "uid_a").withColumnRenamed("natural_key", "key_a"), "uid_a")
+                  .join(nk.withColumnRenamed("uid", "uid_b").withColumnRenamed("natural_key", "key_b"), "uid_b")
+                  .orderBy(F.col("confidence").desc()).limit(50).collect())
+        for r in detail:
+            print(f"    duyet: {r.key_a} ~ {r.key_b} conf={r.confidence:.2f} {r.evidence}")
     by_class = {r[0]: r[1] for r in entity.groupBy("class_iri").count().collect()}
     by_pred = {r[0]: r[1] for r in triple.groupBy("predicate_iri").count().collect()}
     for k in sorted(by_class):
@@ -373,5 +419,5 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
         print(f"    canh {k}: {by_pred[k]}")
     for r in report["reconciliation"]:
         print(f"    doi soat {r['mapping_id']}: nguon {r['expected']} = do thi {r['got']}")
-    return {"ontology_version": tb["version"], "run_id": run_id, "entity": n_ent, "triple": n_tri,
+    return {"ontology_version": tb["version"], "run_id": run_id, "entity": n_ent, "triple": n_tri, "same_as": n_same, "same_as_review": n_review,
             "by_class": by_class, "by_predicate": by_pred, **report}

@@ -151,3 +151,106 @@ def test_tham_so_sai_tra_ve_is_error_de_model_tu_sua(cat):
     assert res["is_error"] and "find_entity" in json.loads(res["content"])["error"]
     assert "fallbacks" not in client.calls[0]          # Bedrock: khong co tham so fallbacks
     assert ans.grounded
+
+
+# ---------------------------------------------------------------- tool AML trên Neptune (backend giả)
+
+class FakeGraph:
+    """Đồ thị giả: A -(1 bước)- B không có; A -(2 bước qua P)- B có. Ghi lại truy vấn để kiểm tham số hoá."""
+
+    def __init__(self):
+        self.calls = []
+
+    def run_cypher(self, query, params):
+        self.calls.append((query, params))
+        if "*1]" in query or "*1..1}" in query:
+            return []
+        if "-[:" in query and "*2]" in query:
+            return [{"nodes": [{"uid": U1, "label": "TK AML 1-A1"}, {"uid": "c" * 32, "label": "Corporation #1"},
+                               {"uid": "d" * 32, "label": "TK AML 2-B1"}],
+                     "edges": [{"triple_id": T1, "type": "isHeldBy"}, {"triple_id": "e" * 32, "type": "isHeldBy"}]}]
+        if "involvedIn]->(v)" in query:
+            return [{"label": "TK AML 1-A1", "attempts": [{"attempt_uid": "f" * 32, "typology": "CYCLE",
+                                                           "triple_id": "0" * 32}], "owners": []}]
+        return [{"triple_id": "1" * 32, "from_uid": U1, "to_uid": "d" * 32, "n_txn": 3}]
+
+
+def test_explain_link_tang_dan_do_dai_va_tham_so_hoa(cat):
+    g = FakeGraph()
+    t = TL.Tools(FakeBackend(), cat, graph=g)
+    out = t.call("explain_link", {"uid_a": U1, "uid_b": "d" * 32, "max_hops": 4})
+    assert out["hops"] == 2 and len(out["rows"][0]["edges"]) == 2
+    assert len(g.calls) == 2                                    # 1 buoc khong thay -> thu 2 buoc
+    assert all(U1 not in q and p == {"a": U1, "b": "d" * 32} for q, p in g.calls)   # uid KHONG ghep vao chuoi
+    assert {T1, "e" * 32, "c" * 32} <= t.seen_ids              # id long nhau vao danh sach grounding
+    assert G.check(f"Hai tai khoan cung chu [triple:{T1}] [triple:{'e' * 32}]", t.seen_ids).ok
+
+
+def test_aml_subgraph_va_loi_tham_so(cat):
+    g = FakeGraph()
+    t = TL.Tools(FakeBackend(), cat, graph=g)
+    out = t.call("aml_subgraph", {"uid": U1, "hops": 9, "limit": 10_000})
+    assert out["node"]["attempts"][0]["typology"] == "CYCLE"
+    q, p = g.calls[-1]
+    assert "*1..2]" in q and p["limit"] == 200                  # hops, limit bi kep bien
+    assert "f" * 32 in t.seen_ids and "1" * 32 in t.seen_ids
+    bad = t.call("aml_subgraph", {"uid": "' OR 1=1 //", "hops": 1, "limit": 5})
+    assert bad["_is_error"] and len(g.calls) == 2              # chan truoc khi goi Neptune
+    off = TL.Tools(FakeBackend(), cat).call("explain_link", {"uid_a": U1, "uid_b": U1, "max_hops": 2})
+    assert off["_is_error"] and "Neptune chua bat" in off["error"]
+
+
+# ---------------------------------------------------------------- sanctions_review (hàng đợi duyệt O8)
+
+def test_sanctions_review_sql_tham_so_hoa_va_kep_bien():
+    s = TL.sql_sanctions_review(None, None, 999)
+    assert "same_as_review" in s and "r.confidence >= 0.6000" in s and s.endswith("LIMIT 100")
+    s = TL.sql_sanctions_review(U1, 0.75, 5)
+    assert f"r.uid_a = '{U1}' OR r.uid_b = '{U1}'" in s and ">= 0.7500" in s
+    for bad in [("x' OR 1=1 --", None), (None, 2.0), (None, "0.7; DROP")]:
+        with pytest.raises(TL.ToolError):
+            TL.sql_sanctions_review(bad[0], bad[1], 5)
+
+
+class ReviewBackend(FakeBackend):
+    def run_sql(self, sql):
+        self.sql.append(sql)
+        return [{"uid_a": U1, "label_a": "Khách 666", "uid_b": "c" * 32, "label_b": "Ivan Petrov",
+                 "confidence": "0.80", "rule_id": "sanctions_name", "evidence": "name=exact;birth=no;country=no"}]
+
+
+def test_sanctions_review_dua_ca_hai_uid_vao_grounding(cat):
+    t = TL.Tools(ReviewBackend(), cat)
+    out = t.call("sanctions_review", {"uid": None, "min_confidence": None, "limit": None})
+    assert "CHUA duyet" in out["note"] and {U1, "c" * 32} <= t.seen_ids
+    assert any(s["name"] == "sanctions_review" for s in TL.TOOL_SPECS)
+
+
+def test_vong_lap_cong_don_usage_va_danh_dau_retry(cat):
+    def with_usage(resp, i, o):
+        resp.usage = NS(input_tokens=i, output_tokens=o, cache_read_input_tokens=100, cache_creation_input_tokens=0)
+        return resp
+    client = FakeClient([with_usage(_tool("find_entity", {"text": "Khách 2", "class_iri": None, "limit": None}, 1), 10, 5),
+                         with_usage(_text(f"Khách 2 [triple:{'d' * 32}]"), 20, 7),
+                         with_usage(_text(f"Khách 2 [uid:{U1}]"), 30, 9)])
+    ans = L.ask("?", TL.Tools(FakeBackend(), cat), client, L.MODEL, provider="bedrock")
+    assert ans.grounded and ans.retried
+    assert ans.usage == {"input_tokens": 60, "output_tokens": 21, "cache_read_input_tokens": 300,
+                         "cache_creation_input_tokens": 0}
+
+
+def test_describe_khong_phan_biet_dau(cat):
+    assert C.describe(cat, "the tin dung")[0]["iri"] == "fin:CreditCard"
+    assert C.describe(cat, "THẺ TÍN DỤNG")[0]["iri"] == "fin:CreditCard"
+
+
+def test_mcp_server_cung_tool_va_kiem_trich_dan(cat):
+    from agent import mcp_server as M
+
+    names = [s["name"] for s in M.tool_list()]
+    assert names[:-1] == [s["name"] for s in TL.TOOL_SPECS] and names[-1] == "check_citations"
+    assert all("strict" not in s for s in M.tool_list())
+    t = TL.Tools(FakeBackend(), cat)
+    assert not M.handle(t, "check_citations", {"answer": f"Khach 2 [uid:{U1}]"})["ok"]     # chua goi tool
+    M.handle(t, "find_entity", {"text": "Khách 2", "class_iri": None, "limit": None})
+    assert M.handle(t, "check_citations", {"answer": f"Khach 2 [uid:{U1}]"})["ok"]

@@ -1,0 +1,5 @@
+# Thu vien rieng cua agent (KHONG dong goi vao etl.zip, xem agent/__init__.py)
+anthropic>=1.1          # Messages API: Claude API + Amazon Bedrock (AnthropicBedrockMantle)
+boto3                   # Athena (persona workgroup), Lambda neptune-ops
+pyyaml                  # agent/eval/questions.yml
+mcp>=2.3,<3             # agent/mcp_server.py (demo qua Claude Desktop / Claude Code)

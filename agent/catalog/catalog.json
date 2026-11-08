@@ -4,6 +4,7 @@
    "children": [],
    "definition": "Tai khoan tien gui / thanh toan o mot ngan hang.",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank"
    ],
@@ -106,6 +107,7 @@
    "children": [],
    "definition": "To chuc tin dung giu tai khoan (ngan hang doi ung trong chuyen tien lien ngan hang).",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank"
    ],
@@ -453,7 +455,9 @@
   {
    "children": [],
    "definition": "Mot vu rua tien gom nhieu giao dich theo mot kieu hinh (ground truth IBM AML).",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:LaunderingAttempt",
    "label_en": "Laundering attempt",
    "label_vi": "Vụ rửa tiền",
@@ -564,9 +568,11 @@
    ],
    "definition": "Phap nhan: doanh nghiep, ho kinh doanh, to chuc.",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank",
-    "mbd"
+    "mbd",
+    "opensanctions"
    ],
    "iri": "fin:Organization",
    "label_en": "Organization",
@@ -586,10 +592,12 @@
    ],
    "definition": "Nguoi hoac to chuc co vai tro trong mot quan he tai chinh.",
    "graph_sources": [
+    "aml",
     "bank_marketing",
     "berka",
     "corebank",
-    "mbd"
+    "mbd",
+    "opensanctions"
    ],
    "iri": "fin:Party",
    "label_en": "Party",
@@ -688,7 +696,8 @@
    "graph_sources": [
     "bank_marketing",
     "berka",
-    "corebank"
+    "corebank",
+    "opensanctions"
    ],
    "iri": "fin:Person",
    "label_en": "Person",
@@ -791,7 +800,9 @@
   {
    "children": [],
    "definition": "Thuc the co trong danh sach cam van / theo doi (OpenSanctions).",
-   "graph_sources": [],
+   "graph_sources": [
+    "opensanctions"
+   ],
    "iri": "fin:SanctionedEntity",
    "label_en": "Sanctioned entity",
    "label_vi": "Đối tượng bị cấm vận",
@@ -886,7 +897,9 @@
   {
    "children": [],
    "definition": "Mau cau truc chuyen tien rua tien: FAN-OUT, FAN-IN, CYCLE, SCATTER-GATHER, GATHER-SCATTER, BIPARTITE, STACK, RANDOM.",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:Typology",
    "label_en": "Laundering typology",
    "label_vi": "Kiểu hình rửa tiền",
@@ -916,6 +929,7 @@
    "definition": "Ngan hang giu tai khoan.",
    "domain": "fin:Account",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank"
    ],
@@ -993,7 +1007,9 @@
   {
    "definition": "Kieu hinh cua vu rua tien.",
    "domain": "fin:LaunderingAttempt",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:hasTypology",
    "kind": "object",
    "label_vi": "có kiểu hình",
@@ -1029,7 +1045,9 @@
   {
    "definition": "Tai khoan gui hoac nhan tien trong mot vu rua tien.",
    "domain": "fin:Account",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:involvedIn",
    "kind": "object",
    "label_vi": "tham gia vụ",
@@ -1052,7 +1070,9 @@
   {
    "definition": "So huu phap nhan truc tiep (weight = ty le so huu). Bac cau tinh san o track_a_onto.closure.",
    "domain": "fin:Party",
-   "graph_sources": [],
+   "graph_sources": [
+    "opensanctions"
+   ],
    "iri": "fin:isDirectlyOwnedBy",
    "kind": "object",
    "label_vi": "được sở hữu trực tiếp bởi",
@@ -1062,7 +1082,9 @@
   {
    "definition": "Tai khoan thuoc mot ben tham gia (IBM AML account -> entity_id).",
    "domain": "fin:Account",
-   "graph_sources": [],
+   "graph_sources": [
+    "aml"
+   ],
    "iri": "fin:isHeldBy",
    "kind": "object",
    "label_vi": "thuộc về bên",
@@ -1145,7 +1167,10 @@
   {
    "definition": "Hai node la cung mot thuc the o hai nguon, KEM do tin cay. Khong dung owl:sameAs: gop cung sai thi khong go duoc.",
    "domain": "fin:Party",
-   "graph_sources": [],
+   "graph_sources": [
+    "berka",
+    "corebank"
+   ],
    "iri": "fin:sameAs",
    "kind": "object",
    "label_vi": "cùng là",
@@ -1186,6 +1211,7 @@
    "definition": "Canh TONG HOP: tai khoan chuyen tien toi tai khoan khac trong mot ky (weight = tong tien). Tung giao dich o silver.",
    "domain": "fin:Account",
    "graph_sources": [
+    "aml",
     "berka",
     "corebank"
    ],
@@ -1230,9 +1256,11 @@
   }
  ],
  "sources": [
+  "aml",
   "bank_marketing",
   "berka",
   "corebank",
-  "mbd"
+  "mbd",
+  "opensanctions"
  ]
 }

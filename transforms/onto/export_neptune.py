@@ -13,6 +13,10 @@ Quy tắc chiếu:
   - KHÔNG xuất natural_key: Neptune chỉ phân quyền mức cụm, không che cột được như Lake Formation.
   - --AS_OF (tuỳ chọn): chỉ cạnh/đỉnh có valid_from < AS_OF — bản point-in-time cho Neptune Analytics
     tính đặc trưng model mà không rò tương lai (quy tắc O9).
+  - --SCOPE aml_investigation: AML chỉ xuất VÙNG ĐIỀU TRA (docs/NEPTUNE.md mục 3.1) thay vì 2,1 triệu tài
+    khoản / 3 triệu cặp chuyển tiền: hạt giống = tài khoản tham gia một vụ rửa tiền; mở một bước theo
+    transfersTo (hai chiều) và theo chủ sở hữu chung (isHeldBy); cạnh AML chỉ giữ khi CẢ HAI đầu trong
+    vùng. Nguồn khác (corebank, Berka, UC2) giữ nguyên. Đồ thị đầy đủ vẫn ở Iceberg.
 """
 
 from __future__ import annotations
@@ -28,6 +32,42 @@ def _local(col):
     from pyspark.sql import functions as F
 
     return F.regexp_replace(col, "^[a-z]+:", "")
+
+
+AML = "aml"
+
+
+def aml_investigation(entity, triple):
+    """Cắt AML về vùng điều tra; trả (entity, triple) đã lọc. Nguồn khác không đổi."""
+    from pyspark.sql import functions as F
+
+    is_aml_e = F.col("source_system") == AML
+    aml_t = triple.where(F.col("source_dataset").startswith("silver_aml"))
+    rest_t = triple.where(~F.col("source_dataset").startswith("silver_aml") | F.col("source_dataset").isNull())
+    pred = lambda p: aml_t.where(F.col("predicate_iri") == p)  # noqa: E731
+
+    seeds = pred("fin:involvedIn").select(F.col("subject_uid").alias("uid")).distinct()
+    tr = pred("fin:transfersTo")
+    nb = (tr.join(seeds, tr.subject_uid == seeds.uid).select(F.col("object_uid").alias("uid"))
+          .union(tr.join(seeds, tr.object_uid == seeds.uid).select(F.col("subject_uid").alias("uid"))))
+    held = pred("fin:isHeldBy")
+    owners = held.join(seeds, held.subject_uid == seeds.uid).select(F.col("object_uid").alias("party"))
+    same_owner = held.join(owners, held.object_uid == owners.party).select(F.col("subject_uid").alias("uid"))
+    accounts = seeds.union(nb).union(same_owner).distinct()
+    # Đỉnh phụ của vùng: ngân hàng, chủ sở hữu của tài khoản trong vùng, vụ rửa tiền
+    side = (aml_t.where(F.col("predicate_iri").isin("fin:atBank", "fin:isHeldBy"))
+            .join(accounts, aml_t.subject_uid == accounts.uid).select(F.col("object_uid").alias("uid")))
+    attempts = pred("fin:involvedIn").select(F.col("object_uid").alias("uid"))
+    keep = accounts.union(side).union(attempts).distinct().cache()
+
+    ent = entity.where(~is_aml_e).unionByName(entity.where(is_aml_e).join(keep, "uid", "left_semi"))
+    s_in = aml_t.join(keep.withColumnRenamed("uid", "subject_uid"), "subject_uid", "left_semi")
+    # Đối tượng: trong vùng, hoặc là node ontology (khái niệm kiểu hình) — không thuộc AML
+    onto_uids = entity.where(~is_aml_e).select(F.col("uid").alias("object_uid"))
+    kept_obj = keep.withColumnRenamed("uid", "object_uid").union(onto_uids)
+    t_aml = s_in.where(F.col("object_uid").isNull()).unionByName(
+        s_in.join(kept_obj, "object_uid", "left_semi").select(*s_in.columns))
+    return ent, rest_t.unionByName(t_aml)
 
 
 def frames(entity, triple, subclass, as_of: Optional[str] = None):
@@ -86,15 +126,26 @@ def run(spark, args: Dict[str, str]) -> Dict[str, Any]:
     as_of = args.get("AS_OF")
     ent, tri, sub = (spark.table(f"{CATALOG}.{db}.{t}") for t in ("entity", "triple", "subclass"))
     run_id = tri.select("run_id").first()[0]
+    scope = args.get("SCOPE", "full")
+    if scope == "aml_investigation":
+        ent, tri = aml_investigation(ent, tri)
+        ent, tri = ent.cache(), tri.cache()
+    elif scope != "full":
+        raise ValueError(f"--SCOPE {scope!r}: full | aml_investigation")
     vertices, edges = frames(ent, tri, sub.select("class_iri", "ancestor_iri"), as_of)
-    out = f"{base}/{run_id}" + (f"/as_of={as_of}" if as_of else "")
+    out = f"{base}/{run_id}/{scope}" + (f"/as_of={as_of}" if as_of else "")
     opts = {"header": "true", "escape": '"', "quoteAll": "false", "emptyValue": ""}
     # Bulk loader nap MOI file duoi prefix: khong de Spark ghi file rong _SUCCESS
     spark.sparkContext._jsc.hadoopConfiguration().set("mapreduce.fileoutputcommitter.marksuccessfuljobs", "false")
-    vertices.write.mode("overwrite").options(**opts).csv(f"{out}/vertices")
-    edges.write.mode("overwrite").options(**opts).csv(f"{out}/edges")
+    # File DEU va NHO: bang triple phan vung theo predicate nen Spark ra file lech (0,15 -> 28 MB);
+    # bulk loader tren db.t4g.medium (4 GB) het bo nho o file 28 MB (11-07). Chia ~ROWS_PER_FILE dong/file.
+    rows = int(args.get("ROWS_PER_FILE", "20000"))
+    n_files = lambda n: max(1, -(-n // rows))  # noqa: E731
+    vertices.repartition(n_files(ent.count())).write.mode("overwrite").options(**opts).csv(f"{out}/vertices")
+    n_edge_files = n_files(tri.where("object_uid IS NOT NULL").count())
+    edges.repartition(n_edge_files).write.mode("overwrite").options(**opts).csv(f"{out}/edges")
     n_v, n_e = spark.read.option("header", "true").csv(f"{out}/vertices").count(), \
         spark.read.option("header", "true").csv(f"{out}/edges").count()
-    print(f"  xuat {out}: {n_v} dinh, {n_e} canh (graph run_id {run_id})")
-    return {"path": out, "graph_run_id": run_id, "vertices": n_v, "edges": n_e,
-            "loader_hint": {"source": out + "/", "format": "opencypher", "parallelism": "HIGH"}}
+    print(f"  xuat {out}: {n_v} dinh, {n_e} canh (graph run_id {run_id}, scope {scope})")
+    return {"path": out, "graph_run_id": run_id, "scope": scope, "vertices": n_v, "edges": n_e,
+            "loader_hint": {"source": out + "/", "format": "opencypher", "parallelism": "LOW"}}

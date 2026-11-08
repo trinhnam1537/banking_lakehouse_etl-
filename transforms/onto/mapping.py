@@ -56,6 +56,11 @@ class Source:
 class Ref:
     entity: str              # id của mục entities trong cùng file
     key: List[str]           # biểu thức SQL, khớp theo vị trí với key của node
+    concept: Optional[str] = None   # hoặc: biểu thức -> skos:notation của một khái niệm TBox (vd 'FAN-OUT')
+
+
+# Lớp của node khái niệm theo concept scheme (khái niệm SKOS trong TBox thành node trên đồ thị)
+SCHEME_CLASS = {"fin:typologyScheme": "fin:Typology"}
 
 
 @dataclass
@@ -142,6 +147,8 @@ def _source(raw: Dict[str, Any], database: str, where_ctx: str) -> Source:
 
 
 def _ref(raw: Any, ctx: str) -> Ref:
+    if isinstance(raw, dict) and "concept" in raw:
+        return Ref(entity="", key=[], concept=str(raw["concept"]))
     if not isinstance(raw, dict) or "entity" not in raw or "key" not in raw:
         raise MappingError(f"{ctx}: tham chieu node can {{entity, key}}")
     key = raw["key"] if isinstance(raw["key"], list) else [raw["key"]]
@@ -299,6 +306,8 @@ def validate(mappings: List[Mapping], tbox: Dict[str, Any]) -> None:
             errors.append(f"{ctx}: doi tuong {obj_types} khong phai {p['range']} (range {p['iri']})")
 
     def ref_types(m: Mapping, r: Ref, ctx: str) -> Optional[List[str]]:
+        if r.concept is not None:
+            return sorted(set(SCHEME_CLASS.values()))
         e = m.entities.get(r.entity)
         if e is None:
             errors.append(f"{ctx}: khong co node `{r.entity}` trong {m.name}")
