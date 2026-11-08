@@ -1,5 +1,8 @@
 # Tầng Ontology và Knowledge Graph — thiết kế, xây dựng, phục vụ model và AI agent
 
+> Lý thuyết nền (RDF, OWL, SHACL, SKOS, suy diễn, hợp nhất thực thể, so sánh với các KG khác, nguồn trích dẫn):
+> [KG-ONTOLOGY-THEORY.md](KG-ONTOLOGY-THEORY.md).
+
 > **Trạng thái (10-30, kiểm lại 10-31):** tài liệu **thiết kế**. Đã có trên hạ tầng: database `track_a_onto`
 > (**rỗng**: bảng `triple` CHƯA được tạo; lược đồ 6 cột mới chỉ nằm trong job khung `jobs/glue/onto_closure.py`,
 > job này đọc bảng đó nhưng chưa chạy bao giờ; mục 4.2 là thiết kế), các tầng nguồn
