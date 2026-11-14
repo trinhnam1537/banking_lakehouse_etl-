@@ -85,10 +85,18 @@ def lending_conn():
 
 
 def kafka_producer(client_id: str):
-    """Producer an toàn: idempotent + acks=all — producer thử lại không sinh bản trùng."""
+    """Producer an toàn: idempotent + acks=all — producer thử lại không sinh bản trùng.
+
+    Broker có SASL (máy nguồn EC2): đặt KAFKA_SASL_USERNAME / KAFKA_SASL_PASSWORD
+    (KAFKA_SASL_MECHANISM mặc định SCRAM-SHA-512). Không đặt = PLAINTEXT (Redpanda local).
+    """
     from confluent_kafka import Producer
 
+    from sourcing.readers.kafka import sasl_conf
+
     return Producer({
+        **sasl_conf(env("KAFKA_SASL_USERNAME", ""), env("KAFKA_SASL_PASSWORD", ""),
+                    env("KAFKA_SASL_MECHANISM", "SCRAM-SHA-512")),
         "bootstrap.servers": env("KAFKA_BOOTSTRAP", "localhost:19092"),
         "client.id": client_id,
         "enable.idempotence": True,

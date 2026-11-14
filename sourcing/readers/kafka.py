@@ -24,6 +24,24 @@ from .base import Batch, Reader
 BATCH_SIZE = 10_000
 
 
+def sasl_conf(username: str, password: str, mechanism: str = "SCRAM-SHA-512") -> Dict[str, str]:
+    """Cấu hình librdkafka cho SASL/SCRAM. User rỗng hoặc còn nguyên `${BIEN}` -> {} (PLAINTEXT).
+
+    `${BIEN}` còn nguyên nghĩa là máy chạy không đặt biến: chạy local với Redpanda không
+    xác thực. Gặp broker có SASL thì broker từ chối kết nối, lỗi hiện ngay ở lần đầu.
+    """
+    if not username or username.startswith("${"):
+        return {}
+    if not password or password.startswith("${"):
+        raise ValueError(f"co sasl_username '{username}' nhung thieu mat khau")
+    return {
+        "security.protocol": "SASL_PLAINTEXT",
+        "sasl.mechanism": mechanism,
+        "sasl.username": username,
+        "sasl.password": password,
+    }
+
+
 class KafkaReader(Reader):
     """Cần `confluent-kafka` — khai trong runtime.additional_python_modules."""
 
@@ -47,6 +65,7 @@ class KafkaReader(Reader):
             # bản tin còn nằm trong bộ nhớ lúc job chết.
             "enable.auto.commit": False,
             "socket.timeout.ms": 20_000,
+            **sasl_conf(self.k.sasl_username, self.k.sasl_password, self.k.sasl_mechanism),
         })
 
     def read(self, checkpoint: Optional[Checkpoint]) -> Iterator[Batch]:

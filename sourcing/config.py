@@ -173,6 +173,12 @@ class KafkaSource:
     auto_offset_reset: str = "earliest"
     max_records_per_run: int = 500_000
     poll_timeout_seconds: float = 10.0
+    # SASL/SCRAM: chi user + mat khau, khong TLS (broker chi nghe trong VPC). Bo trong (hoac
+    # bien ${...} chua dat) = PLAINTEXT, cho Redpanda local. Mat khau KHONG ghi vao YAML:
+    # "${KAFKA_SASL_PASSWORD}", may chay tu dat (repo ha tang: kafka-sink.sh).
+    sasl_username: str = ""
+    sasl_password: str = field(default="", repr=False)
+    sasl_mechanism: str = "SCRAM-SHA-512"
 
 
 @dataclass
