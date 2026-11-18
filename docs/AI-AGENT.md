@@ -320,10 +320,7 @@ hai agent là đóng góp của ontology. Đã có (11-18): `agent/baseline.py` 
   liệu hơn agent ontology. Không kiểm grounding (không có uid để trích); cột "Căn cứ" của đối chứng luôn "không".
 
 ```powershell
-# 1 lan / gio (credential 1 gio): nhap MFA cho tung persona, ghi ra profile -mcp cho boto3 (repo ha tang)
-#   . .\docs\iamssume.ps1 -Profile fg-de -McpProfile fg-de-mcp
-#   . .\docs\iamssume.ps1 -Profile fg-analyst -McpProfile fg-analyst-mcp      (doi ma MFA moi, khong dung lai ma cu)
-#   . .\docs\iamssume.ps1                                                     (TerraformAdmin: Lambda neptune-ops, Bedrock)
+# Repo ha tang: . .\docs\iamssume-all.ps1  (1 ma MFA -> fingraph-mcp, fg-de-mcp, fg-analyst-mcp; chay lai moi gio)
 $env:FINGRAPH_BEDROCK_RUNTIME_MODEL = "global.anthropic.claude-opus-4-6-v1"
 .\.venv\Scripts\python.exe -m agent.eval.run --provider bedrock-runtime `
     --workgroup fingraph-dev-analyst --agent-profile fg-analyst-mcp `
