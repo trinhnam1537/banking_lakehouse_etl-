@@ -127,7 +127,10 @@ def sql_neighborhood(uid: str, predicate_iri: Optional[str], direction: str, lim
 
 
 def sql_count_holders(product_class: str, region_label: Optional[str], as_of: Optional[str]) -> str:
-    """CQ2: số khách giữ sản phẩm thuộc lớp X (gồm MỌI lớp con, qua bảng subclass)."""
+    """CQ2: số khách giữ sản phẩm thuộc lớp X (gồm MỌI lớp con, qua bảng subclass).
+
+    Trả cả dòng TỔNG theo nguồn (class_iri = '*'): số khách KHÁC NHAU giữ ít nhất một lớp con. Cộng các dòng theo lớp
+    con là SAI khi một khách giữ nhiều lớp con (đánh giá 11-18, câu A03: cộng ra 1.574, đúng là 1.404)."""
     c, d = _cls(product_class), _date(as_of)
     region = ""
     if region_label:
@@ -140,14 +143,17 @@ def sql_count_holders(product_class: str, region_label: Optional[str], as_of: Op
               WHERE l.subject_uid = h.subject_uid AND l.predicate_iri = 'fin:locatedIn'
                 AND lower(rg.label) LIKE '%{r}%')"""
     return f"""
-SELECT p.class_iri, p.label, c.source_system, count(DISTINCT h.subject_uid) AS customers
+SELECT coalesce(p.class_iri, '*') AS class_iri,
+       coalesce(p.label, 'TONG so khach khac nhau (moi lop con)') AS label,
+       c.source_system, count(DISTINCT h.subject_uid) AS customers
 FROM {DB}.triple h
 JOIN {DB}.triple o ON o.subject_uid = h.object_uid AND o.predicate_iri = 'fin:ofProduct'
 JOIN {DB}.entity p ON p.uid = o.object_uid
 JOIN {DB}.subclass s ON s.class_iri = p.class_iri AND s.ancestor_iri = '{c}'
 JOIN {DB}.entity c ON c.uid = h.subject_uid
 WHERE h.predicate_iri = 'fin:hasHolding'{_at('h', d)}{region}
-GROUP BY p.class_iri, p.label, c.source_system ORDER BY customers DESC""".strip()
+GROUP BY GROUPING SETS ((p.class_iri, p.label, c.source_system), (c.source_system))
+ORDER BY c.source_system, (p.class_iri IS NULL) DESC, customers DESC""".strip()
 
 
 # ---------------------------------------------------------------- openCypher (Neptune)
@@ -212,7 +218,7 @@ WHERE r.confidence >= {lo:.4f}{who}
 ORDER BY r.confidence DESC, r.uid_a LIMIT {max(1, min(int(limit), 100))}""".strip()
 
 
-def check_readonly_sql(sql: str) -> str:
+def check_readonly_sql(sql: str, read_dbs: tuple = READ_DBS) -> str:
     s = sql.strip().rstrip(";")
     if ";" in s:
         raise ToolError("chi mot cau lenh")
@@ -222,8 +228,8 @@ def check_readonly_sql(sql: str) -> str:
         raise ToolError("cau lenh co tu khoa ghi/DDL")
     dbs = {m.lower() for m in re.findall(r"\b([a-z_][a-z0-9_]*)\.[a-z_][a-z0-9_]*\b", s, re.IGNORECASE)}
     tables_dbs = {d for d in dbs if d.startswith(("track_", "silver_", "raw_"))}
-    if tables_dbs - set(READ_DBS):
-        raise ToolError(f"chi doc duoc {READ_DBS}, cau co {sorted(tables_dbs - set(READ_DBS))}")
+    if tables_dbs - set(read_dbs):
+        raise ToolError(f"chi doc duoc {read_dbs}, cau co {sorted(tables_dbs - set(read_dbs))}")
     if not re.search(r"\blimit\s+\d+\s*$", s, re.IGNORECASE):
         s += f" LIMIT {MAX_ROWS}"
     return s

@@ -1,0 +1,6 @@
+# Thu vien rieng cua recsys/ (KHONG dong goi vao etl.zip, khong chay tren Glue)
+pandas>=2.2
+scikit-learn>=1.5
+lightgbm>=4.5
+matplotlib>=3.9
+boto3

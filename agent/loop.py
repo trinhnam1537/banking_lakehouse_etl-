@@ -30,6 +30,11 @@ MODEL = "claude-opus-5-5"
 # Bedrock ap-southeast-1 (kiem 06-11-2026): Opus 5.5 chi goi qua inference profile, profile duy nhat la
 # global.* (co the xu ly ngoai Singapore, xem agent/README.md A2). Ghi de bang FINGRAPH_BEDROCK_MODEL.
 BEDROCK_MODEL = os.environ.get("FINGRAPH_BEDROCK_MODEL", "global.anthropic.claude-opus-5-5")
+# Bedrock qua bedrock-runtime (InvokeModel, client AnthropicBedrock). Kiem 18-11-2026: Mantle chua phuc vu o
+# ap-southeast-1 (404 moi model) va tai khoan chi duoc cap Claude 4.6 tro xuong; Opus 4.6 la model manh nhat
+# goi duoc. Ghi de bang FINGRAPH_BEDROCK_RUNTIME_MODEL khi AWS cap them model.
+BEDROCK_RUNTIME_MODEL = os.environ.get("FINGRAPH_BEDROCK_RUNTIME_MODEL", "global.anthropic.claude-opus-4-6-v1")
+PROVIDERS = ("anthropic", "bedrock", "bedrock-runtime")
 MAX_TURNS = 12
 
 RULES = """Ban la tro ly du lieu cua ngan hang (do an FinGraph). Ban tra loi cau hoi ve khach hang, tai khoan,
@@ -75,7 +80,12 @@ class Answer:
 
 
 def make_client(provider: str, region: str = "ap-southeast-1"):
-    """(client, model). provider: 'anthropic' (Claude API) | 'bedrock' (Amazon Bedrock, Mantle)."""
+    """(client, model). provider: 'anthropic' (Claude API) | 'bedrock' (Amazon Bedrock, Mantle)
+    | 'bedrock-runtime' (Amazon Bedrock, InvokeModel)."""
+    if provider == "bedrock-runtime":
+        from anthropic import AnthropicBedrock
+
+        return AnthropicBedrock(aws_region=region, max_retries=6), BEDROCK_RUNTIME_MODEL
     if provider == "bedrock":
         from anthropic import AnthropicBedrockMantle
 
@@ -92,11 +102,15 @@ def _create(client, provider: str, **kw):
 
 
 def ask(question: str, tools: Tools, client, model: str, provider: str = "anthropic",
-        max_turns: int = MAX_TURNS) -> Answer:
+        max_turns: int = MAX_TURNS, system: Optional[List[Dict[str, Any]]] = None,
+        tool_specs: Optional[List[Dict[str, Any]]] = None, check_grounding: bool = True) -> Answer:
+    """Một câu hỏi, một phiên. system / tool_specs / check_grounding cho phép chạy agent đối chứng
+    (agent/baseline.py) trên CÙNG vòng lặp: chỉ khác bộ tool và system prompt."""
     log: List[Dict[str, Any]] = []
     prev_log = tools.log
     tools.log = lambda rec: (log.append(rec), prev_log(rec))
-    system = system_blocks(tools.cat)
+    system = system if system is not None else system_blocks(tools.cat)
+    specs = tool_specs if tool_specs is not None else TOOL_SPECS
     messages: List[Dict[str, Any]] = [{"role": "user", "content": question}]
     retried = False
     usage = dict.fromkeys(USAGE_KEYS, 0)
@@ -105,8 +119,9 @@ def ask(question: str, tools: Tools, client, model: str, provider: str = "anthro
         return Answer(text, grounded, rep, log, turn, stop, retried, usage)
 
     for turn in range(1, max_turns + 1):
-        resp = _create(client, provider, model=model, max_tokens=16000, system=system, tools=TOOL_SPECS,
-                       messages=messages, output_config={"effort": "medium"}, cache_control={"type": "ephemeral"})
+        resp = _create(client, provider, model=model, max_tokens=16000, system=system, tools=specs,
+                       messages=messages, thinking={"type": "adaptive"}, output_config={"effort": "medium"},
+                       cache_control={"type": "ephemeral"})
         u = getattr(resp, "usage", None)
         for k in USAGE_KEYS:
             usage[k] += int(getattr(u, k, 0) or 0)
@@ -127,6 +142,8 @@ def ask(question: str, tools: Tools, client, model: str, provider: str = "anthro
             messages.append({"role": "user", "content": results})          # MOT message cho moi ket qua
             continue
         text = "".join(b.text for b in resp.content if b.type == "text")
+        if not check_grounding:
+            return done(text, False, None, turn, resp.stop_reason)
         rep = G.check(text, tools.seen_ids)
         if rep.ok:
             return done(text, True, rep, turn, resp.stop_reason)
@@ -142,7 +159,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Hoi agent FinGraph")
     ap.add_argument("question")
     ap.add_argument("--workgroup", required=True, help="Athena workgroup cua persona, vd fingraph-dev-analyst")
-    ap.add_argument("--provider", choices=["anthropic", "bedrock"], default="bedrock")
+    ap.add_argument("--provider", choices=PROVIDERS, default="bedrock")
     ap.add_argument("--region", default="ap-southeast-1")
     ap.add_argument("--neptune", default=None, help="ten Lambda neptune-ops de bat tool AML, vd fingraph-dev-neptune-ops")
     a = ap.parse_args(argv)

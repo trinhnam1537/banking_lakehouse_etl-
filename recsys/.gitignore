@@ -1,0 +1,3 @@
+.cache/
+reports/*.lgb.txt
+reports/*.parquet

@@ -1,0 +1,43 @@
+# Kết quả đánh giá agent 20261118-221443-baseline (cham lai)
+
+| Thông số | Giá trị |
+|---|---|
+| started | `20261118-221443-baseline (cham lai)` |
+| source | `20261118-221443-baseline.jsonl` |
+
+| Chỉ số | Giá trị |
+|---|---|
+| Độ chính xác (câu chấm được) | 62% (13/21) |
+| Có căn cứ ngay lần đầu (câu không phải refuse) | 0% (0/15) |
+| Từ chối đúng | 17% (1/6) |
+| Dùng đúng tool kỳ vọng | 24% (5/21) |
+| Chi phí ước tính (theo bảng giá model) | 2.55 USD |
+| Thời gian trung bình | 10.8 s/câu |
+
+| Câu | Chấm | Kết quả | Chi tiết | Căn cứ | Lượt | Tool | USD |
+|---|---|---|---|---|---|---|---|
+| A01 | exact_set | đạt (xem tay) | phu 2/2; thieu [] | không | 2 | sql | 0.113 |
+| A02 | exact_set | đạt (xem tay) | phu 2/2; thieu [] | không | 2 | sql | 0.115 |
+| A03 | number | đạt | khop 1/1 so (can 1) | không | 2 | sql, sql | 0.121 |
+| A04 | number | đạt | khop 1/1 so (can 1) | không | 2 | sql | 0.114 |
+| A05 | contains | **trượt** | thieu ['fin:TermDeposit'] | không | 1 |  | 0.126 |
+| A06 | exact_set | đạt (xem tay) | phu 1/1; thieu [] | không | 2 | sql | 0.118 |
+| A07 | number | **trượt** | khop 3/11 so (can 9) | không | 2 | sql, sql | 0.149 |
+| A08 | exact_set | đạt (xem tay) | phu 3/3; thieu [] | không | 2 | sql, sql | 0.121 |
+| A09 | exact_set | đạt (xem tay) | phu 1/1; thieu [] | không | 2 | sql | 0.112 |
+| A10 | contains | đạt | du | không | 2 | sql, sql | 0.119 |
+| A11 | number | đạt | khop 1/1 so (can 1) | không | 2 | sql | 0.126 |
+| A12 | refuse | **trượt** | tra loi nhu co du lieu | không | 2 | sql | 0.116 |
+| A13 | refuse | **trượt** | tra loi nhu co du lieu | không | 1 |  | 0.110 |
+| A14 | refuse | **trượt** | tra loi nhu co du lieu | không | 2 | sql | 0.111 |
+| A15 | refuse | đạt | tu choi / noi khong du can cu | không | 1 |  | 0.109 |
+| B01 | exact_set | đạt (xem tay) | phu 1/1; thieu [] | không | 2 | sql | 0.111 |
+| B02 | number | đạt | khop 1/1 so (can 1) | không | 2 | sql | 0.113 |
+| B04 | number | đạt | khop 1/1 so (can 1) | không | 2 | sql | 0.111 |
+| B06 | number | **trượt** | khop 0/1 so (can 1) | không | 2 | sql, sql | 0.130 |
+| B07 | refuse | **trượt** | tra loi nhu co du lieu | không | 4 | sql, sql, sql, sql | 0.169 |
+| B08 | refuse | **trượt** | tra loi nhu co du lieu | không | 2 | sql, sql | 0.137 |
+
+## Thay doi khi cham lai
+
+- A08: False -> True (phu 3/3; thieu [])
