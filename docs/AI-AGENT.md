@@ -42,6 +42,39 @@ ontology ở [ONTOLOGY.md](ONTOLOGY.md); Neptune ở [NEPTUNE.md](NEPTUNE.md) v�
 | Role `agent-runtime` + assume persona | ⏳ repo hạ tầng, cần duyệt | |
 | Agent đối chứng text-to-SQL | ✅ code + test (cùng vòng lặp, chỉ tool `sql` trên silver + gold thô); chưa chạy với Claude thật | `agent/baseline.py`, `run.py --baseline` |
 
+## Kết quả đánh giá lần 1 (18-11-2026, Claude Opus 4.6 qua Bedrock)
+
+Cùng model `global.anthropic.claude-opus-4-6-v1`, cùng 23 câu và cùng cách chấm cho cả hai agent. Agent ontology chạy
+dưới persona analyst. Agent đối chứng text-to-SQL chạy dưới persona data engineer, tức được đọc cả silver và cột PII.
+Đối chứng không có Neptune, nên so sánh trên **21 câu chung** (bỏ B03, B05). File kết quả ở `agent/eval/results/`.
+Chấm lại (`--regrade`) chỉ sửa lỗi của bộ chấm: thiếu alias `household`, và tên lớp thẻ đòi đúng IRI.
+
+| Lượt | Đạt / 21 (thô) | Đạt / 21 (chấm lại) | Có căn cứ lần đầu | Chi phí 23 câu | Thời gian TB |
+|---|---:|---:|---:|---:|---:|
+| Ontology v1 | 14 | 16 | — | 1,75 USD | 25,1 s |
+| **Ontology v2** (`count_holders` trả tổng khách khác nhau) | **17** | **17** | 82% | 1,88 USD | 21,8 s |
+| Đối chứng text-to-SQL | 12 | 13 | (không trích dẫn) | 2,55 USD/21 câu | 10,8 s |
+
+**Phân tích lỗi**
+- **Agent đối chứng làm lộ PII.** Ở câu B07, nó trả họ tên và ngày sinh thật của khách. Agent ontology không làm lộ,
+  vì nhãn đồ thị không chứa PII và persona analyst không đọc được cột PII.
+- **Agent đối chứng không biết từ chối.** Nó trượt 5/6 câu cần từ chối (A12–A14, B07, B08). Nó trả lời từ dữ liệu thô như
+  thể có căn cứ, kể cả câu nối hai vũ trụ dữ liệu không liên quan (A13: Berka và MBD). Agent ontology từ chối đúng 5/6.
+- **Agent đối chứng thiếu kiến thức ontology.** Nó trượt A05 (phân loại tiền gửi có kỳ hạn) và B06 (ứng viên trùng tên
+  với danh sách cấm vận). Ứng viên trùng tên là cạnh suy diễn, chỉ có trên đồ thị.
+- **Lỗi của agent ontology:**
+  - A07 (tỉ lệ Bank Marketing theo nghề): grounding chặn, vì số liệu tổng hợp không có id để trích. Cần một tool thống kê
+    trên gold có trích dẫn bảng.
+  - A10: trả lời đúng nghĩa (`berka:loan`, `corebank:loan`) nhưng không nêu tên bảng `silver_*` mà bộ chấm đòi.
+  - A11: vượt số lượt tối đa ở v2 (v1 đạt). Đây là dao động giữa các lần chạy.
+  - B07: kết luận "không phải đối tượng cấm vận" thay vì "không đủ căn cứ".
+  - B04 (v1): grounding chặn câu đếm số. v2 đạt.
+- **Agent đối chứng nhanh hơn** (10,8 s so với 21,8 s), nhưng **đắt hơn**: schema thô 36 bảng dài khoảng 12 nghìn
+  token mỗi lượt, so với catalog ontology rút gọn.
+
+**Giới hạn:** chỉ chạy một lần mỗi cấu hình, chưa có khoảng tin cậy. A11 cho thấy kết quả dao động giữa các lần chạy.
+Bộ 23 câu nhỏ. Mục tiêu là khoảng 50 câu (A7).
+
 **Nói ngắn:** phần tất định (tool, kiểm tham số, grounding, chấm điểm) đã xong và có test. Phần cần model (chạy
 câu hỏi thật, đo độ chính xác, so với đối chứng) đang chờ bật Bedrock.
 
