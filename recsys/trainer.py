@@ -55,9 +55,13 @@ def fit(spec: Spec, df, seed: int = 7, max_rounds: int = 2000, neg_rate: float =
     for j, (p, y) in enumerate(zip(spec.products, spec.label_cols)):
         ytr, yva = Yv(tr, y), Yv(va, y)
         keep = (ytr > 0) | (np.random.default_rng(seed + j).random(len(ytr)) < neg_rate)
+        vkeep = np.ones(len(yva), bool)
+        if spec.eligible_cols:   # chi hoc tren dong san pham CON duoc goi y: dong da giu luon nhan 0, hoc vo nghia
+            keep &= tr[spec.eligible_cols[j]].to_numpy(bool)
+            vkeep = va[spec.eligible_cols[j]].to_numpy(bool)
         dtr = lgb.Dataset(Xtr[keep], ytr[keep], feature_name=list(spec.feature_cols), categorical_feature=cat_idx or "auto",
                           free_raw_data=False).construct()
-        dva = lgb.Dataset(Xva, yva, reference=dtr, free_raw_data=False).construct()
+        dva = lgb.Dataset(Xva[vkeep], yva[vkeep], reference=dtr, free_raw_data=False).construct()
         m = lgb.train(_lgb_params(seed), dtr, max_rounds, valid_sets=[dva],
                       callbacks=[lgb.early_stopping(100, verbose=False)])
         models[p] = m
@@ -87,7 +91,7 @@ def fit(spec: Spec, df, seed: int = 7, max_rounds: int = 2000, neg_rate: float =
 def report(res: Dict) -> str:
     rk = res["ranking"]
     kcol = next(k for k in rk[0] if k.startswith("map@"))
-    pp = [r for r in res["per_product"] if r["model"] in ("lightgbm", "repeat")]
+    pp = [r for r in res["per_product"] if r["model"] != "popularity"]
     out = [f"### {res['dataset']}", "",
            f"Train {res['n_train']:,} / valid {res['n_valid']:,} / test {res['n_test']:,} dong.", "",
            "**Xep hang san pham cho tung khach** (dong test co >= 1 san pham duoc mua):", "",
