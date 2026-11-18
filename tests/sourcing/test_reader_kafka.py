@@ -169,3 +169,47 @@ def test_kafka_khong_co_tin_moi_thi_khong_consume(fake_kafka):
     fake_kafka.update(partitions=[0, 1], high={0: 42, 1: 0}, rounds=[[_Msg(0, 99)]])
     batches = list(KafkaReader(_kafka_cfg()).read(Checkpoint("t_job", {"0": "41"})))
     assert batches == []
+
+
+# ---------- SASL/SCRAM ----------
+
+
+def test_kafka_sasl_khi_co_user(fake_kafka):
+    from sourcing.readers.kafka import KafkaReader
+
+    fake_kafka.update(partitions=[0], rounds=[])
+    list(KafkaReader(_kafka_cfg(sasl_username="u", sasl_password="p")).read(None))
+    conf = fake_kafka["c"].conf
+    assert conf["security.protocol"] == "SASL_PLAINTEXT"
+    assert conf["sasl.mechanism"] == "SCRAM-SHA-512"
+    assert (conf["sasl.username"], conf["sasl.password"]) == ("u", "p")
+
+
+def test_kafka_bien_chua_dat_thi_plaintext(fake_kafka, monkeypatch):
+    from sourcing.readers.kafka import KafkaReader
+
+    monkeypatch.delenv("KAFKA_SASL_USERNAME", raising=False)
+    monkeypatch.delenv("KAFKA_SASL_PASSWORD", raising=False)
+    fake_kafka.update(partitions=[0], rounds=[])
+    cfg = _kafka_cfg(sasl_username="${KAFKA_SASL_USERNAME}", sasl_password="${KAFKA_SASL_PASSWORD}")
+    list(KafkaReader(cfg).read(None))
+    assert "security.protocol" not in fake_kafka["c"].conf
+
+
+def test_kafka_sasl_lay_tu_bien_moi_truong(fake_kafka, monkeypatch):
+    from sourcing.readers.kafka import KafkaReader
+
+    monkeypatch.setenv("KAFKA_SASL_USERNAME", "fingraph-lake-sink")
+    monkeypatch.setenv("KAFKA_SASL_PASSWORD", "bi-mat")
+    fake_kafka.update(partitions=[0], rounds=[])
+    cfg = _kafka_cfg(sasl_username="${KAFKA_SASL_USERNAME}", sasl_password="${KAFKA_SASL_PASSWORD}")
+    assert "bi-mat" not in repr(cfg.kafka)  # mat khau khong lot vao log
+    list(KafkaReader(cfg).read(None))
+    assert fake_kafka["c"].conf["sasl.password"] == "bi-mat"
+
+
+def test_kafka_co_user_thieu_mat_khau_thi_bao_loi():
+    from sourcing.readers.kafka import sasl_conf
+
+    with pytest.raises(ValueError):
+        sasl_conf("u", "${KAFKA_SASL_PASSWORD}")

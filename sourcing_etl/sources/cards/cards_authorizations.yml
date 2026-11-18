@@ -18,6 +18,10 @@ kafka:
   auto_offset_reset: earliest
   max_records_per_run: 500000
   poll_timeout_seconds: 10
+  # SASL/SCRAM (broker may nguon). User = fingraph-lake-sink, mat khau do kafka-sink.sh dat
+  # tu file tren may (repo ha tang: kafka-init.sh). Khong dat bien = PLAINTEXT (Redpanda local).
+  sasl_username: "${KAFKA_SASL_USERNAME}"
+  sasl_password: "${KAFKA_SASL_PASSWORD}"
 
 cdc:
   mode: cdc1   # moc = offset tung partition, khong can watermark_column
