@@ -188,7 +188,20 @@ def run_one(q: Dict[str, Any], ask, truth_backend, price: Optional[Dict[str, flo
         except Exception as e:  # noqa: BLE001 — đáp án lỗi thì vẫn chạy agent, đánh dấu không chấm
             truth_err = str(e)[:300]
     t0 = time.monotonic()
-    ans = ask(q["question"])
+    for attempt in range(3):
+        try:
+            ans = ask(q["question"])
+            break
+        except Exception as e:  # noqa: BLE001 — loi mang / API: thu lai, het luot thi ghi loi, khong dung ca luot chay
+            err = f"{type(e).__name__}: {str(e)[:200]}"
+            print(f"  {q['id']}: loi lan {attempt + 1}: {err}")
+            time.sleep(30 * (attempt + 1))
+    else:
+        return {"id": q["id"], "use_case": q["id"][0], "question": q["question"], "grade": q.get("grade"),
+                "passed": None, "detail": f"loi goi agent: {err}", "manual_check": False, "answer": "",
+                "grounded": False, "grounded_first_try": False, "turns": 0, "stop_reason": "error", "tools": [],
+                "expected_tools_used": False, "usage": {}, "usd": 0.0,
+                "seconds": round(time.monotonic() - t0, 1), "truth_rows": truth_rows, "truth_error": truth_err}
     secs = round(time.monotonic() - t0, 1)
     used = [r["tool"] for r in ans.tool_log]
     g = grade(q, ans.text, ans.stop_reason, truth_rows)

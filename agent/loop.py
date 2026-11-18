@@ -85,7 +85,7 @@ def make_client(provider: str, region: str = "ap-southeast-1"):
     if provider == "bedrock-runtime":
         from anthropic import AnthropicBedrock
 
-        return AnthropicBedrock(aws_region=region), BEDROCK_RUNTIME_MODEL
+        return AnthropicBedrock(aws_region=region, max_retries=6), BEDROCK_RUNTIME_MODEL
     if provider == "bedrock":
         from anthropic import AnthropicBedrockMantle
 
