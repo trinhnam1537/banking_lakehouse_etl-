@@ -19,6 +19,8 @@ from typing import Dict, List, Optional
 
 REGISTRY = {
     "gold.berka_uc2": "transforms.gold.berka_uc2",
+    # Baseline the cho rule realtime ClickHouse (repo ha tang modules/kafka/realtime)
+    "gold.card_baseline": "transforms.gold.card_baseline",
     "pretrain.uc2_next_product": "transforms.pretrain.uc2_next_product",
     # Tang ontology (docs/ONTOLOGY-BUILD.md): job onto-spark, --LAYER onto
     "onto.load_schema": "transforms.onto.load_schema",

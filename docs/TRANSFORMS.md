@@ -72,6 +72,26 @@ Chống rò rỉ tương lai (lý do tầng này tách khỏi gold):
 **`track_a_pretrain.uc2_next_product_stats`** `(split, product)`: số dòng, số dương, tỉ lệ dương, số khách. Xem bảng
 này trước khi huấn luyện để biết độ mất cân bằng và tập nào rỗng.
 
+## Baseline thẻ cho rule realtime (`transforms/gold/card_baseline.py`)
+
+Đầu vào: `silver_cards.card_authorization`, cửa sổ `BASELINE_DAYS` (90) ngày tính tới ngày giao dịch cuối.
+
+| Bảng | Khoá | Dùng cho |
+|---|---|---|
+| `track_a_gold.card_spend_baseline` | `card_token` | Rule `AMOUNT_SPIKE` (so với p90 của thẻ), `NIGHT_HIGH_RISK` (`night_ratio`) |
+| `track_a_gold.card_category_baseline` | `category` | Ngưỡng dự phòng cho thẻ mới (p90/p99 của nhóm merchant) |
+
+Rule so với **p90**, không với p99 hay trung bình + k·độ lệch chuẩn. Lý do: nhãn đến trễ 20 ngày nên baseline lẫn
+gian lận cũ, và một đợt gian lận đủ đẩy p99/độ lệch chuẩn lên mức của chính nó.
+
+`--SERVING_EXPORT` (Glue job đặt sẵn `s3://<bucket>/serving/realtime`) ghi thêm bản Parquet một file của hai bảng.
+ClickHouse trên máy nguồn nạp lại bản này mỗi giờ. Thiết kế rule và dashboard: repo hạ tầng `docs/REALTIME-FRAUD.md`.
+
+```powershell
+aws glue start-job-run --job-name fingraph-dev-gold-spark --profile fingraph `
+  --arguments '{\"--TRANSFORM\":\"gold.card_baseline\"}'
+```
+
 ## Chạy
 
 ```powershell

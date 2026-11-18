@@ -2,6 +2,7 @@
 
     python -m simulators.cards.stream generate --days 7 --speed 0          # 7 ngày nghiệp vụ, nhanh nhất
     python -m simulators.cards.stream generate --live --rate 5             # giờ THẬT, ~5 giao dịch/giây
+                                       # (--rate: thêm chủ thẻ Faker tới đủ nhịp, mỗi thẻ giữ nhịp người thật)
     python -m simulators.cards.stream replay data/sparkov/fraudTrain.csv   # phát lại bộ Kaggle
 
 Bộ Kaggle (1,85 triệu giao dịch 2019-2020, 1.000 khách Mỹ, sinh bằng Sparkov):
@@ -26,6 +27,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import itertools
 import json
 import math
 import random
@@ -50,7 +52,36 @@ def _pick(rng, items, w):
     return rng.choices(items, w)[0]
 
 
-def holders(rng: random.Random) -> List[Dict]:
+SYNTH_PAN0 = 5299990000000000  # so the chu the gia lap THEM (--live): khong co trong core.card
+
+
+def _holder(fake, cc, name, g, dob, addr, cid) -> Dict:
+    r = random.Random(cc)
+    fake.seed_instance(int(cc[-9:]))
+    first, _, last = name.partition(" ")
+    return {"cc_num": cc, "first": first, "last": last or first, "gender": g, "dob": str(dob),
+            "street": (addr or "").split(",")[0], "city": fake.city(), "state": "CZ",
+            "zip": fake.postcode(), "lat": round(r.uniform(*LAT), 4), "long": round(r.uniform(*LON), 4),
+            "city_pop": int(r.lognormvariate(9, 1.5)), "job": fake.job(), "client_id": cid,
+            "rate": r.uniform(0.5, 3.0),  # giao dich/ngay
+            "night_owl": r.random() < 0.2}
+
+
+def _synthetic(fake, i: int) -> Dict:
+    """Chu the Faker tat dinh theo i: cung i -> cung nguoi, ke ca sau khi khoi dong lai."""
+    cc = str(SYNTH_PAN0 + i)
+    r = random.Random(cc)
+    fake.seed_instance(i)
+    g = r.choice("FM")
+    name = fake.name_female() if g == "F" else fake.name_male()
+    return _holder(fake, cc, name, g, fake.date_of_birth(minimum_age=18, maximum_age=85), fake.address(), None)
+
+
+def holders(rng: random.Random, target_daily: float = 0.0) -> List[Dict]:
+    """Chu the = khach core banking. target_daily > 0 (--live): them chu the Faker cho toi
+    khi tong nhip >= target_daily giao dich/ngay. Moi the van giu nhip 0,5-3 giao dich/ngay
+    nhu khach that, nen rule theo the (VELOCITY, so tien so voi baseline) khong phai doi;
+    so dot gian lan cung tang theo so the."""
     from faker import Faker
 
     fake = Faker("cs_CZ")
@@ -70,17 +101,14 @@ def holders(rng: random.Random) -> List[Dict]:
             g = rng.choice("FM")
             rows.append((str(4 * 10**15 + i), fake.name_female() if g == "F" else fake.name_male(), g,
                          fake.date_of_birth(minimum_age=18, maximum_age=85), fake.address(), None))
-    out = []
-    for cc, name, g, dob, addr, cid in rows:
-        r = random.Random(cc)
-        fake.seed_instance(int(cc[-9:]))
-        first, _, last = name.partition(" ")
-        out.append({"cc_num": cc, "first": first, "last": last or first, "gender": g, "dob": str(dob),
-                    "street": (addr or "").split(",")[0], "city": fake.city(), "state": "CZ",
-                    "zip": fake.postcode(), "lat": round(r.uniform(*LAT), 4), "long": round(r.uniform(*LON), 4),
-                    "city_pop": int(r.lognormvariate(9, 1.5)), "job": fake.job(), "client_id": cid,
-                    "rate": r.uniform(0.5, 3.0),  # giao dich/ngay
-                    "night_owl": r.random() < 0.2})
+    out = [_holder(fake, *row) for row in rows]
+    total, n_core = sum(h["rate"] for h in out), len(out)
+    while total < target_daily:
+        h = _synthetic(fake, len(out) - n_core)
+        out.append(h)
+        total += h["rate"]
+    if len(out) > n_core:
+        print(f"them {len(out) - n_core:,} chu the gia lap -> ~{total:,.0f} giao dich/ngay")
     return out
 
 
@@ -127,10 +155,12 @@ def event(h: Dict, m: Dict, ts: dt.datetime, amt: float) -> Dict:
 def day_events(rng: random.Random, d: dt.date, hs: List[Dict], ms: List[Dict]):
     """(ts, event, is_fraud) cho một ngày, đã sắp theo thời gian."""
     out = []
-    w = [1 - m["night"] for m in ms]
+    # cum_weights tinh MOT lan: rng.choices(weights=) cong don lai 800 trong so moi lan goi,
+    # ~100 nghin chu the (--live) thi mot ngay mat ~2 phut. Cung chuoi ngau nhien nhu cu.
+    cw = list(itertools.accumulate(1 - m["night"] for m in ms))
     for h in hs:
         for _ in range(_poisson(rng, h["rate"])):
-            m = _pick(rng, ms, w)
+            m = rng.choices(ms, cum_weights=cw)[0]
             night = h["night_owl"] and rng.random() < 0.3
             hour = rng.randint(0, 5) if night else int(min(23, max(6, rng.gauss(15, 4))))
             ts = dt.datetime.combine(d, dt.time(hour, rng.randint(0, 59), rng.randint(0, 59)))
@@ -158,21 +188,27 @@ def _poisson(rng, lam):
 
 def cmd_generate(args) -> None:
     rng = random.Random(args.seed)
-    hs, ms = holders(rng), merchants(rng)
+    hs, ms = holders(rng, args.rate * 86400 if args.live else 0.0), merchants(rng)
     print(f"{len(hs)} chu the, {len(ms)} merchant")
     producer = None if args.dry else kafka_producer("sim-cards")
     labels = LabelSink("cards", ["trans_num", "is_fraud"], args.label_delay_days, dry=args.dry)
-    d = dt.date.today() if args.live else (args.start or SIM_EPOCH)
+    d = dt.datetime.utcnow().date() if args.live else (args.start or SIM_EPOCH)  # UTC: so voi utcnow()
     end = d + dt.timedelta(days=args.days - 1)
     sent = 0
+    started = dt.datetime.utcnow()
     while args.live or d <= end:
         evs = day_events(rng, d, hs, ms)
         wall0, sim0 = time.monotonic(), dt.datetime.combine(d, dt.time())
         for ts, ev, fraud in evs:
-            if args.live:  # gio that: cho toi dung thoi diem, dong dau thoi gian hien tai
-                now = dt.datetime.utcnow()
-                if ts > now:
-                    time.sleep(min((ts - now).total_seconds(), 1 / max(args.rate, 0.1)))
+            if args.live:
+                # Gio THAT: event_ts = dong ho. Truoc 11-09 chi ngu toi da 1/rate giay moi giao
+                # dich -> mot ngay mo phong phat het trong ~13 phut, event_ts chay truoc gio that
+                # hang thang (repo ha tang SETUP-LOG, su co 11-09). Nhip do so chu the quyet dinh.
+                if ts < started:
+                    continue  # phan da qua cua ngay dau (vd vua khoi dong lai): khong phat bu
+                wait = (ts - dt.datetime.utcnow()).total_seconds()
+                if wait > 0:
+                    time.sleep(wait)
             elif args.speed > 0:
                 lag = (ts - sim0).total_seconds() / args.speed - (time.monotonic() - wall0)
                 if lag > 0:
