@@ -38,9 +38,9 @@ ontology ở [ONTOLOGY.md](ONTOLOGY.md); Neptune ở [NEPTUNE.md](NEPTUNE.md) v�
 | Bộ câu hỏi đánh giá | ✅ 23 câu (15 use case A, 8 use case B) | `agent/eval/questions.yml` |
 | Bộ chạy đánh giá + chấm tự động | ✅ code + test; **chưa chạy với Claude thật** | `agent/eval/run.py` |
 | MCP server cho demo | ✅ đã khởi động thử qua stdio (liệt kê tool, chặn id bịa, chặn uid độc hại) | `agent/mcp_server.py` |
-| Gọi Claude thật | ⏳ cần bật model access Bedrock (console, chủ tài khoản) | |
+| Gọi Claude thật | ⏳ kiểm 11-18: Bedrock báo "Model use case details have not been submitted" (gửi form use case Anthropic trên console); Claude 5.x báo "not available for this account" (cần AWS cấp). Mantle chưa phục vụ ap-southeast-1 | provider `bedrock-runtime` (mặc định Opus 4.6) |
 | Role `agent-runtime` + assume persona | ⏳ repo hạ tầng, cần duyệt | |
-| Agent đối chứng text-to-SQL | ⏳ sau khi chạy được Claude thật | |
+| Agent đối chứng text-to-SQL | ✅ code + test (cùng vòng lặp, chỉ tool `sql` trên silver + gold thô); chưa chạy với Claude thật | `agent/baseline.py`, `run.py --baseline` |
 
 **Nói ngắn:** phần tất định (tool, kiểm tham số, grounding, chấm điểm) đã xong và có test. Phần cần model (chạy
 câu hỏi thật, đo độ chính xác, so với đối chứng) đang chờ bật Bedrock.
@@ -310,8 +310,25 @@ Không có `--yes` thì chỉ in danh sách câu và ước chi phí, để khô
 ### 9.5 Đối chứng cho luận văn
 
 Cùng bộ câu, cùng model, một agent **chỉ có tool `query` trên schema silver thô** (text-to-SQL). Chênh lệch giữa
-hai agent là đóng góp của ontology. Việc còn làm: thêm chế độ `--baseline` vào bộ chạy (đổi bộ tool và system
-prompt, giữ nguyên chấm điểm).
+hai agent là đóng góp của ontology. Đã có (11-18): `agent/baseline.py` + cờ `--baseline` của bộ chạy.
+
+- Cùng `loop.ask` (tham số `system`, `tool_specs`, `check_grounding=False`), cùng chấm điểm, cùng model.
+- Một tool `sql` (SELECT/WITH, chỉ database có trong schema). Schema ĐẦY ĐỦ kèm comment cột ở system prompt
+  (36 bảng, ~12 nghìn token, cache được), chụp từ Glue: `python -m agent.baseline --dump-schema` ->
+  `agent/catalog/raw_schema.json`.
+- Chạy dưới workgroup `fingraph-dev-data-engineer` (đọc được silver, kể cả cột PII): đối chứng có NHIỀU quyền dữ
+  liệu hơn agent ontology. Không kiểm grounding (không có uid để trích); cột "Căn cứ" của đối chứng luôn "không".
+
+```powershell
+# Can credential persona data engineer (MFA): profile fg-de, xem repo ha tang SETUP-LOG
+$env:FINGRAPH_BEDROCK_RUNTIME_MODEL = "global.anthropic.claude-opus-4-6-v1"
+.\.venv\Scripts\python.exe -m agent.eval.run --provider bedrock-runtime --workgroup fingraph-dev-analyst `
+    --truth-workgroup fingraph-dev-data-engineer --neptune fingraph-dev-neptune-ops --yes          # ontology
+.\.venv\Scripts\python.exe -m agent.eval.run --provider bedrock-runtime --baseline `
+    --workgroup fingraph-dev-data-engineer --truth-workgroup fingraph-dev-data-engineer --yes     # doi chung
+```
+
+Kết quả ghi `agent/eval/results/<thời điểm>[-baseline].md`. Hai agent phải dùng CÙNG model để so sánh công bằng.
 
 ---
 
