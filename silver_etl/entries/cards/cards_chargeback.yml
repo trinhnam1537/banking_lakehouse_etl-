@@ -1,0 +1,38 @@
+# Silver the: nhan gian lan qua chargeback, den tre 20 ngay (landing/cards/chargebacks/). Mot dong = mot giao dich.
+# CHI dung de danh gia / huan luyen, KHONG la dac trung cho rule hay mo hinh thoi gian thuc.
+# Noi: silver_cards.card_authorization.trans_num = chargeback.trans_num.
+# File nhan labels_YYYYMMDD.csv.gz chua nhan cua giao dich NGAY YYYYMMDD, ghi ra sau 20 ngay (simulators/common.py LabelSink).
+
+name: cards_chargeback
+description: The - nhan gian lan tung giao dich qua chargeback (den tre 20 ngay)
+owner: namth
+enabled: true
+
+source:
+  dataset: cards/chargebacks
+
+target:
+  database: silver_cards
+  table: chargeback
+  ddl: silver_cards/chargeback.sql
+
+columns:
+  - {name: trans_num, nullable: false, comment: "Khoa noi voi silver_cards.card_authorization"}
+  - {name: is_fraud, type: boolean, nullable: false, comment: "true = giao dich gian lan (chargeback)"}
+  - {name: label_file, path: _src_file, hash: false, comment: "File nhan goc trong _inbox: labels_<ngay giao dich>.csv.gz"}
+
+technical:
+  keys: [trans_num]
+
+writer:
+  type: simple
+  mode: append
+
+quality:
+  not_null: [trans_num, is_fraud]
+  max_cast_error_ratio: 0.0
+  duplicate_keys: warn
+
+runtime:
+  size: S
+  timeout_minutes: 30
