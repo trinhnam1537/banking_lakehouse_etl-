@@ -127,7 +127,10 @@ def sql_neighborhood(uid: str, predicate_iri: Optional[str], direction: str, lim
 
 
 def sql_count_holders(product_class: str, region_label: Optional[str], as_of: Optional[str]) -> str:
-    """CQ2: số khách giữ sản phẩm thuộc lớp X (gồm MỌI lớp con, qua bảng subclass)."""
+    """CQ2: số khách giữ sản phẩm thuộc lớp X (gồm MỌI lớp con, qua bảng subclass).
+
+    Trả cả dòng TỔNG theo nguồn (class_iri = '*'): số khách KHÁC NHAU giữ ít nhất một lớp con. Cộng các dòng theo lớp
+    con là SAI khi một khách giữ nhiều lớp con (đánh giá 11-18, câu A03: cộng ra 1.574, đúng là 1.404)."""
     c, d = _cls(product_class), _date(as_of)
     region = ""
     if region_label:
@@ -140,14 +143,17 @@ def sql_count_holders(product_class: str, region_label: Optional[str], as_of: Op
               WHERE l.subject_uid = h.subject_uid AND l.predicate_iri = 'fin:locatedIn'
                 AND lower(rg.label) LIKE '%{r}%')"""
     return f"""
-SELECT p.class_iri, p.label, c.source_system, count(DISTINCT h.subject_uid) AS customers
+SELECT coalesce(p.class_iri, '*') AS class_iri,
+       coalesce(p.label, 'TONG so khach khac nhau (moi lop con)') AS label,
+       c.source_system, count(DISTINCT h.subject_uid) AS customers
 FROM {DB}.triple h
 JOIN {DB}.triple o ON o.subject_uid = h.object_uid AND o.predicate_iri = 'fin:ofProduct'
 JOIN {DB}.entity p ON p.uid = o.object_uid
 JOIN {DB}.subclass s ON s.class_iri = p.class_iri AND s.ancestor_iri = '{c}'
 JOIN {DB}.entity c ON c.uid = h.subject_uid
 WHERE h.predicate_iri = 'fin:hasHolding'{_at('h', d)}{region}
-GROUP BY p.class_iri, p.label, c.source_system ORDER BY customers DESC""".strip()
+GROUP BY GROUPING SETS ((p.class_iri, p.label, c.source_system), (c.source_system))
+ORDER BY c.source_system, (p.class_iri IS NULL) DESC, customers DESC""".strip()
 
 
 # ---------------------------------------------------------------- openCypher (Neptune)

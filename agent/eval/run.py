@@ -53,6 +53,10 @@ ALIASES: Dict[str, List[str]] = {
     "permanent_order": ["fin:StandingOrder", "lệnh chuyển tiền định kỳ", "định kỳ"],
     "insurance": ["fin:InsuranceProduct", "bảo hiểm"],
     "account": ["fin:CurrentAccount", "fin:Account", "tài khoản"],
+    # 11-18: ma 'household' (lenh chi dinh ky SIPO) -> lop fin:RecurringPayment; truoc do thieu nen cham sai A01/A02
+    "household": ["fin:RecurringPayment", "thanh toán định kỳ", "household", "sipo"],
+    # Ten lop ontology -> cach goi thong thuong: agent doi chung (khong co ontology) tra loi dung nghia van duoc tinh
+    "fin:ClassicCard": ["classic"], "fin:JuniorCard": ["junior"], "fin:GoldCard": ["gold", "thẻ vàng"],
 }
 
 REFUSAL = re.compile(
@@ -239,6 +243,29 @@ def summarize(results: List[Dict[str, Any]], meta: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def regrade(path: Path) -> int:
+    """Chấm lại bằng bộ chấm hiện tại từ câu trả lời + đáp án đã lưu. truth_rows chỉ lưu 20 dòng đầu."""
+    spec = load()
+    params = dict(spec.get("defaults") or {})
+    qs = {q["id"]: render(q, params) for q in spec["questions"]}
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    changed = []
+    for r in rows:
+        if r["id"] not in qs or r.get("stop_reason") == "error":
+            continue
+        g = grade(qs[r["id"]], r["answer"], r["stop_reason"], r.get("truth_rows"))
+        if g["passed"] != r["passed"]:
+            changed.append(f"{r['id']}: {r['passed']} -> {g['passed']} ({g['detail']})")
+        r.update(passed=g["passed"], detail=g["detail"], manual_check=g.get("manual_check", False))
+    meta = {"started": path.stem + " (cham lai)", "source": path.name}
+    md = summarize(rows, meta) + "\n## Thay doi khi cham lai\n\n" + "".join(f"- {c}\n" for c in changed)
+    out = path.with_name(path.stem + "-regrade.md")
+    out.write_text(md, encoding="utf-8")
+    print("\n".join(changed) or "khong doi")
+    print(f"Ket qua: {out}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Chay bo cau hoi danh gia agent FinGraph")
     ap.add_argument("--workgroup", required=True, help="workgroup persona cua AGENT, vd fingraph-dev-analyst")
@@ -256,9 +283,13 @@ def main(argv=None) -> int:
     ap.add_argument("--only", default=None, help="danh sach id, vd A01,A03,B01; hoac tien to use case: B")
     ap.add_argument("--param", action="append", default=[], help="ten=gia_tri, ghi de 'defaults' trong questions.yml")
     ap.add_argument("--out", default=str(HERE / "results"))
+    ap.add_argument("--regrade", default=None,
+                    help="cham LAI file .jsonl da chay (khong goi model), ghi <file>-regrade.md; dung khi sua bo cham")
     ap.add_argument("--yes", action="store_true", help="THUC SU goi model (ton tien); khong co thi chi in ke hoach")
     a = ap.parse_args(argv)
 
+    if a.regrade:
+        return regrade(Path(a.regrade))
     spec = load()
     params = dict(spec.get("defaults") or {})
     params.update(dict(p.split("=", 1) for p in a.param))
