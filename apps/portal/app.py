@@ -136,8 +136,10 @@ def page_customer360():
             lift = f" · lift ×{x['lift']:.1f}" if x["lift"] else ""
             st.write(f"**{x['name']}**: {x['score']:.1%} khách tương tự mua trong kỳ tới{lift}")
             st.caption(f"Căn cứ: {x['basis']} ({x['n_segment']} dòng train, cùng vùng và nhóm tuổi)")
-        st.caption("Baseline thống kê trên track_a_pretrain.uc2_next_product (tập train). "
-                   "Sẽ thay bằng điểm của model gợi ý khi pipeline pretrain công bố bảng điểm.")
+        st.caption("Baseline thống kê trên track_a_pretrain.uc2_next_product (tập train). Chỉ gợi ý khoản vay và "
+                   "thẻ: nhãn bảo hiểm / hộ gia đình của Berka bị lệch (docs/RECSYS.md mục 3.2).")
+
+    page_mbd_reco()
 
     st.subheader("Quan hệ trong đồ thị tri thức")
     u = query(P, D.sql_customer_uid(cid))
@@ -152,6 +154,30 @@ def page_customer360():
         st.warning(out.get("error"))
     else:
         st.dataframe(pd.DataFrame(out.get("rows", [])), use_container_width=True, hide_index=True)
+
+
+def page_mbd_reco():
+    with st.expander("Gợi ý bằng model (LightGBM, khách MBD)", expanded=False):
+        why = D.recsys_available()
+        if why:
+            st.info(why)
+            return
+        st.caption("Khách của bộ MBD (client_id dạng mã băm), khác khách Berka ở trên. Điểm dùng để XẾP HẠNG; "
+                   "p_calibrated đã hiệu chỉnh lại tỉ lệ lấy mẫu âm. Lý do lấy từ SHAP.")
+        mid = st.text_input("client_id MBD", key="mbd_cid")
+        if mid and st.button("Chấm điểm", key="mbd_go"):
+            try:
+                with st.spinner("Đang tính đặc trưng qua Athena và chấm điểm…"):
+                    r = D.recommend_mbd(session_for(P.profile), P.workgroup, mid, k=3)
+            except (ValueError, D.QueryError) as e:
+                st.warning(str(e))
+                return
+            if r.empty:
+                st.info("Không có khách này trong silver_mbd.")
+            else:
+                st.dataframe(r, use_container_width=True, hide_index=True,
+                             column_config={c: st.column_config.NumberColumn(format="%.3f")
+                                            for c in ["score", "p_calibrated"]})
 
 
 def page_aml():

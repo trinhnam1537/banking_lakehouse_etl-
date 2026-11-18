@@ -38,16 +38,18 @@ def test_recommend_skips_owned_and_ranks_by_segment_rate():
         {"product": "household", "rate_seg": "0.5", "rate_all": "0.3", "n": "500"},     # đã có -> bỏ
         {"product": "unknown", "rate_seg": "1", "rate_all": "1", "n": "500"},          # ngoài danh mục
     ]
-    recs = D.recommend(PROFILE, rates)
+    recs = D.recommend(PROFILE, rates, allowed=list(D.PRODUCTS))
     assert [r["product"] for r in recs] == ["insurance", "card_classic"]
     assert recs[0]["lift"] == pytest.approx(2.0)
+    # mặc định không gợi ý insurance/household (nhãn lệch)
+    assert [r["product"] for r in D.recommend(PROFILE, rates)] == ["card_classic"]
     assert recs[0]["basis"] == "nhóm tương tự"
 
 
 def test_recommend_small_segment_falls_back_to_overall_rate():
     rates = [{"product": "card_gold", "rate_seg": "0.9", "rate_all": "0.01", "n": "5"},
              {"product": "insurance", "rate_seg": "0.03", "rate_all": "0.03", "n": "400"}]
-    recs = D.recommend(PROFILE, rates, min_n=30)
+    recs = D.recommend(PROFILE, rates, min_n=30, allowed=list(D.PRODUCTS))
     gold = next(r for r in recs if r["product"] == "card_gold")
     assert gold["score"] == pytest.approx(0.01)      # không tin nhóm 5 dòng
     assert gold["basis"].startswith("toàn bộ")
@@ -77,3 +79,13 @@ def test_readonly_sql():
                 "WITH a AS (SELECT 1) DELETE FROM b", "", "show tables"]:
         with pytest.raises(ValueError):
             D.readonly_sql(bad)
+
+
+def test_mbd_client_id_validation(monkeypatch):
+    import sys, types
+    fake = types.ModuleType("recsys"); fake.mbd = types.SimpleNamespace(FEATURE_SQL="WITH a AS (SELECT 1) SELECT * FROM a;")
+    monkeypatch.setitem(sys.modules, "recsys", fake); monkeypatch.setitem(sys.modules, "recsys.mbd", fake.mbd)
+    s = D.sql_mbd_features("abc123")
+    assert "CAST('abc123' AS varchar)" in s and s.endswith("LIMIT 1") and ";" not in s
+    with pytest.raises(ValueError):
+        D.sql_mbd_features("x' OR '1'='1")

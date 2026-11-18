@@ -37,7 +37,7 @@ def personas() -> Dict[str, Persona]:
                            e("FINGRAPH_PROFILE_ANALYST", "fg-analyst-mcp"), f"{PREFIX}-analyst"),
         "de": Persona("de", "Data engineer", e("FINGRAPH_PROFILE_DE", "fg-de-mcp"),
                       f"{PREFIX}-data-engineer", graph=True, ops=True),
-        "customer": Persona("customer", "Khách hàng (client 2)", e("FINGRAPH_PROFILE_CUSTOMER", "fg-client2"),
+        "customer": Persona("customer", "Khách hàng (client 2)", e("FINGRAPH_PROFILE_CUSTOMER", "fg-client2-mcp"),
                             f"{PREFIX}-customer-client-2", customer=True),
     }
 
@@ -177,8 +177,13 @@ seg AS (
 SELECT s.product, s.rate_seg, b.rate_all, s.n FROM seg s JOIN base b ON b.product = s.product""".strip()
 
 
+# Nhãn UC2 của insurance/household lệch do cách mở tài khoản Berka (artefact, docs/RECSYS.md mục 3.2):
+# không gợi ý hai sản phẩm này cho tới khi nhãn được sửa.
+RECOMMENDABLE = ("loan", "card_classic", "card_junior", "card_gold")
+
+
 def recommend(profile: Dict[str, Any], rates: Sequence[Dict[str, Any]], min_n: int = 30,
-              top: int = 3) -> List[Dict[str, Any]]:
+              top: int = 3, allowed: Sequence[str] = RECOMMENDABLE) -> List[Dict[str, Any]]:
     """Gợi ý sản phẩm baseline: sản phẩm khách CHƯA có, xếp theo tỉ lệ mua của nhóm khách tương tự.
 
     Nhóm quá nhỏ (< min_n dòng) thì dùng tỉ lệ toàn bộ để không gợi ý theo nhiễu. lift = nhóm / toàn bộ.
@@ -187,7 +192,7 @@ def recommend(profile: Dict[str, Any], rates: Sequence[Dict[str, Any]], min_n: i
     out = []
     for r in rates:
         p = r.get("product")
-        if p not in PRODUCTS:
+        if p not in PRODUCTS or p not in allowed:
             continue
         flag, name = PRODUCTS[p]
         if str(profile.get(flag, "")).lower() in ("true", "1"):
@@ -256,3 +261,44 @@ def visible_tables(session, databases: Optional[Sequence[str]] = None) -> List[D
         except Exception:  # database không có quyền DESCRIBE
             continue
     return rows
+
+
+# ------------------------------------------------------------------ gợi ý bằng model (recsys, MBD)
+
+def recsys_available() -> Optional[str]:
+    """None nếu dùng được recsys (code + model LightGBM đã train); ngược lại là lý do."""
+    try:
+        from recsys import mbd, recommend as R  # noqa: F401
+    except ImportError as e:
+        return f"Chưa có package recsys ({e}). Cần nhánh recsys được merge vào main."
+    missing = [p for p in mbd.PRODUCTS if not (R.REPORTS / f"mbd_{p}.lgb.txt").exists()]
+    if missing:
+        return f"Chưa có model {missing} trong {R.REPORTS}: chạy `python -m recsys.mbd` để huấn luyện."
+    return None
+
+
+def sql_mbd_features(client_id: str) -> str:
+    """Đặc trưng recsys.mbd của MỘT khách, tháng báo cáo mới nhất. Bọc nguyên FEATURE_SQL (cửa sổ tính trên
+    toàn lịch sử của khách) rồi mới lọc, để đặc trưng giống hệt lúc huấn luyện."""
+    from recsys import mbd
+
+    cid = str(client_id).strip()
+    if not re.fullmatch(r"[A-Za-z0-9_\-]{1,64}", cid):
+        raise ValueError("client_id MBD chỉ gồm chữ, số, '_' hoặc '-'")
+    lit = cid if cid.isdigit() else f"'{cid}'"
+    return (f"SELECT * FROM ({mbd.FEATURE_SQL.strip().rstrip(';')}) x "
+            f"WHERE CAST(client_id AS varchar) = CAST({lit} AS varchar) ORDER BY report_month DESC LIMIT 1")
+
+
+def recommend_mbd(session, workgroup: str, client_id: str, k: int = 3):
+    """Top-k sản phẩm MBD bằng model LightGBM của recsys, chạy bằng credential của persona (không dùng
+    profile mặc định fg-de-mcp của recsys.data.athena_df)."""
+    import pandas as pd
+    from recsys import mbd, recommend as R
+
+    df = pd.DataFrame(run_sql(session, workgroup, sql_mbd_features(client_id), timeout_s=180))
+    if df.empty:
+        return df
+    for c in mbd.FEATURES:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    return R.score(df, R.load_models(), k)

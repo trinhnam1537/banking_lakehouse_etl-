@@ -19,7 +19,7 @@ Người dùng ──▶ Portal (Streamlit, máy người dùng / máy nội b�
 |---|---|---|
 | Chuyên viên phân tích / RM / AML (DA-BA) | `fg-analyst-mcp` | Tổng quan, Khách hàng 360, Điều tra AML (hàng đợi cấm vận), Gian lận thẻ, Truy vấn SQL, Trợ lý AI |
 | Data engineer | `fg-de-mcp` | Như trên, cộng lần chạy Glue gần nhất và tìm đường liên hệ trên Neptune |
-| Khách hàng (client 2) | `fg-client2` | Tài khoản của tôi: tài khoản, số dư theo tháng, 50 giao dịch gần nhất, khoản vay |
+| Khách hàng (client 2) | `fg-client2-mcp` | Tài khoản của tôi: tài khoản, số dư theo tháng, 50 giao dịch gần nhất, khoản vay |
 
 | Trang | Nguồn | Ghi chú |
 |---|---|---|
@@ -61,6 +61,6 @@ không tin nhóm quá nhỏ, thông báo lỗi quyền dễ hiểu. Không cần
 ## Hạn chế
 
 - Chạy cục bộ bằng profile AWS của người dùng; chưa có đăng nhập web (Cognito) hay triển khai dùng chung.
-- Persona khách hàng cần profile không-MFA `fg-client2` (assume-all.ps1 chưa sinh).
+- Gợi ý Berka chỉ gồm khoản vay và thẻ (nhãn bảo hiểm, hộ gia đình bị lệch). Gợi ý bằng model chỉ có cho khách MBD, cần `recsys/` và model đã train (`python -m recsys.mbd`).
 - Gợi ý là baseline thống kê; chưa có model.
 - Trợ lý AI cần Bedrock đã điền form use case Anthropic.
