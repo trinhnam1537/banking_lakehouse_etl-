@@ -18,7 +18,15 @@ Ba bảng, ghi đè mỗi lần:
   card_rule_eval_daily    (txn_date, rule)            như trên theo ngày (dashboard)
 level = txn (mỗi giao dịch) | card_day (thẻ x ngày: dương nếu có giao dịch gian lận, bắt được nếu có cảnh báo).
 
-Tham số (--KHOA): CARDS_DB (silver_cards), GOLD_DB (track_a_gold), BASELINE_DAYS (90), REFRESH_DAYS (7),
+UNIVERSE (mặc định labeled): tập giao dịch dùng cho baseline, velocity và đánh giá.
+  labeled  chỉ giao dịch CÓ dòng nhãn. Trên dev, landing chứa nhiều lần chạy producer độc lập chồng lên cùng 919 thẻ
+           core banking; chỉ một lần chạy có file nhãn (LabelSink giữ nhãn trong bộ nhớ, producer khởi động lại là
+           mất). Giao dịch của lần chạy khác không nhãn mà vẫn có gian lận, trộn vào thì velocity / baseline của thẻ
+           bị nhiễu bởi gian lận không ai chấm được. Đo 11-18: 150.340 giao dịch có nhãn, 600.960 không nhãn.
+           Lọc theo SỰ CÓ MẶT của dòng nhãn (thuộc luồng nào), không theo giá trị nhãn: không rò nhãn vào rule.
+  all      mọi giao dịch (đúng hành vi production, khi mọi giao dịch rồi sẽ có nhãn).
+
+Tham số (--KHOA): UNIVERSE, CARDS_DB (silver_cards), GOLD_DB (track_a_gold), BASELINE_DAYS (90), REFRESH_DAYS (7),
 WARMUP_DAYS (30: EVAL_FROM mặc định = ngày giao dịch đầu tiên + WARMUP_DAYS), EVAL_FROM, EVAL_TO (YYYY-MM-DD, tuỳ chọn).
 """
 
@@ -122,15 +130,20 @@ def run(spark, args: Dict[str, str]) -> Dict[str, int]:
     days = int(args.get("BASELINE_DAYS", "90"))
     refresh = max(1, int(args.get("REFRESH_DAYS", "7")))
     warmup = int(args.get("WARMUP_DAYS", "30"))
+    universe = args.get("UNIVERSE", "labeled")
+    if universe not in ("labeled", "all"):
+        raise ValueError(f"UNIVERSE phai la labeled | all, nhan {universe!r}")
 
-    tx = (current(table(spark, src, "card_authorization"), "trans_num")
-          .select("trans_num", "card_token", "category", "trans_ts", "txn_date",
+    labels = (current(table(spark, src, "chargeback"), "trans_num")
+              .select("trans_num", F.col("is_fraud").cast("boolean").alias("is_fraud"), "label_file"))
+    tx = current(table(spark, src, "card_authorization"), "trans_num")
+    if universe == "labeled":
+        tx = tx.join(labels.select("trans_num"), "trans_num", "left_semi")
+    tx = (tx.select("trans_num", "card_token", "category", "trans_ts", "txn_date",
                   F.col("amount").cast("double").alias("amt"),
                   F.hour("trans_ts").alias("hour"),
                   (F.hour("trans_ts") < NIGHT_HOURS).cast("int").alias("is_night"))
           .cache())
-    labels = (current(table(spark, src, "chargeback"), "trans_num")
-              .select("trans_num", F.col("is_fraud").cast("boolean").alias("is_fraud"), "label_file"))
     first_txn, last_txn = tx.agg(F.min("txn_date"), F.max("txn_date")).first()
     if first_txn is None:
         print(f"  {src}.card_authorization rong -> bo qua")
@@ -145,7 +158,7 @@ def run(spark, args: Dict[str, str]) -> Dict[str, int]:
     eval_to = args.get("EVAL_TO") or str(lab_dates[1])
     n_snap = (dt.date.fromisoformat(eval_to) - dt.date.fromisoformat(eval_from)).days // refresh + 1
     print(f"  giao dich {first_txn}..{last_txn}; co nhan {lab_dates[0]}..{lab_dates[1]}; "
-          f"danh gia {eval_from}..{eval_to}, baseline {days} ngay, chup moi {refresh} ngay ({n_snap} ban)")
+          f"tap {universe}; danh gia {eval_from}..{eval_to}, baseline {days} ngay, chup moi {refresh} ngay ({n_snap} ban)")
     if n_snap <= 0:
         print("  cua so danh gia rong -> bo qua")
         return {}
@@ -176,6 +189,7 @@ def run(spark, args: Dict[str, str]) -> Dict[str, int]:
           .withColumn("multi_rule_3", F.col("n_rules_2h") >= 3)
           .withColumn("eval_from", F.to_date(F.lit(eval_from))).withColumn("eval_to", F.to_date(F.lit(eval_to)))
           .withColumn("baseline_days", F.lit(days)).withColumn("refresh_days", F.lit(refresh))
+          .withColumn("universe", F.lit(universe))
           .drop("snap_k", "is_night")
           .cache())
 
@@ -190,7 +204,8 @@ def run(spark, args: Dict[str, str]) -> Dict[str, int]:
     summary = (_metrics(F, long_txn, keys, "pred").withColumn("level", F.lit("txn"))
                .unionByName(_metrics(F, long_card, keys, "pred").withColumn("level", F.lit("card_day")))
                .withColumn("eval_from", F.to_date(F.lit(eval_from))).withColumn("eval_to", F.to_date(F.lit(eval_to)))
-               .withColumn("baseline_days", F.lit(days)).withColumn("refresh_days", F.lit(refresh)))
+               .withColumn("baseline_days", F.lit(days)).withColumn("refresh_days", F.lit(refresh))
+               .withColumn("universe", F.lit(universe)))
     daily = (_metrics(F, long_txn.where(F.col("severity") == "any"), ["txn_date", "rule"], "pred")
              .withColumn("level", F.lit("txn")))
 

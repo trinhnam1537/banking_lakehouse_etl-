@@ -40,10 +40,12 @@ def _seed(spark, lake):
         # SAU ngay chup: khong duoc lot vao baseline (ro du lieu tuong lai)
         _tx("f1", "A", "2026-03-01 20:00:00", "grocery_pos", 9000.0),
     ]
+    fraud = {"a1", "a2", "a3", "a4"}
+    lab = [(r[0], r[0] in fraud, f"labels_{r[4]:%Y%m%d}.csv.gz") for r in rows]
+    # Luong KHONG nhan (producer khac) tren cung the A, ngay truoc a1: neu lot vao, a3 da du 4 giao dich / 2 gio
+    rows += [_tx(f"u{i}", "A", f"2026-03-01 00:5{i}:00", "travel", 5.0) for i in range(3)]
     lake.t["silver_cards.card_authorization"] = spark.createDataFrame(
         rows, "trans_num string, card_token string, category string, trans_ts timestamp, txn_date date, amount double")
-    fraud = {"a1", "a2", "a3", "a4"}
-    lab = [(r[0], r[0] in fraud, "labels_20260301.csv.gz") for r in rows if r[4] == dt.date(2026, 3, 1)]
     lake.t["silver_cards.chargeback"] = spark.createDataFrame(
         lab, "trans_num string, is_fraud boolean, label_file string")
 
@@ -56,6 +58,7 @@ def test_backtest_rule_va_chi_so(spark, monkeypatch):
     monkeypatch.setattr(E, "write_table", lake.write_table)
     _seed(spark, lake)
     out = E.run(spark, {"EVAL_FROM": "2026-03-01", "EVAL_TO": "2026-03-01"})
+    # 7 giao dich co nhan trong ngay; u0..u2 khong nhan khong vao danh gia, khong lam tang n_2h
     assert out["card_rule_eval_txn"] == 7
 
     tx = {r["trans_num"]: r for r in lake.t["track_a_gold.card_rule_eval_txn"].collect()}
