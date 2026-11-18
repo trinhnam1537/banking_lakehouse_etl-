@@ -235,6 +235,10 @@ def main(argv=None) -> int:
                     help="agent DOI CHUNG text-to-SQL (agent/baseline.py): chi tool sql tren silver + gold tho; "
                          "--workgroup nen la workgroup doc duoc silver, vd fingraph-dev-data-engineer")
     ap.add_argument("--region", default="ap-southeast-1")
+    ap.add_argument("--agent-profile", default=None,
+                    help="profile AWS cho Athena cua AGENT (persona), vd fg-analyst-mcp; mac dinh credential hien hanh")
+    ap.add_argument("--truth-profile", default=None,
+                    help="profile AWS cho truth_sql (doc silver), vd fg-de-mcp; mac dinh credential hien hanh")
     ap.add_argument("--neptune", default=None, help="Lambda neptune-ops cho cau AML (use case B)")
     ap.add_argument("--only", default=None, help="danh sach id, vd A01,A03,B01; hoac tien to use case: B")
     ap.add_argument("--param", action="append", default=[], help="ten=gia_tri, ghi de 'defaults' trong questions.yml")
@@ -268,8 +272,11 @@ def main(argv=None) -> int:
     from ..tools import AthenaBackend, NeptuneBackend, Tools
 
     client, model = L.make_client(a.provider, a.region)
-    truth = AthenaBackend(a.truth_workgroup, region=a.region) if a.truth_workgroup else None
-    agent_be = AthenaBackend(a.workgroup, region=a.region)
+    import boto3
+
+    sess = lambda prof: boto3.Session(profile_name=prof) if prof else None  # noqa: E731
+    truth = AthenaBackend(a.truth_workgroup, session=sess(a.truth_profile), region=a.region) if a.truth_workgroup else None
+    agent_be = AthenaBackend(a.workgroup, session=sess(a.agent_profile), region=a.region)
     graph = NeptuneBackend(a.neptune, region=a.region) if a.neptune else None
 
     if a.baseline:

@@ -320,12 +320,17 @@ hai agent là đóng góp của ontology. Đã có (11-18): `agent/baseline.py` 
   liệu hơn agent ontology. Không kiểm grounding (không có uid để trích); cột "Căn cứ" của đối chứng luôn "không".
 
 ```powershell
-# Can credential persona data engineer (MFA): profile fg-de, xem repo ha tang SETUP-LOG
+# 1 lan / gio (credential 1 gio): nhap MFA cho tung persona, ghi ra profile -mcp cho boto3 (repo ha tang)
+#   . .\docs\iamssume.ps1 -Profile fg-de -McpProfile fg-de-mcp
+#   . .\docs\iamssume.ps1 -Profile fg-analyst -McpProfile fg-analyst-mcp      (doi ma MFA moi, khong dung lai ma cu)
+#   . .\docs\iamssume.ps1                                                     (TerraformAdmin: Lambda neptune-ops, Bedrock)
 $env:FINGRAPH_BEDROCK_RUNTIME_MODEL = "global.anthropic.claude-opus-4-6-v1"
-.\.venv\Scripts\python.exe -m agent.eval.run --provider bedrock-runtime --workgroup fingraph-dev-analyst `
-    --truth-workgroup fingraph-dev-data-engineer --neptune fingraph-dev-neptune-ops --yes          # ontology
+.\.venv\Scripts\python.exe -m agent.eval.run --provider bedrock-runtime `
+    --workgroup fingraph-dev-analyst --agent-profile fg-analyst-mcp `
+    --truth-workgroup fingraph-dev-data-engineer --truth-profile fg-de-mcp --neptune fingraph-dev-neptune-ops --yes   # ontology
 .\.venv\Scripts\python.exe -m agent.eval.run --provider bedrock-runtime --baseline `
-    --workgroup fingraph-dev-data-engineer --truth-workgroup fingraph-dev-data-engineer --yes     # doi chung
+    --workgroup fingraph-dev-data-engineer --agent-profile fg-de-mcp `
+    --truth-workgroup fingraph-dev-data-engineer --truth-profile fg-de-mcp --yes                                     # doi chung
 ```
 
 Kết quả ghi `agent/eval/results/<thời điểm>[-baseline].md`. Hai agent phải dùng CÙNG model để so sánh công bằng.
