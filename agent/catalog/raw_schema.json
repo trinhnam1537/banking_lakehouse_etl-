@@ -1,0 +1,3752 @@
+{
+ "silver_aml": {
+  "account": {
+   "columns": [
+    [
+     "bank_id",
+     "string",
+     "Ma ngan hang, khop transfer.from_bank / to_bank"
+    ],
+    [
+     "bank_name",
+     "string",
+     "Ten ngan hang tong hop"
+    ],
+    [
+     "account_number",
+     "string",
+     "Ma tai khoan, khop transfer.from_account / to_account"
+    ],
+    [
+     "entity_id",
+     "string",
+     "Ma phap nhan so huu; mot phap nhan co the co nhieu tai khoan"
+    ],
+    [
+     "entity_name",
+     "string",
+     "Nhan tong hop, vd 'Corporation #33520' (khong phai ten that)"
+    ],
+    [
+     "entity_type",
+     "string",
+     "Loai phap nhan tach tu entity_name: Corporation | Sole Proprietorship | Partnership | ..."
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "IBM AML - danh muc tai khoan va phap nhan so huu"
+  },
+  "label": {
+   "columns": [
+    [
+     "txn_id",
+     "string",
+     "Khoa noi voi silver_aml.transfer"
+    ],
+    [
+     "is_laundering",
+     "boolean",
+     "true = giao dich thuoc mot vu rua tien"
+    ],
+    [
+     "label_file",
+     "string",
+     "File nhan goc trong _inbox (ngay nhan duoc biet)"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "IBM AML - nhan rua tien tung giao dich (den tre 14 ngay)"
+  },
+  "laundering_attempt": {
+   "columns": [
+    [
+     "attempt_id",
+     "string",
+     "Ma vu, vd HI-Medium-00042"
+    ],
+    [
+     "typology",
+     "string",
+     "FAN-OUT | FAN-IN | CYCLE | SCATTER-GATHER | GATHER-SCATTER | BIPARTITE | STACK | RANDOM"
+    ],
+    [
+     "typology_detail",
+     "string",
+     "Chi tiet kieu hinh, vd 'Max 16-degree Fan-Out'"
+    ],
+    [
+     "txn_id",
+     "string",
+     "Khoa noi voi silver_aml.transfer / label"
+    ],
+    [
+     "source_ts",
+     "timestamp",
+     "Thoi gian goc IBM, chua doi truc"
+    ],
+    [
+     "from_bank",
+     "string",
+     "Ma ngan hang gui"
+    ],
+    [
+     "from_account",
+     "string",
+     "Tai khoan gui"
+    ],
+    [
+     "to_bank",
+     "string",
+     "Ma ngan hang nhan"
+    ],
+    [
+     "to_account",
+     "string",
+     "Tai khoan nhan"
+    ],
+    [
+     "amount_received",
+     "decimal(28,8)",
+     "So tien nhan, theo receiving_currency"
+    ],
+    [
+     "receiving_currency",
+     "string",
+     "Tien nhan"
+    ],
+    [
+     "amount_paid",
+     "decimal(28,8)",
+     "So tien tra, theo payment_currency"
+    ],
+    [
+     "payment_currency",
+     "string",
+     "Tien tra"
+    ],
+    [
+     "payment_format",
+     "string",
+     "Hinh thuc thanh toan"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "IBM AML - giao dich thuoc tung vu rua tien, kem kieu hinh (FAN-OUT, CYCLE...)"
+  },
+  "transfer": {
+   "columns": [
+    [
+     "txn_id",
+     "string",
+     "Ma giao dich tat dinh (sha1 noi dung + lan xuat hien), noi voi label/pattern"
+    ],
+    [
+     "event_ts",
+     "timestamp",
+     "Thoi diem giao dich da doi ve truc chung (SIM_EPOCH), UTC, do phan giai phut"
+    ],
+    [
+     "source_ts",
+     "string",
+     "Thoi diem goc trong file IBM (yyyy/MM/dd HH:mm, 09/2022)"
+    ],
+    [
+     "from_bank",
+     "string",
+     "Ma ngan hang gui (chuoi, giu so 0 dau)"
+    ],
+    [
+     "from_account",
+     "string",
+     "Tai khoan gui, chi duy nhat khi di cung from_bank"
+    ],
+    [
+     "to_bank",
+     "string",
+     "Ma ngan hang nhan"
+    ],
+    [
+     "to_account",
+     "string",
+     "Tai khoan nhan"
+    ],
+    [
+     "amount_received",
+     "decimal(28,8)",
+     "So tien ben nhan nhan duoc, theo receiving_currency"
+    ],
+    [
+     "receiving_currency",
+     "string",
+     "Tien nhan (15 loai, gom Bitcoin)"
+    ],
+    [
+     "amount_paid",
+     "decimal(28,8)",
+     "So tien ben gui tra, theo payment_currency"
+    ],
+    [
+     "payment_currency",
+     "string",
+     "Tien tra"
+    ],
+    [
+     "payment_format",
+     "string",
+     "ACH | Cheque | Credit Card | Wire | Cash | Bitcoin | Reinvestment"
+    ],
+    [
+     "event_date",
+     "date",
+     "Ngay nghiep vu (UTC)"
+    ],
+    [
+     "is_self_transfer",
+     "boolean",
+     "Tu chuyen cho chinh minh (thuong Reinvestment) -> self-loop, loai khoi canh do thi"
+    ],
+    [
+     "is_cross_currency",
+     "boolean",
+     "Tien nhan khac tien tra (co quy doi)"
+    ],
+    [
+     "fx_rate_paid_per_received",
+     "decimal(28,12)",
+     "Ty gia ngam: don vi tien tra cho 1 don vi tien nhan"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "IBM AML - giao dich chuyen tien lien ngan hang (khong nhan), append theo manifest"
+  }
+ },
+ "silver_bank_marketing": {
+  "contact_additional": {
+   "columns": [
+    [
+     "source_file",
+     "string",
+     "File goc trong archive UCI"
+    ],
+    [
+     "source_row",
+     "bigint",
+     "So dong trong file goc"
+    ],
+    [
+     "age",
+     "int",
+     "Tuoi khach"
+    ],
+    [
+     "job",
+     "string",
+     "Nghe nghiep"
+    ],
+    [
+     "marital",
+     "string",
+     "married | single | divorced | unknown"
+    ],
+    [
+     "education",
+     "string",
+     "basic.4y | basic.6y | basic.9y | high.school | professional.course | university.degree | illiterate | unknown"
+    ],
+    [
+     "credit_default",
+     "string",
+     "Co no xau: yes | no | unknown"
+    ],
+    [
+     "housing_loan",
+     "string",
+     "Co vay mua nha"
+    ],
+    [
+     "personal_loan",
+     "string",
+     "Co vay tieu dung"
+    ],
+    [
+     "contact_channel",
+     "string",
+     "cellular | telephone"
+    ],
+    [
+     "last_contact_month",
+     "string",
+     "Thang lan goi cuoi"
+    ],
+    [
+     "last_contact_dow",
+     "string",
+     "Thu trong tuan: mon..fri"
+    ],
+    [
+     "duration_sec",
+     "int",
+     "Do dai cuoc goi (giay), ro ri nhan"
+    ],
+    [
+     "campaign_contacts",
+     "int",
+     "So lan goi trong dot nay"
+    ],
+    [
+     "days_since_prev_contact",
+     "int",
+     "So ngay tu lan goi truoc; 999 = chua tung goi"
+    ],
+    [
+     "prev_contacts",
+     "int",
+     "So lan goi truoc dot nay"
+    ],
+    [
+     "prev_outcome",
+     "string",
+     "success | failure | nonexistent"
+    ],
+    [
+     "emp_var_rate",
+     "double",
+     "Ty le bien dong viec lam (quy)"
+    ],
+    [
+     "cons_price_idx",
+     "double",
+     "Chi so gia tieu dung (thang)"
+    ],
+    [
+     "cons_conf_idx",
+     "double",
+     "Chi so niem tin tieu dung (thang)"
+    ],
+    [
+     "euribor_3m",
+     "double",
+     "Lai suat Euribor 3 thang (ngay)"
+    ],
+    [
+     "nr_employed",
+     "double",
+     "So nguoi co viec (nghin, quy)"
+    ],
+    [
+     "subscribed",
+     "boolean",
+     "NHAN UC2: dang ky tien gui co ky han"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Bank Marketing (bank-additional-full) - lan goi + chi so kinh te vi mo"
+  },
+  "contact_full": {
+   "columns": [
+    [
+     "source_file",
+     "string",
+     "File goc trong archive UCI"
+    ],
+    [
+     "source_row",
+     "bigint",
+     "So dong trong file goc (khoa cung source_file)"
+    ],
+    [
+     "age",
+     "int",
+     "Tuoi khach"
+    ],
+    [
+     "job",
+     "string",
+     "Nghe nghiep: admin., blue-collar, management, ... , unknown"
+    ],
+    [
+     "marital",
+     "string",
+     "married | single | divorced (divorced gom ca goa)"
+    ],
+    [
+     "education",
+     "string",
+     "primary | secondary | tertiary | unknown"
+    ],
+    [
+     "credit_default",
+     "string",
+     "Co no xau: yes | no | unknown"
+    ],
+    [
+     "balance_eur",
+     "decimal(18,2)",
+     "So du binh quan nam (EUR), co the am"
+    ],
+    [
+     "housing_loan",
+     "string",
+     "Co vay mua nha: yes | no | unknown"
+    ],
+    [
+     "personal_loan",
+     "string",
+     "Co vay tieu dung: yes | no | unknown"
+    ],
+    [
+     "contact_channel",
+     "string",
+     "cellular | telephone | unknown"
+    ],
+    [
+     "last_contact_day",
+     "int",
+     "Ngay trong thang cua lan goi cuoi"
+    ],
+    [
+     "last_contact_month",
+     "string",
+     "Thang lan goi cuoi: jan..dec"
+    ],
+    [
+     "duration_sec",
+     "int",
+     "Do dai cuoc goi (giay). CHI biet sau cuoc goi -> khong dung lam dac trung du doan"
+    ],
+    [
+     "campaign_contacts",
+     "int",
+     "So lan goi trong dot nay (ke ca lan nay)"
+    ],
+    [
+     "days_since_prev_contact",
+     "int",
+     "So ngay tu lan goi dot truoc; -1 = chua tung goi"
+    ],
+    [
+     "prev_contacts",
+     "int",
+     "So lan goi truoc dot nay"
+    ],
+    [
+     "prev_outcome",
+     "string",
+     "Ket qua dot truoc: success | failure | other | unknown"
+    ],
+    [
+     "subscribed",
+     "boolean",
+     "NHAN UC2: khach dang ky tien gui co ky han (fin:TermDeposit)"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Bank Marketing (bank-full) - lan goi telemarketing va ket qua dang ky tien gui co ky han"
+  }
+ },
+ "silver_berka": {
+  "account": {
+   "columns": [
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "district_id",
+     "int",
+     "Chi nhanh mo tai khoan"
+    ],
+    [
+     "frequency_code",
+     "string",
+     "Ma Sec goc cua ky sao ke"
+    ],
+    [
+     "opened_date",
+     "date",
+     ""
+    ],
+    [
+     "statement_frequency",
+     "string",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Tai khoan tien gui (Berka goc) - ky sao ke, chi nhanh, ngay mo"
+  },
+  "card": {
+   "columns": [
+    [
+     "card_id",
+     "int",
+     ""
+    ],
+    [
+     "disp_id",
+     "int",
+     ""
+    ],
+    [
+     "card_type",
+     "string",
+     "classic | junior | gold"
+    ],
+    [
+     "issued_date",
+     "date",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "The thanh toan (Berka goc) - loai the, ngay phat hanh"
+  },
+  "client": {
+   "columns": [
+    [
+     "client_id",
+     "int",
+     ""
+    ],
+    [
+     "gender",
+     "string",
+     "F | M"
+    ],
+    [
+     "birth_date",
+     "date",
+     "PII"
+    ],
+    [
+     "district_id",
+     "int",
+     "Noi o"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Khach hang ca nhan (Berka goc) - gioi tinh, ngay sinh, quan/huyen"
+  },
+  "disp": {
+   "columns": [
+    [
+     "disp_id",
+     "int",
+     ""
+    ],
+    [
+     "client_id",
+     "int",
+     ""
+    ],
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "disp_type",
+     "string",
+     "OWNER | DISPONENT"
+    ],
+    [
+     "is_owner",
+     "boolean",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Quyen cua khach tren tai khoan (OWNER/DISPONENT) - Berka goc"
+  },
+  "district": {
+   "columns": [
+    [
+     "district_id",
+     "int",
+     ""
+    ],
+    [
+     "district_name",
+     "string",
+     ""
+    ],
+    [
+     "region",
+     "string",
+     ""
+    ],
+    [
+     "inhabitants",
+     "int",
+     ""
+    ],
+    [
+     "munic_lt_500",
+     "int",
+     "So xa < 500 dan"
+    ],
+    [
+     "munic_500_1999",
+     "int",
+     ""
+    ],
+    [
+     "munic_2000_9999",
+     "int",
+     ""
+    ],
+    [
+     "munic_ge_10000",
+     "int",
+     ""
+    ],
+    [
+     "cities",
+     "int",
+     ""
+    ],
+    [
+     "urban_ratio",
+     "decimal(5,1)",
+     "Ty le dan thanh thi (%)"
+    ],
+    [
+     "avg_salary",
+     "int",
+     "Luong trung binh (CZK)"
+    ],
+    [
+     "unemployment_95",
+     "decimal(5,2)",
+     "Ty le that nghiep 1995 (%), co NULL"
+    ],
+    [
+     "unemployment_96",
+     "decimal(5,2)",
+     ""
+    ],
+    [
+     "entrepreneurs_per_1000",
+     "int",
+     ""
+    ],
+    [
+     "crimes_95",
+     "int",
+     "So vu pham toi 1995, co NULL"
+    ],
+    [
+     "crimes_96",
+     "int",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Danh muc quan/huyen va chi so kinh te - xa hoi (Berka goc)"
+  },
+  "loan": {
+   "columns": [
+    [
+     "loan_id",
+     "int",
+     ""
+    ],
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "granted_date",
+     "date",
+     ""
+    ],
+    [
+     "amount",
+     "decimal(18,2)",
+     "CZK"
+    ],
+    [
+     "duration_months",
+     "int",
+     ""
+    ],
+    [
+     "monthly_payment",
+     "decimal(18,2)",
+     ""
+    ],
+    [
+     "status_code",
+     "string",
+     "Ma Berka: A | B | C | D"
+    ],
+    [
+     "loan_status",
+     "string",
+     ""
+    ],
+    [
+     "is_problem_loan",
+     "boolean",
+     "Da hoac dang khong tra du"
+    ],
+    [
+     "maturity_date",
+     "date",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Khoan vay (Berka goc) - trang thai tra no, nhan cho mo hinh rui ro tin dung"
+  },
+  "standing_order": {
+   "columns": [
+    [
+     "order_id",
+     "int",
+     ""
+    ],
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "bank_to",
+     "string",
+     "Ma ngan hang nhan (2 chu cai)"
+    ],
+    [
+     "account_to",
+     "bigint",
+     ""
+    ],
+    [
+     "amount",
+     "decimal(12,2)",
+     "decimal(6,1) o nguon"
+    ],
+    [
+     "k_symbol",
+     "string",
+     "Ma muc dich goc"
+    ],
+    [
+     "purpose",
+     "string",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Lenh chuyen tien dinh ky (Berka goc)"
+  },
+  "trans": {
+   "columns": [
+    [
+     "trans_id",
+     "bigint",
+     ""
+    ],
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "trans_date",
+     "date",
+     "Ngay nghiep vu"
+    ],
+    [
+     "trans_type_code",
+     "string",
+     "PRIJEM | VYDAJ | VYBER (loi goc)"
+    ],
+    [
+     "operation_code",
+     "string",
+     ""
+    ],
+    [
+     "amount",
+     "decimal(18,2)",
+     "Luon duong; dau xem direction"
+    ],
+    [
+     "balance_after",
+     "decimal(18,2)",
+     "So du sau giao dich, co the am"
+    ],
+    [
+     "k_symbol",
+     "string",
+     ""
+    ],
+    [
+     "counterparty_bank",
+     "string",
+     ""
+    ],
+    [
+     "counterparty_account",
+     "bigint",
+     "0 o nguon = khong co doi ung (rut tien mat / rut the) -> NULL"
+    ],
+    [
+     "direction",
+     "string",
+     ""
+    ],
+    [
+     "signed_amount",
+     "decimal(18,2)",
+     ""
+    ],
+    [
+     "operation_type",
+     "string",
+     ""
+    ],
+    [
+     "purpose",
+     "string",
+     ""
+    ],
+    [
+     "is_overdraft",
+     "boolean",
+     ""
+    ],
+    [
+     "is_berka_type_error",
+     "boolean",
+     "Loi goc Berka: rut tien ghi o cot type"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "So giao dich tai khoan (Berka goc) - su kien, append theo manifest"
+  }
+ },
+ "silver_cards": {
+  "card_authorization": {
+   "columns": [
+    [
+     "trans_num",
+     "string",
+     "Ma giao dich (khoa)"
+    ],
+    [
+     "trans_ts",
+     "timestamp",
+     "Thoi diem giao dich (gio dia phuong may phat)"
+    ],
+    [
+     "unix_time",
+     "bigint",
+     "Thoi diem dang epoch giay"
+    ],
+    [
+     "card_token",
+     "string",
+     "md5(so the) — noi silver_corebank.card"
+    ],
+    [
+     "cc_num_masked",
+     "string",
+     "So the da che (6 dau + 4 cuoi)"
+    ],
+    [
+     "merchant",
+     "string",
+     "Ten don vi chap nhan the"
+    ],
+    [
+     "category",
+     "string",
+     "Nhom nganh merchant: grocery_pos, shopping_net, kids_pets, ..."
+    ],
+    [
+     "amount",
+     "decimal(18,2)",
+     "So tien (CZK)"
+    ],
+    [
+     "first_name",
+     "string",
+     "PII: ten chu the"
+    ],
+    [
+     "last_name",
+     "string",
+     "PII: ho chu the"
+    ],
+    [
+     "gender",
+     "string",
+     "M | F"
+    ],
+    [
+     "street",
+     "string",
+     "PII: dia chi"
+    ],
+    [
+     "city",
+     "string",
+     "Thanh pho chu the"
+    ],
+    [
+     "state",
+     "string",
+     "Ma quoc gia/vung (CZ)"
+    ],
+    [
+     "zip",
+     "string",
+     "Ma buu chinh"
+    ],
+    [
+     "lat",
+     "double",
+     "Vi do chu the"
+    ],
+    [
+     "lon",
+     "double",
+     "Kinh do chu the"
+    ],
+    [
+     "city_pop",
+     "int",
+     "Dan so thanh pho chu the"
+    ],
+    [
+     "job",
+     "string",
+     "PII: nghe nghiep chu the"
+    ],
+    [
+     "dob",
+     "date",
+     "PII: ngay sinh chu the"
+    ],
+    [
+     "merch_lat",
+     "double",
+     "Vi do merchant"
+    ],
+    [
+     "merch_lon",
+     "double",
+     "Kinh do merchant"
+    ],
+    [
+     "txn_date",
+     "date",
+     "Ngay giao dich"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Giao dich the (authorization) tu Kafka, append theo micro-batch"
+  }
+ },
+ "silver_corebank": {
+  "account": {
+   "columns": [
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "district_id",
+     "int",
+     "Chi nhanh mo tai khoan"
+    ],
+    [
+     "frequency_code",
+     "string",
+     "Ma Sec goc cua ky sao ke"
+    ],
+    [
+     "opened_date",
+     "date",
+     ""
+    ],
+    [
+     "currency",
+     "string",
+     ""
+    ],
+    [
+     "balance",
+     "decimal(18,2)",
+     "So du tai thoi diem keo; am = thau chi"
+    ],
+    [
+     "status",
+     "string",
+     ""
+    ],
+    [
+     "source_created_at",
+     "timestamp",
+     "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"
+    ],
+    [
+     "source_updated_at",
+     "timestamp",
+     "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"
+    ],
+    [
+     "statement_frequency",
+     "string",
+     ""
+    ],
+    [
+     "is_overdrawn",
+     "boolean",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ],
+    [
+     "ds_valid_from",
+     "date",
+     "Phien ban co hieu luc tu ngay (gom)"
+    ],
+    [
+     "ds_valid_to",
+     "date",
+     "Het hieu luc tu ngay (khong gom); 9999-12-31 = hien hanh"
+    ],
+    [
+     "ds_is_current",
+     "boolean",
+     "Phien ban hien hanh"
+    ]
+   ],
+   "comment": "Tai khoan tien gui - thuoc tinh va so du, lich su SCD2"
+  },
+  "card": {
+   "columns": [
+    [
+     "card_id",
+     "int",
+     ""
+    ],
+    [
+     "disp_id",
+     "int",
+     ""
+    ],
+    [
+     "card_type",
+     "string",
+     "classic | junior | gold"
+    ],
+    [
+     "issued_date",
+     "date",
+     ""
+    ],
+    [
+     "card_number_masked",
+     "string",
+     ""
+    ],
+    [
+     "card_token",
+     "string",
+     "md5(so the) - khoa noi cards_authorizations.card_token"
+    ],
+    [
+     "status",
+     "string",
+     "ACTIVE | BLOCKED"
+    ],
+    [
+     "source_created_at",
+     "timestamp",
+     "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"
+    ],
+    [
+     "source_updated_at",
+     "timestamp",
+     "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ],
+    [
+     "ds_valid_from",
+     "date",
+     "Phien ban co hieu luc tu ngay (gom)"
+    ],
+    [
+     "ds_valid_to",
+     "date",
+     "Het hieu luc tu ngay (khong gom); 9999-12-31 = hien hanh"
+    ],
+    [
+     "ds_is_current",
+     "boolean",
+     "Phien ban hien hanh"
+    ]
+   ],
+   "comment": "The thanh toan (so the da che, token) - SCD2"
+  },
+  "client": {
+   "columns": [
+    [
+     "client_id",
+     "int",
+     ""
+    ],
+    [
+     "full_name",
+     "string",
+     "PII. Gia lap (Berka da an danh)"
+    ],
+    [
+     "national_id",
+     "string",
+     "PII. rodne cislo gia lap YYMMDD/XXXX"
+    ],
+    [
+     "gender",
+     "string",
+     "F | M"
+    ],
+    [
+     "birth_date",
+     "date",
+     "PII"
+    ],
+    [
+     "district_id",
+     "int",
+     ""
+    ],
+    [
+     "email",
+     "string",
+     "PII"
+    ],
+    [
+     "phone",
+     "string",
+     "PII"
+    ],
+    [
+     "address",
+     "string",
+     "PII"
+    ],
+    [
+     "status",
+     "string",
+     "ACTIVE | CLOSED (xoa mem)"
+    ],
+    [
+     "source_created_at",
+     "timestamp",
+     "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"
+    ],
+    [
+     "source_updated_at",
+     "timestamp",
+     "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"
+    ],
+    [
+     "is_active",
+     "boolean",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ],
+    [
+     "ds_valid_from",
+     "date",
+     "Phien ban co hieu luc tu ngay (gom)"
+    ],
+    [
+     "ds_valid_to",
+     "date",
+     "Het hieu luc tu ngay (khong gom); 9999-12-31 = hien hanh"
+    ],
+    [
+     "ds_is_current",
+     "boolean",
+     "Phien ban hien hanh"
+    ]
+   ],
+   "comment": "Khach hang ca nhan (PII) - lich su thay doi SCD2"
+  },
+  "disp": {
+   "columns": [
+    [
+     "disp_id",
+     "int",
+     ""
+    ],
+    [
+     "client_id",
+     "int",
+     ""
+    ],
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "disp_type",
+     "string",
+     "OWNER | DISPONENT"
+    ],
+    [
+     "source_created_at",
+     "timestamp",
+     "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"
+    ],
+    [
+     "source_updated_at",
+     "timestamp",
+     "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"
+    ],
+    [
+     "is_owner",
+     "boolean",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ],
+    [
+     "ds_valid_from",
+     "date",
+     "Phien ban co hieu luc tu ngay (gom)"
+    ],
+    [
+     "ds_valid_to",
+     "date",
+     "Het hieu luc tu ngay (khong gom); 9999-12-31 = hien hanh"
+    ],
+    [
+     "ds_is_current",
+     "boolean",
+     "Phien ban hien hanh"
+    ]
+   ],
+   "comment": "Quyen cua khach tren tai khoan (OWNER/DISPONENT) - SCD2"
+  },
+  "district": {
+   "columns": [
+    [
+     "district_id",
+     "int",
+     ""
+    ],
+    [
+     "district_name",
+     "string",
+     ""
+    ],
+    [
+     "region",
+     "string",
+     ""
+    ],
+    [
+     "inhabitants",
+     "int",
+     ""
+    ],
+    [
+     "munic_lt_500",
+     "int",
+     "So xa < 500 dan"
+    ],
+    [
+     "munic_500_1999",
+     "int",
+     ""
+    ],
+    [
+     "munic_2000_9999",
+     "int",
+     ""
+    ],
+    [
+     "munic_ge_10000",
+     "int",
+     ""
+    ],
+    [
+     "cities",
+     "int",
+     ""
+    ],
+    [
+     "urban_ratio",
+     "decimal(5,1)",
+     "Ty le dan thanh thi (%)"
+    ],
+    [
+     "avg_salary",
+     "int",
+     "Luong trung binh (CZK)"
+    ],
+    [
+     "unemployment_95",
+     "decimal(5,2)",
+     "Ty le that nghiep 1995 (%), co NULL"
+    ],
+    [
+     "unemployment_96",
+     "decimal(5,2)",
+     ""
+    ],
+    [
+     "entrepreneurs_per_1000",
+     "int",
+     ""
+    ],
+    [
+     "crimes_95",
+     "int",
+     "So vu pham toi 1995, co NULL"
+    ],
+    [
+     "crimes_96",
+     "int",
+     ""
+    ],
+    [
+     "source_updated_at",
+     "timestamp",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Danh muc quan/huyen va chi so kinh te - xa hoi (Berka district)"
+  },
+  "loan": {
+   "columns": [
+    [
+     "loan_id",
+     "int",
+     ""
+    ],
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "granted_date",
+     "date",
+     ""
+    ],
+    [
+     "amount",
+     "decimal(18,2)",
+     ""
+    ],
+    [
+     "duration_months",
+     "int",
+     ""
+    ],
+    [
+     "monthly_payment",
+     "decimal(18,2)",
+     ""
+    ],
+    [
+     "status_code",
+     "string",
+     "Ma Berka: A | B | C | D"
+    ],
+    [
+     "source_created_at",
+     "timestamp",
+     "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"
+    ],
+    [
+     "source_updated_at",
+     "timestamp",
+     "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"
+    ],
+    [
+     "loan_status",
+     "string",
+     ""
+    ],
+    [
+     "is_problem_loan",
+     "boolean",
+     "Da hoac dang khong tra du"
+    ],
+    [
+     "maturity_date",
+     "date",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ],
+    [
+     "ds_valid_from",
+     "date",
+     "Phien ban co hieu luc tu ngay (gom)"
+    ],
+    [
+     "ds_valid_to",
+     "date",
+     "Het hieu luc tu ngay (khong gom); 9999-12-31 = hien hanh"
+    ],
+    [
+     "ds_is_current",
+     "boolean",
+     "Phien ban hien hanh"
+    ]
+   ],
+   "comment": "Khoan vay - trang thai tra no theo thoi gian, SCD2"
+  },
+  "standing_order": {
+   "columns": [
+    [
+     "order_id",
+     "int",
+     ""
+    ],
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "bank_to",
+     "string",
+     ""
+    ],
+    [
+     "account_to",
+     "bigint",
+     ""
+    ],
+    [
+     "amount",
+     "decimal(12,2)",
+     ""
+    ],
+    [
+     "k_symbol",
+     "string",
+     "Ma muc dich goc"
+    ],
+    [
+     "active",
+     "boolean",
+     ""
+    ],
+    [
+     "source_created_at",
+     "timestamp",
+     "created_at o he thong nguon (gio THAT, khong phai gio nghiep vu)"
+    ],
+    [
+     "source_updated_at",
+     "timestamp",
+     "updated_at o nguon — moc CDC1, thu tu chon ban moi nhat"
+    ],
+    [
+     "purpose",
+     "string",
+     ""
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ],
+    [
+     "ds_valid_from",
+     "date",
+     "Phien ban co hieu luc tu ngay (gom)"
+    ],
+    [
+     "ds_valid_to",
+     "date",
+     "Het hieu luc tu ngay (khong gom); 9999-12-31 = hien hanh"
+    ],
+    [
+     "ds_is_current",
+     "boolean",
+     "Phien ban hien hanh"
+    ]
+   ],
+   "comment": "Lenh chuyen tien dinh ky - SCD2"
+  },
+  "trans": {
+   "columns": [
+    [
+     "trans_id",
+     "bigint",
+     ""
+    ],
+    [
+     "account_id",
+     "int",
+     ""
+    ],
+    [
+     "trans_date",
+     "date",
+     "Ngay nghiep vu"
+    ],
+    [
+     "booked_at",
+     "timestamp",
+     "Lich su Berka: gio sinh tat dinh 07-20h"
+    ],
+    [
+     "trans_type_code",
+     "string",
+     "PRIJEM | VYDAJ | VYBER (loi goc)"
+    ],
+    [
+     "operation_code",
+     "string",
+     ""
+    ],
+    [
+     "amount",
+     "decimal(18,2)",
+     "Luon duong; dau xem direction"
+    ],
+    [
+     "balance_after",
+     "decimal(18,2)",
+     "So du sau giao dich, co the am"
+    ],
+    [
+     "k_symbol",
+     "string",
+     ""
+    ],
+    [
+     "counterparty_bank",
+     "string",
+     ""
+    ],
+    [
+     "counterparty_account",
+     "bigint",
+     ""
+    ],
+    [
+     "source_created_at",
+     "timestamp",
+     ""
+    ],
+    [
+     "direction",
+     "string",
+     ""
+    ],
+    [
+     "signed_amount",
+     "decimal(18,2)",
+     ""
+    ],
+    [
+     "operation_type",
+     "string",
+     ""
+    ],
+    [
+     "purpose",
+     "string",
+     ""
+    ],
+    [
+     "is_overdraft",
+     "boolean",
+     ""
+    ],
+    [
+     "is_berka_type_error",
+     "boolean",
+     "Loi goc Berka: rut tien ghi o cot type"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "So giao dich tai khoan - su kien, append theo manifest"
+  }
+ },
+ "silver_fx": {
+  "cnb_czk_rate": {
+   "columns": [
+    [
+     "rate_date",
+     "date",
+     "Ngay cong bo ty gia (ngay lam viec)"
+    ],
+    [
+     "usd_czk",
+     "decimal(18,6)",
+     "CZK cho 1 USD"
+    ],
+    [
+     "eur_czk",
+     "decimal(18,6)",
+     "CZK cho 1 EUR (tu 1999)"
+    ],
+    [
+     "gbp_czk",
+     "decimal(18,6)",
+     "CZK cho 1 GBP"
+    ],
+    [
+     "chf_czk",
+     "decimal(18,6)",
+     "CZK cho 1 CHF"
+    ],
+    [
+     "cad_czk",
+     "decimal(18,6)",
+     "CZK cho 1 CAD"
+    ],
+    [
+     "aud_czk",
+     "decimal(18,6)",
+     "CZK cho 1 AUD"
+    ],
+    [
+     "cny_czk",
+     "decimal(18,6)",
+     "CZK cho 1 CNY"
+    ],
+    [
+     "mxn_czk",
+     "decimal(18,6)",
+     "CZK cho 1 MXN"
+    ],
+    [
+     "brl_czk",
+     "decimal(18,6)",
+     "CZK cho 1 BRL"
+    ],
+    [
+     "ils_czk",
+     "decimal(18,6)",
+     "CZK cho 1 ILS"
+    ],
+    [
+     "xdr_czk",
+     "decimal(18,6)",
+     "CZK cho 1 SDR (IMF)"
+    ],
+    [
+     "jpy_czk",
+     "decimal(18,8)",
+     "CZK cho 1 JPY (CNB niem yet theo 100 JPY)"
+    ],
+    [
+     "inr_czk",
+     "decimal(18,8)",
+     "CZK cho 1 INR (niem yet theo 100 INR)"
+    ],
+    [
+     "rub_czk",
+     "decimal(18,8)",
+     "CZK cho 1 RUB (niem yet theo 100 RUB; ngung tu 03/2022)"
+    ],
+    [
+     "source_year_file",
+     "string",
+     "File nam goc cua CNB"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Ty gia CNB - CZK cho 1 don vi ngoai te, moi ngay lam viec tu 1993"
+  },
+  "vcb_vnd_rate": {
+   "columns": [
+    [
+     "published_at",
+     "timestamp",
+     "Thoi diem VCB cap nhat bang ty gia (UTC)"
+    ],
+    [
+     "currency_code",
+     "string",
+     "Ma ISO 4217: USD, EUR, JPY, ..."
+    ],
+    [
+     "currency_name",
+     "string",
+     "Ten dong tien theo VCB"
+    ],
+    [
+     "buy_cash",
+     "decimal(18,4)",
+     "VND/1 don vi: mua tien mat (NULL neu VCB khong mua)"
+    ],
+    [
+     "buy_transfer",
+     "decimal(18,4)",
+     "VND/1 don vi: mua chuyen khoan"
+    ],
+    [
+     "sell",
+     "decimal(18,4)",
+     "VND/1 don vi: ban ra"
+    ],
+    [
+     "rate_date",
+     "date",
+     "Ngay ap dung ty gia"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "Ty gia Vietcombank - VND cho 1 don vi ngoai te (mua tien mat, mua chuyen khoan, ban)"
+  }
+ },
+ "silver_mbd": {
+  "client_split": {
+   "columns": [
+    [
+     "client_id",
+     "string",
+     "Ma khach doanh nghiep (hash), khop target_month.client_id"
+    ],
+    [
+     "fold",
+     "int",
+     "Fold 0..4"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "MBD-mini - phan khach vao fold 0..4"
+  },
+  "target_month": {
+   "columns": [
+    [
+     "client_id",
+     "string",
+     "Ma khach doanh nghiep (hash SHA-256 cua Sber)"
+    ],
+    [
+     "report_month",
+     "date",
+     "Ngay cuoi thang bao cao"
+    ],
+    [
+     "target_1",
+     "boolean",
+     "Mua san pham an danh 1 trong thang sau"
+    ],
+    [
+     "target_2",
+     "boolean",
+     "Mua san pham an danh 2 trong thang sau"
+    ],
+    [
+     "target_3",
+     "boolean",
+     "Mua san pham an danh 3 trong thang sau"
+    ],
+    [
+     "target_4",
+     "boolean",
+     "Mua san pham an danh 4 trong thang sau"
+    ],
+    [
+     "trans_count",
+     "int",
+     "So giao dich cua khach trong thang"
+    ],
+    [
+     "diff_trans_date",
+     "int",
+     "Khoang ngay giua giao dich dau va cuoi trong thang"
+    ],
+    [
+     "fold",
+     "int",
+     "Fold 0..4 cua bo du lieu (chia train/test theo khach)"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "MBD-mini - nhan mua 4 san pham an danh theo khach x thang"
+  }
+ },
+ "silver_opensanctions": {
+  "entity": {
+   "columns": [
+    [
+     "entity_id",
+     "string",
+     "Ma OpenSanctions (NK-... hoac ma nguon)"
+    ],
+    [
+     "entity_schema",
+     "string",
+     "Loai FtM: Person, Company, Ownership, Directorship, Address, ..."
+    ],
+    [
+     "caption",
+     "string",
+     "Nhan hien thi"
+    ],
+    [
+     "is_target",
+     "boolean",
+     "true = doi tuong bi cam van; false = thuc the lien quan"
+    ],
+    [
+     "referents",
+     "array<string>",
+     "Ma goc o cac nguon da hop nhat"
+    ],
+    [
+     "source_datasets",
+     "array<string>",
+     "Nguon chua thuc the"
+    ],
+    [
+     "origin",
+     "array<string>",
+     "Cach OpenSanctions suy ra (metadata, inferred, patch)"
+    ],
+    [
+     "properties",
+     "map<string,array<string>>",
+     "Thuoc tinh FtM: name, birthDate, country, ownerId/assetId (Ownership)..."
+    ],
+    [
+     "first_seen",
+     "timestamp",
+     "Lan dau thay"
+    ],
+    [
+     "last_seen",
+     "timestamp",
+     "Lan gan nhat thay (doi moi lan crawl)"
+    ],
+    [
+     "last_change",
+     "timestamp",
+     "Lan gan nhat noi dung doi"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ],
+    [
+     "ds_valid_from",
+     "date",
+     "Phien ban co hieu luc tu ngay (gom)"
+    ],
+    [
+     "ds_valid_to",
+     "date",
+     "Het hieu luc tu ngay (khong gom); 9999-12-31 = hien hanh"
+    ],
+    [
+     "ds_is_current",
+     "boolean",
+     "Phien ban hien hanh"
+    ]
+   ],
+   "comment": "OpenSanctions - thuc the FtM day du (thuoc tinh dang map), lich su SCD2"
+  },
+  "entity_change": {
+   "columns": [
+    [
+     "delta_version",
+     "string",
+     "Phien ban delta, vd 20261008075007-crk (thu tu thoi gian)"
+    ],
+    [
+     "op",
+     "string",
+     "ADD | MOD | DEL"
+    ],
+    [
+     "entity_id",
+     "string",
+     "Ma thuc the"
+    ],
+    [
+     "entity_schema",
+     "string",
+     "Loai FtM"
+    ],
+    [
+     "caption",
+     "string",
+     "Nhan hien thi"
+    ],
+    [
+     "is_target",
+     "boolean",
+     "Doi tuong bi cam van"
+    ],
+    [
+     "source_datasets",
+     "array<string>",
+     "Nguon chua thuc the"
+    ],
+    [
+     "properties",
+     "map<string,array<string>>",
+     "Thuoc tinh FtM sau thay doi (rong voi DEL)"
+    ],
+    [
+     "last_change",
+     "timestamp",
+     "Thoi diem noi dung doi"
+    ],
+    [
+     "version_ts",
+     "timestamp",
+     "Thoi diem phat hanh phien ban (tu delta_version)"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "OpenSanctions - su kien thay doi thuc the theo phien ban delta"
+  },
+  "target": {
+   "columns": [
+    [
+     "entity_id",
+     "string",
+     "Ma OpenSanctions (NK-...), on dinh giua cac lan chup"
+    ],
+    [
+     "entity_schema",
+     "string",
+     "Loai FtM: Person | Organization | Company | Vessel | Airplane | LegalEntity"
+    ],
+    [
+     "name",
+     "string",
+     "Ten chinh"
+    ],
+    [
+     "birth_date",
+     "string",
+     "Ngay sinh/thanh lap (chuoi: co the chi co nam, nhieu gia tri noi ';')"
+    ],
+    [
+     "sanctions",
+     "string",
+     "Mo ta bien phap cam van (van ban tu do)"
+    ],
+    [
+     "first_seen",
+     "timestamp",
+     "Lan dau OpenSanctions thay doi tuong"
+    ],
+    [
+     "last_seen",
+     "timestamp",
+     "Lan gan nhat thay (doi moi lan crawl)"
+    ],
+    [
+     "last_change",
+     "timestamp",
+     "Lan gan nhat noi dung doi"
+    ],
+    [
+     "aliases",
+     "array<string>",
+     "Ten khac"
+    ],
+    [
+     "countries",
+     "array<string>",
+     "Ma quoc gia ISO-2 (chu thuong)"
+    ],
+    [
+     "addresses",
+     "array<string>",
+     "Dia chi"
+    ],
+    [
+     "identifiers",
+     "array<string>",
+     "Ma dinh danh: IMO, so ho chieu, ma so thue..."
+    ],
+    [
+     "phones",
+     "array<string>",
+     "PII: so dien thoai"
+    ],
+    [
+     "emails",
+     "array<string>",
+     "PII: email"
+    ],
+    [
+     "program_ids",
+     "array<string>",
+     "Chuong trinh cam van: US-GLOMAG, EU-RUS..."
+    ],
+    [
+     "source_datasets",
+     "array<string>",
+     "Danh sach nguon (OFAC SDN, EU...)"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ],
+    [
+     "ds_valid_from",
+     "date",
+     "Phien ban co hieu luc tu ngay (gom)"
+    ],
+    [
+     "ds_valid_to",
+     "date",
+     "Het hieu luc tu ngay (khong gom); 9999-12-31 = hien hanh"
+    ],
+    [
+     "ds_is_current",
+     "boolean",
+     "Phien ban hien hanh"
+    ]
+   ],
+   "comment": "OpenSanctions - doi tuong bi cam van (nguoi, to chuc, tau...), lich su SCD2"
+  }
+ },
+ "silver_paysim": {
+  "fraud_label": {
+   "columns": [
+    [
+     "txn_ref",
+     "string",
+     "Khoa noi voi silver_paysim.transaction"
+    ],
+    [
+     "is_fraud",
+     "boolean",
+     "Gian lan that (isFraud)"
+    ],
+    [
+     "is_flagged_fraud",
+     "boolean",
+     "He thong cu da gan co (isFlaggedFraud: TRANSFER > 200.000)"
+    ],
+    [
+     "label_file",
+     "string",
+     "File nhan goc trong _inbox"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "PaySim - nhan gian lan tung giao dich (den tre 30 ngay)"
+  },
+  "transaction": {
+   "columns": [
+    [
+     "txn_ref",
+     "string",
+     "Ma doi soat do doi tac cap (PS + so dong goc)"
+    ],
+    [
+     "txn_ts",
+     "timestamp",
+     "Thoi diem giao dich tren truc chung, UTC"
+    ],
+    [
+     "step",
+     "int",
+     "Gio mo phong goc 1..744"
+    ],
+    [
+     "txn_type",
+     "string",
+     "CASH_IN | CASH_OUT | DEBIT | PAYMENT | TRANSFER"
+    ],
+    [
+     "amount",
+     "decimal(18,2)",
+     "So tien giao dich"
+    ],
+    [
+     "orig_account",
+     "string",
+     "Vi gui (C... = khach)"
+    ],
+    [
+     "orig_balance_before",
+     "decimal(18,2)",
+     "So du vi gui truoc giao dich"
+    ],
+    [
+     "orig_balance_after",
+     "decimal(18,2)",
+     "So du vi gui sau giao dich"
+    ],
+    [
+     "dest_account",
+     "string",
+     "Vi nhan: C... = khach, M... = merchant"
+    ],
+    [
+     "dest_balance_before",
+     "decimal(18,2)",
+     "Merchant luon 0 (gioi han cua PaySim)"
+    ],
+    [
+     "dest_balance_after",
+     "decimal(18,2)",
+     "So du vi nhan sau giao dich"
+    ],
+    [
+     "txn_date",
+     "date",
+     "Ngay nghiep vu (UTC)"
+    ],
+    [
+     "dest_type",
+     "string",
+     "MERCHANT | CUSTOMER (theo tien to dest_account)"
+    ],
+    [
+     "balance_mismatch_orig",
+     "boolean",
+     "So du ben gui khong khop (orig_before - amount <> orig_after) — loi da biet cua PaySim, dac trung huu ich"
+    ],
+    [
+     "ds_key",
+     "string",
+     "Khoa nghiep vu bam SHA-256 (technical.keys)"
+    ],
+    [
+     "ds_hash",
+     "string",
+     "Bam cac cot nghiep vu — phat hien thay doi"
+    ],
+    [
+     "ds_record_status",
+     "string",
+     "I=moi, U=doi, D=xoa, N=khong doi (scd4a)"
+    ],
+    [
+     "ds_partition_date",
+     "date",
+     "Ngay du lieu (technical.partition_date)"
+    ],
+    [
+     "ds_cdc_index",
+     "bigint",
+     "Thu tu CDC: micro-giay hoac so tang dan"
+    ],
+    [
+     "ds_etl_timestamp",
+     "timestamp",
+     "Thoi diem ghi"
+    ],
+    [
+     "ds_etl_job_id",
+     "string",
+     "run_id cua lan chay ghi dong nay"
+    ],
+    [
+     "ds_source",
+     "string",
+     "Manifest (hoac prefix) ma dong nay den tu"
+    ]
+   ],
+   "comment": "PaySim - giao dich vi dien tu tu file doi soat cuoi ngay (khong nhan)"
+  }
+ },
+ "track_a_gold": {
+  "berka_client_month": {
+   "columns": [
+    [
+     "client_id",
+     "int",
+     ""
+    ],
+    [
+     "month",
+     "date",
+     ""
+    ],
+    [
+     "first_open_month",
+     "date",
+     ""
+    ],
+    [
+     "n_accounts",
+     "bigint",
+     ""
+    ],
+    [
+     "txn_cnt",
+     "bigint",
+     ""
+    ],
+    [
+     "inflow",
+     "double",
+     ""
+    ],
+    [
+     "outflow",
+     "double",
+     ""
+    ],
+    [
+     "end_balance",
+     "double",
+     ""
+    ],
+    [
+     "cash_wd_cnt",
+     "bigint",
+     ""
+    ],
+    [
+     "card_wd_cnt",
+     "bigint",
+     ""
+    ],
+    [
+     "avg_balance",
+     "double",
+     ""
+    ],
+    [
+     "min_balance",
+     "double",
+     ""
+    ],
+    [
+     "txn_cnt_3m",
+     "bigint",
+     ""
+    ],
+    [
+     "inflow_3m",
+     "double",
+     ""
+    ],
+    [
+     "outflow_3m",
+     "double",
+     ""
+    ],
+    [
+     "cash_wd_cnt_3m",
+     "bigint",
+     ""
+    ],
+    [
+     "card_wd_cnt_3m",
+     "bigint",
+     ""
+    ],
+    [
+     "min_balance_3m",
+     "double",
+     ""
+    ],
+    [
+     "avg_balance_3m",
+     "double",
+     ""
+    ],
+    [
+     "pension_3m",
+     "int",
+     ""
+    ],
+    [
+     "overdraft_3m",
+     "int",
+     ""
+    ],
+    [
+     "inflow_trend",
+     "double",
+     ""
+    ],
+    [
+     "net_flow_3m",
+     "double",
+     ""
+    ],
+    [
+     "tenure_months",
+     "int",
+     ""
+    ],
+    [
+     "gender",
+     "string",
+     "F | M"
+    ],
+    [
+     "district_id",
+     "int",
+     "Noi o"
+    ],
+    [
+     "region",
+     "string",
+     ""
+    ],
+    [
+     "district_avg_salary",
+     "double",
+     ""
+    ],
+    [
+     "district_unemployment_96",
+     "double",
+     ""
+    ],
+    [
+     "district_urban_ratio",
+     "double",
+     ""
+    ],
+    [
+     "district_inhabitants",
+     "int",
+     ""
+    ],
+    [
+     "district_entrepreneurs_per_1000",
+     "int",
+     ""
+    ],
+    [
+     "age",
+     "int",
+     ""
+    ],
+    [
+     "has_loan",
+     "boolean",
+     ""
+    ],
+    [
+     "has_card_classic",
+     "boolean",
+     ""
+    ],
+    [
+     "has_card_junior",
+     "boolean",
+     ""
+    ],
+    [
+     "has_card_gold",
+     "boolean",
+     ""
+    ],
+    [
+     "has_insurance",
+     "boolean",
+     ""
+    ],
+    [
+     "has_household",
+     "boolean",
+     ""
+    ],
+    [
+     "n_products",
+     "int",
+     ""
+    ],
+    [
+     "month_end",
+     "date",
+     ""
+    ]
+   ],
+   "comment": "UC2: anh chup cuoi thang khach x thang - ho so, hanh vi, san pham dang giu (Berka)"
+  },
+  "berka_product_event": {
+   "columns": [
+    [
+     "client_id",
+     "int",
+     ""
+    ],
+    [
+     "product",
+     "string",
+     ""
+    ],
+    [
+     "acquired_month",
+     "date",
+     ""
+    ],
+    [
+     "source",
+     "string",
+     ""
+    ]
+   ],
+   "comment": "UC2: thang dau tien khach so huu tung san pham (Berka)"
+  },
+  "card_category_baseline": {
+   "columns": [
+    [
+     "category",
+     "string",
+     "Nhom nganh merchant: grocery_pos, shopping_net, kids_pets, ..."
+    ],
+    [
+     "n_txn",
+     "bigint",
+     ""
+    ],
+    [
+     "avg_amt",
+     "double",
+     ""
+    ],
+    [
+     "std_amt",
+     "double",
+     ""
+    ],
+    [
+     "p50_amt",
+     "double",
+     ""
+    ],
+    [
+     "p90_amt",
+     "double",
+     ""
+    ],
+    [
+     "p95_amt",
+     "double",
+     ""
+    ],
+    [
+     "p99_amt",
+     "double",
+     ""
+    ],
+    [
+     "as_of",
+     "date",
+     ""
+    ],
+    [
+     "baseline_days",
+     "int",
+     ""
+    ]
+   ],
+   "comment": "Baseline so tien theo nhom merchant (90 ngay), du phong cho the moi"
+  },
+  "card_spend_baseline": {
+   "columns": [
+    [
+     "card_token",
+     "string",
+     "md5(so the) — noi silver_corebank.card"
+    ],
+    [
+     "n_txn",
+     "bigint",
+     ""
+    ],
+    [
+     "n_days",
+     "bigint",
+     ""
+    ],
+    [
+     "avg_amt",
+     "double",
+     ""
+    ],
+    [
+     "std_amt",
+     "double",
+     ""
+    ],
+    [
+     "p50_amt",
+     "double",
+     ""
+    ],
+    [
+     "p90_amt",
+     "double",
+     ""
+    ],
+    [
+     "p95_amt",
+     "double",
+     ""
+    ],
+    [
+     "p99_amt",
+     "double",
+     ""
+    ],
+    [
+     "max_amt",
+     "double",
+     ""
+    ],
+    [
+     "night_ratio",
+     "double",
+     ""
+    ],
+    [
+     "online_ratio",
+     "double",
+     ""
+    ],
+    [
+     "avg_distance_km",
+     "double",
+     ""
+    ],
+    [
+     "p95_distance_km",
+     "double",
+     ""
+    ],
+    [
+     "first_seen",
+     "date",
+     ""
+    ],
+    [
+     "last_seen",
+     "date",
+     ""
+    ],
+    [
+     "as_of",
+     "date",
+     ""
+    ],
+    [
+     "baseline_days",
+     "int",
+     ""
+    ]
+   ],
+   "comment": "Baseline chi tieu tung the (90 ngay) cho rule realtime ClickHouse"
+  }
+ }
+}

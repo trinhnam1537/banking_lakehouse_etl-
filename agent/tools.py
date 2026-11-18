@@ -212,7 +212,7 @@ WHERE r.confidence >= {lo:.4f}{who}
 ORDER BY r.confidence DESC, r.uid_a LIMIT {max(1, min(int(limit), 100))}""".strip()
 
 
-def check_readonly_sql(sql: str) -> str:
+def check_readonly_sql(sql: str, read_dbs: tuple = READ_DBS) -> str:
     s = sql.strip().rstrip(";")
     if ";" in s:
         raise ToolError("chi mot cau lenh")
@@ -222,8 +222,8 @@ def check_readonly_sql(sql: str) -> str:
         raise ToolError("cau lenh co tu khoa ghi/DDL")
     dbs = {m.lower() for m in re.findall(r"\b([a-z_][a-z0-9_]*)\.[a-z_][a-z0-9_]*\b", s, re.IGNORECASE)}
     tables_dbs = {d for d in dbs if d.startswith(("track_", "silver_", "raw_"))}
-    if tables_dbs - set(READ_DBS):
-        raise ToolError(f"chi doc duoc {READ_DBS}, cau co {sorted(tables_dbs - set(READ_DBS))}")
+    if tables_dbs - set(read_dbs):
+        raise ToolError(f"chi doc duoc {read_dbs}, cau co {sorted(tables_dbs - set(read_dbs))}")
     if not re.search(r"\blimit\s+\d+\s*$", s, re.IGNORECASE):
         s += f" LIMIT {MAX_ROWS}"
     return s

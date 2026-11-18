@@ -254,3 +254,40 @@ def test_mcp_server_cung_tool_va_kiem_trich_dan(cat):
     assert not M.handle(t, "check_citations", {"answer": f"Khach 2 [uid:{U1}]"})["ok"]     # chua goi tool
     M.handle(t, "find_entity", {"text": "Khách 2", "class_iri": None, "limit": None})
     assert M.handle(t, "check_citations", {"answer": f"Khach 2 [uid:{U1}]"})["ok"]
+
+
+# ---------------------------------------------------------------- agent đối chứng text-to-SQL
+
+from agent import baseline as BL  # noqa: E402
+
+SCHEMA = {"silver_berka": {"client": {"comment": "khach", "columns": [["client_id", "bigint", "ma khach"]]}},
+          "track_a_gold": {"berka_product_event": {"comment": "", "columns": [["product", "string", ""]]}}}
+
+
+def test_baseline_schema_on_dinh_va_chi_doc_db_trong_schema():
+    assert BL.schema_text(SCHEMA) == BL.schema_text(json.loads(json.dumps(SCHEMA)))
+    assert "silver_berka.client  -- khach" in BL.schema_text(SCHEMA)
+    tools = BL.BaselineTools(FakeBackend(), SCHEMA)
+    out = tools.call("sql", {"sql": "SELECT * FROM track_a_onto.entity"})
+    assert out["_is_error"] and "chi doc duoc" in out["error"]
+    assert tools.call("sql", {"sql": "DROP TABLE silver_berka.client"})["_is_error"]
+    assert tools.call("customer_360", {"uid": U1})["_is_error"]
+
+
+def test_baseline_chay_tren_cung_vong_lap_khong_kiem_grounding():
+    be = FakeBackend()
+    client = FakeClient([_tool("sql", {"sql": "SELECT product FROM track_a_gold.berka_product_event"}, 1),
+                         _text("Khach giu khoan vay.")])
+    ans = BL.ask("Khach 2 giu gi?", be, client, "m", "bedrock-runtime", SCHEMA)
+    assert ans.text == "Khach giu khoan vay." and not ans.grounded and ans.stop_reason == "end_turn"
+    assert be.sql[0].endswith("LIMIT 200")
+    req = client.calls[0]
+    assert [t["name"] for t in req["tools"]] == ["sql"] and "silver_berka.client" in req["system"][0]["text"]
+    assert req["thinking"] == {"type": "adaptive"}
+
+
+def test_gia_theo_model():
+    from agent.eval import run as R
+
+    assert R.price_for("global.anthropic.claude-opus-4-6-v1")["input_tokens"] == 5.0
+    assert R.price_for("claude-opus-5-5")["output_tokens"] == 20.0
