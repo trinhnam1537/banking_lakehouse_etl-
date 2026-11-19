@@ -1,13 +1,14 @@
 # Đánh giá offline hệ gợi ý v2: mbd (2026-11-19)
 
-Mô hình `v2-20261119-2243`; tập test 200,448 dòng (khách × tháng), tháng 2022-12-31, 2023-01-31.
+Mô hình `v2-20261119-2300`; tập test 200,448 dòng (khách × tháng), tháng 2022-12-31, 2023-01-31.
 Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ số: docs/RECSYS-V2.md mục 4.
 
 ## 1. Độ chính xác xếp hạng (từng khách, dòng có ít nhất 1 sản phẩm được mua)
 
 | model | rows | hit@1 | mrr | map@3 | ndcg@3 | recall@3 |
 |---|---|---|---|---|---|---|
-| v2_multitask_calibrated | 1434 | 0.4819 | 0.6973 | 0.6816 | 0.7515 | 0.9496 |
+| v2 (xep theo raw, champion) | 1434 | 0.5084 | 0.7107 | 0.6970 | 0.7646 | 0.9569 |
+| v2 (xep theo calibrated, so sanh) | 1434 | 0.4819 | 0.6973 | 0.6816 | 0.7515 | 0.9496 |
 | v1_lgb_per_product | 1434 | 0.4596 | 0.6863 | 0.6736 | 0.7469 | 0.9562 |
 | repeat | 1434 | 0.4205 | 0.6633 | 0.6500 | 0.7296 | 0.9569 |
 | popularity | 1434 | 0.3145 | 0.5911 | 0.5746 | 0.6707 | 0.9468 |
@@ -16,7 +17,8 @@ Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ 
 
 | Mô hình | Δ Hit@1 | Δ MAP@3 [CI 95%] | Δ NDCG@3 |
 |---|---:|---|---:|
-| v2_multitask_calibrated | +0.0220 | +0.0079 [-0.0052; +0.0197] | +0.0046 |
+| v2 (xep theo raw, champion) | +0.0492 | +0.0236 [+0.0119; +0.0356] | +0.0178 |
+| v2 (xep theo calibrated, so sanh) | +0.0220 | +0.0079 [-0.0052; +0.0197] | +0.0046 |
 | popularity | -0.1441 | -0.0984 [-0.1211; -0.0783] | -0.0757 |
 | repeat | -0.0388 | -0.0235 [-0.0420; -0.0058] | -0.0172 |
 
@@ -44,39 +46,40 @@ Brier tham chiếu = dự đoán hằng số bằng tỉ lệ nền. ECE tính t
 
 | Mô hình | Độ phủ | Gini hiển thị | Độ mới | Cá nhân hoá | Tỉ trọng hiển thị theo sản phẩm |
 |---|---:|---:|---:|---:|---|
-| v2_multitask_calibrated | 1.00 | 0.470 | 0.918 | 0.570 | 34%, 0%, 55%, 11% |
+| v2 (xep theo raw, champion) | 1.00 | 0.507 | 0.912 | 0.534 | 59%, 0%, 35%, 6% |
+| v2 (xep theo calibrated, so sanh) | 1.00 | 0.470 | 0.918 | 0.570 | 34%, 0%, 55%, 11% |
 | popularity | 0.25 | 0.750 | 0.954 | 0.000 | 100%, 0%, 0%, 0% |
 | repeat | 1.00 | 0.711 | 0.903 | 0.098 | 95%, 0%, 3%, 2% |
 | v1_lgb_per_product | 1.00 | 0.682 | 0.918 | 0.183 | 7%, 0%, 90%, 3% |
 
 ## 5. Phân khúc (v2)
 
-**hoat dong** (tỉ số MAP@3 xấu nhất / tốt nhất = 0.887):
+**hoat dong** (tỉ số MAP@3 xấu nhất / tốt nhất = 0.871):
 
 | segment | rows | hit@1 | map@3 | ndcg@3 |
 |---|---|---|---|---|
-| co giao dich thang nay | 1276 | 0.4639 | 0.6722 | 0.7448 |
-| khong giao dich | 158 | 0.6266 | 0.7579 | 0.8058 |
+| co giao dich thang nay | 1276 | 0.4898 | 0.6858 | 0.7558 |
+| khong giao dich | 158 | 0.6582 | 0.7874 | 0.8351 |
 
-**lich su mua** (tỉ số MAP@3 xấu nhất / tốt nhất = 0.865):
+**lich su mua** (tỉ số MAP@3 xấu nhất / tốt nhất = 0.905):
 
 | segment | rows | hit@1 | map@3 | ndcg@3 |
 |---|---|---|---|---|
-| chua tung mua | 941 | 0.4251 | 0.6471 | 0.7255 |
-| da tung mua | 493 | 0.5903 | 0.7476 | 0.8010 |
+| chua tung mua | 941 | 0.4750 | 0.6728 | 0.7460 |
+| da tung mua | 493 | 0.5720 | 0.7432 | 0.7999 |
 
 **tham nien** (tỉ số MAP@3 xấu nhất / tốt nhất = 1.000):
 
 | segment | rows | hit@1 | map@3 | ndcg@3 |
 |---|---|---|---|---|
-| 9+ | 1434 | 0.4819 | 0.6816 | 0.7515 |
+| 9+ | 1434 | 0.5084 | 0.6970 | 0.7646 |
 
 ## 6. Ổn định theo thời gian
 
 | month | rows | hit@1 | map@3 | ndcg@3 |
 |---|---|---|---|---|
-| 2022-12-31 | 759 | 0.4611 | 0.6597 | 0.7312 |
-| 2023-01-31 | 675 | 0.5052 | 0.7063 | 0.7742 |
+| 2022-12-31 | 759 | 0.4783 | 0.6724 | 0.7421 |
+| 2023-01-31 | 675 | 0.5422 | 0.7247 | 0.7899 |
 
 PSI phân bố điểm train -> test: 1 0.474, 2 0.238, 3 0.247, 4 0.152 (< 0,1 ổn định; 0,1-0,25 theo dõi; > 0,25 trôi).
 
@@ -116,14 +119,14 @@ PSI phân bố điểm train -> test: 1 0.474, 2 0.238, 3 0.247, 4 0.152 (< 0,1 
 
 ## 8. Đánh giá ngoại tuyến chính sách (off-policy)
 
-Log mô phỏng: chính sách cũ = sản phẩm phổ biến nhất, thăm dò ε = 0.3; 200,448 khách; giá trị chính sách cũ 0.0022. Giá trị THẬT của chính sách mới (top-1 v2) = 0.0034.
+Log mô phỏng: chính sách cũ = sản phẩm phổ biến nhất, thăm dò ε = 0.3; 200,448 khách; giá trị chính sách cũ 0.0022. Giá trị THẬT của chính sách mới (top-1 v2) = 0.0036.
 
 | Bộ ước lượng | Ước lượng | Độ chệch |
 |---|---:|---:|
-| IPS | 0.0032 | -0.0003 |
-| SNIPS | 0.0032 | -0.0002 |
-| DM | 0.0040 | +0.0006 |
-| DR | 0.0032 | -0.0002 |
+| IPS | 0.0034 | -0.0003 |
+| SNIPS | 0.0034 | -0.0002 |
+| DM | 0.0039 | +0.0002 |
+| DR | 0.0034 | -0.0002 |
 
 ## 9. Đặc trưng quan trọng (gain)
 

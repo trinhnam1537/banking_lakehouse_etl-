@@ -188,7 +188,7 @@ riêng, cần kiểm lại khi bật.
 
 ---
 
-## 5. System prompt: 9 quy tắc
+## 5. System prompt: 12 quy tắc (9 ban đầu + 10-12 thêm 11-19, mục 9.6)
 
 System prompt = 9 quy tắc + catalog rút gọn. Không có ngày giờ hay dữ liệu khách, nên cache được giữa mọi câu hỏi.
 
@@ -364,6 +364,73 @@ $env:FINGRAPH_BEDROCK_RUNTIME_MODEL = "global.anthropic.claude-opus-4-6-v1"
 ```
 
 Kết quả ghi `agent/eval/results/<thời điểm>[-baseline].md`. Hai agent phải dùng CÙNG model để so sánh công bằng.
+
+### 9.6 Đánh giá v3 (19-11-2026): 61 câu, 5 use case, tầng chỉ số, agent khách hàng
+
+**Thay đổi so với lần 1 (18-11)**, đều xuất phát từ phân tích lỗi lần 1:
+
+| Thay đổi | Lỗi lần 1 nó sửa | Mã |
+|---|---|---|
+| Tầng chỉ số: tool `metric` với 8 chỉ số định nghĩa sẵn trên silver/gold, chiều và bộ lọc theo whitelist, đọc bản ghi hiện hành, trả `cite_id` + `source_tables`; grounding nhận `[metric:<id>]` | A07 (câu thống kê bị grounding chặn vì không có id), A11 (tự viết SQL, vượt 12 lượt) | `agent/metrics.py` |
+| `describe` trả `silver_tables` của lớp | A10 (nêu được `berka:loan`, không nêu được tên bảng) | `agent/catalog.py` |
+| Agent khách hàng: tool `my_data` (SQL chỉ đọc trên `silver_berka`) chạy dưới persona `customer-client-2`; Lake Formation lọc dòng ở tầng lưu trữ | Chưa có use case D | `agent/customer.py` |
+| Tool `recommend`: gợi ý của hệ gợi ý v2 cho một khách | Chưa có use case "nên chào sản phẩm gì" (CQ4) | `agent/tools.py` |
+| Nhật ký kiểm toán mỗi lời gọi tool: người hỏi, persona, tool, tham số, id trả về; ghi JSONL qua `FINGRAPH_AGENT_AUDIT` | Checklist O11 | `Tools.call` |
+| Bộ chạy: `--repeat N`, `--truth-only` (kiểm đáp án không gọi model), `leak_sql` (đo rò rỉ dưới persona khách, không qua LLM); `aggregate.py` gộp nhiều lượt | Lần 1 chỉ một lượt, không có khoảng tin cậy | `agent/eval/` |
+
+**Bộ câu v3** (`agent/eval/questions.yml`): 61 câu = A (trợ lý RM) 22, B (AML) 12, C (BA tự phục vụ) 12, D (khách hàng) 8,
+E (quản trị dữ liệu) 7. Theo cách chấm: 23 `number`, 13 `refuse`, 11 `exact_set`, 7 `contains`. Mọi `truth_sql`
+chạy được (kiểm bằng `--truth-only`, 19-11).
+
+**Kết quả lượt 1** (Claude Opus 4.6 trên Bedrock `bedrock-runtime`; Opus 5.x vẫn bị từ chối 403 ở tài khoản này, kiểm
+19-11). Bộ chấm v3.1 áp cho CẢ HAI agent (`aggregate.py` chấm lại mọi lượt bằng bộ chấm hiện hành):
+
+| Chỉ số | Agent ontology | Agent đối chứng text-to-SQL |
+|---|---:|---:|
+| Độ chính xác (mọi câu chấm được) | 55/60 (92%) | 34/50 (68%) |
+| Trên 50 câu chung | **90%** | 68% |
+| Từ chối đúng (câu chung) | 92% | 50% |
+| Thống kê (câu chung) | 88% | 75% |
+| Tra cứu (câu chung) | 93% | 71% |
+| Câu khách hàng D (rò rỉ `leak_sql`) | 8/8, **0 dòng của khách khác** | (không chạy: dùng chung agent khách) |
+| Chi phí | 4,33 USD / 60 câu | 6,06 USD / 50 câu |
+| Thời gian trung bình | 17,3 s/câu | 11,6 s/câu |
+
+So sánh ghép cặp trên 50 câu chung: chênh lệch **+22 điểm phần trăm**, CI 95% bootstrap theo câu [+8; +38]; McNemar
+trên kết quả từng câu: chỉ ontology đạt 14 câu, chỉ đối chứng đạt 3 câu, p = 0,015. Ba câu lần 1 trượt vì tool đã
+được sửa (A07, A10, A11) nay đạt.
+
+**Phân tích lỗi lượt 1** (agent ontology, 5 câu trượt sau chấm lại):
+- A12 (quỹ đầu tư): trả lời "khách không giữ quỹ" thay vì "chưa có dữ liệu" (lớp `fin:Fund` không nguồn nào có).
+  Đã làm rõ quy tắc 2: không có dữ liệu khác với không có.
+- C10 (nhóm ngành chi tiêu thẻ): agent tin catalog "MerchantCategory chưa có dữ liệu trên đồ thị" nên từ chối, dù bảng
+  `track_a_gold.card_category_baseline` có. Đã thêm chỉ số `card_category_spend`.
+- E04 (mã SIPO): `describe("SIPO")` không khớp mã đầy đủ `berka:k_symbol=SIPO`. `describe` nay tra cả phần đuôi.
+- C04, C09 (thống kê ghép nhiều bước): vượt số lượt / grounding chặn số suy ra. Hạn chế còn lại của thiết kế.
+- Lỗi bộ chấm (đã sửa, chấm lại cả hai agent): "không có căn cứ" không khớp regex từ chối (B07, B08); ngày
+  `26/02/1993` không khớp `1993-02-26` (D01).
+
+**Lượt 2, 3:** lượt 2 dừng ở câu 27 (ontology) và 39 (đối chứng) vì Bedrock trả 429 (vượt hạn mức token/phút khi hai
+agent chạy song song) và credential TerraformAdmin hết 1 giờ. Kết quả dở để ở `results/partial/` (không commit
+jsonl). Chạy lại TUẦN TỰ, từng agent một:
+
+```powershell
+# repo hạ tầng: . .\docs\iam\assume-all.ps1 -NewMfa ; .\scripts\neptune-session.ps1 start
+$env:AWS_PROFILE = "fingraph-mcp"
+.\.venv\Scripts\python.exe -m agent.eval.run --provider bedrock-runtime --repeat 2 `
+    --workgroup fingraph-dev-analyst --agent-profile fg-analyst-mcp `
+    --truth-workgroup fingraph-dev-data-engineer --truth-profile fg-de-mcp `
+    --customer-workgroup fingraph-dev-customer-client-2 --customer-profile fg-client2-mcp `
+    --neptune fingraph-dev-neptune-ops --yes
+.\.venv\Scripts\python.exe -m agent.eval.run --provider bedrock-runtime --baseline --repeat 2 `
+    --workgroup fingraph-dev-data-engineer --agent-profile fg-de-mcp `
+    --truth-workgroup fingraph-dev-data-engineer --truth-profile fg-de-mcp --yes
+.\.venv\Scripts\python.exe -m agent.eval.aggregate --ontology 20261119-221605 <2 lượt mới> `
+    --baseline 20261119-221605-baseline <2 lượt mới>
+```
+
+Mỗi lượt khoảng 20 phút và 4-6 USD. Credential persona sống 1 giờ: lượt dài hơn thì chạy lại `assume-all.ps1` (không
+hỏi MFA trong 12 giờ) giữa các lượt; TerraformAdmin (gọi Bedrock) cần MFA mới sau 1 giờ.
 
 ---
 

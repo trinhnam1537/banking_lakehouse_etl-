@@ -191,7 +191,7 @@ def cmd_online(ds: Dataset, m: Ranker, log=print, users_per_day: int = 1500, day
     pa = res["ab"]["final"]["rate_a"]
     res["sample_size"] = {f"{x:.0%}": ON.sample_size(pa, x) for x in (0.05, 0.1, 0.2, 0.5)} if pa > 0 else {}
     log("  A/A nhin trom ...")
-    res["aa"] = ON.aa_peeking(Y, E, ids, pol[ctrl_name], n_sims=100, days=days, daily_users=300)
+    res["aa"] = ON.aa_peeking(Y, E, ids, pol[ctrl_name], n_sims=300, days=days, daily_users=300)
     log("  interleaving ...")
     res["interleaving"] = {n: ON.simulate_interleaving(Y, E, pol[ctrl_name], pol["v2"], n) for n in (500, 2000, 8000)}
     log("  bandit Thompson ...")

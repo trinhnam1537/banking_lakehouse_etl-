@@ -111,17 +111,32 @@ class Ranker:
             m.calibrators[c] = Isotonic().fit(pv[sel], Lva["y"].to_numpy(float)[sel])
         # Chọn điểm XẾP HẠNG trên VALID (không nhìn test): isotonic theo từng sản phẩm đổi thứ tự GIỮA sản phẩm,
         # có miền lợi (Berka), có miền hại (MBD: bậc thang tạo điểm bằng nhau). Xác suất hiển thị luôn là p_cal.
+        # CROSS-FIT: học isotonic trên một nửa valid (chia theo khách), chấm xếp hạng trên nửa kia, rồi đổi vai. Học và
+        # chấm trên CÙNG valid làm bản hiệu chỉnh trông tốt giả (đo 11-19, MBD: valid 0,722 nhưng test 0,682).
+        from .data import matrices
         from .evaluate import ranking
 
-        from .data import matrices
-
-        Yv, Ev = matrices(ds, va)
         m.meta = {"neg_rate": NEG_RATE}
-        mv = {w: next(v for k, v in ranking(Yv, m.predict(ds, va, calibrated=(w == "calibrated")), Ev).items()
-                  if k.startswith("map@")) for w in ("raw", "calibrated")}
+        raw_v = m.predict(ds, va, calibrated=False)
+        Yv, Ev = matrices(ds, va)
+        fold = (pd.util.hash_pandas_object(va[ds.id_col].astype(str), index=False).to_numpy() % 2).astype(int)
+        cal_v = np.zeros_like(raw_v)
+        for f in (0, 1):
+            fit_rows, use_rows = fold == f, fold != f
+            for j in range(len(m.codes)):
+                e_fit, e_use = Ev[fit_rows, j], Ev[use_rows, j]
+                iso = Isotonic().fit(raw_v[fit_rows, j][e_fit], Yv[fit_rows, j][e_fit].astype(float))
+                col = np.zeros(int(use_rows.sum()))
+                col[e_use] = iso(raw_v[use_rows, j][e_use])
+                cal_v[use_rows, j] = col
+
+        def _map(S):
+            return next(v for k, v in ranking(Yv, S, Ev).items() if k.startswith("map@"))
+
+        mv = {"raw": _map(raw_v), "calibrated": _map(cal_v + 1e-9 * raw_v)}
         rank_with = max(mv, key=mv.get)
-        log(f"  {ds.domain.name}: valid MAP xep theo diem tho {mv['raw']:.4f}, theo p_cal {mv['calibrated']:.4f} "
-            f"-> xep theo {rank_with}")
+        log(f"  {ds.domain.name}: valid MAP (cross-fit) xep theo diem tho {mv['raw']:.4f}, theo p_cal "
+            f"{mv['calibrated']:.4f} -> xep theo {rank_with}")
         m.meta = {"model": "lgb_multitask", "domain": ds.domain.name, "best_iter": m.booster.best_iteration,
                   "rank_with": rank_with, "valid_map": mv,
                   "valid_ap": float(m.booster.best_score["valid_0"]["average_precision"]), "neg_rate": NEG_RATE,
