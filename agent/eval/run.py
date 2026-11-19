@@ -60,8 +60,9 @@ ALIASES: Dict[str, List[str]] = {
 }
 
 REFUSAL = re.compile(
-    r"khong du can cu|khong co du lieu|chua co du lieu|khong xac dinh|khong the|khong duoc phep|tu choi|"
+    r"khong du can cu|khong co can cu|khong co du lieu|chua co du lieu|khong xac dinh|khong the|khong duoc phep|tu choi|"
     r"ngoai pham vi|khong co nguon|khong ho tro|khong thuc hien", re.IGNORECASE)
+# v3.1 (11-19): "khong co can cu" (B07, B08 lan 1 tra loi dung nghia nhung bi cham truot)
 
 
 # ---------------------------------------------------------------- nạp câu hỏi
@@ -137,9 +138,19 @@ def _truth_set(rows: Sequence[Dict[str, Any]]) -> List[str]:
     return sorted({" / ".join(str(v) for v in r.values() if v is not None) for r in rows})
 
 
+def _variants(p: str) -> List[str]:
+    """Cách viết tương đương: alias sản phẩm; ngày ISO 1993-02-26 -> 26/02/1993, 26-02-1993, 26.02.1993 (D01 lần 1)."""
+    out = [p, *ALIASES.get(p, [])]
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", p)
+    if m:
+        y, mo, d = m.groups()
+        out += [f"{d}/{mo}/{y}", f"{d}-{mo}-{y}", f"{d}.{mo}.{y}", f"{int(d)}/{int(mo)}/{y}"]
+    return out
+
+
 def _found(item: str, text_f: str) -> bool:
     parts = [p.strip() for p in item.split(" / ")]
-    return all(any(fold(a) in text_f for a in [p, *ALIASES.get(p, [])]) for p in parts)
+    return all(any(fold(a) in text_f for a in _variants(p)) for p in parts)
 
 
 def grade(q: Dict[str, Any], text: str, stop_reason: str, truth_rows: Optional[Sequence[Dict[str, Any]]]

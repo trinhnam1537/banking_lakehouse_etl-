@@ -131,7 +131,9 @@ def describe(cat: Dict[str, Any], term: str) -> List[Dict[str, Any]]:
     hits = []
     for c in cat["classes"]:
         labels = (_fold(c["label_vi"]), _fold(c["label_en"]))
-        keys = {_fold(c["iri"]), *labels, *[_fold(n) for n in c["notations"]]}
+        # mã nguồn đầy đủ (berka:k_symbol=SIPO) và phần đuôi (SIPO, k_symbol=SIPO): câu E04 lần 1 tra "SIPO" không ra
+        tails = {_fold(n.split("=", 1)[-1]) for n in c["notations"]} | {_fold(n.split(":", 1)[-1]) for n in c["notations"]}
+        keys = {_fold(c["iri"]), *labels, *[_fold(n) for n in c["notations"]], *tails}
         if t in keys or (len(t) >= 3 and any(t in k for k in labels)):
             hits.append({"type": "class", **c})
     for p in cat["properties"]:

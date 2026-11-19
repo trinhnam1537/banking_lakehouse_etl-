@@ -117,6 +117,13 @@ METRICS: Dict[str, Metric] = {m.name: m for m in [
            {"n_txn": "count(*)", "n_fraud": "sum(fraud)", "fraud_rate": "round(avg(CAST(fraud AS double)), 6)",
             "n_flagged": "sum(flagged)", "total_amount": "round(sum(amount), 0)"},
            {"txn_type": "txn_type"}, {"txn_type": "txn_type"}, order="n_txn DESC"),
+    Metric("card_category_spend",
+           "Giao dịch thẻ theo nhóm ngành merchant (grocery_pos, shopping_net, travel, ...): số giao dịch, số tiền trung "
+           "bình, trung vị, phân vị 90/99 (baseline chi tiêu, track_a_gold.card_category_baseline). Trả từng dòng.",
+           ["track_a_gold.card_category_baseline"], "track_a_gold.card_category_baseline t",
+           {"n_txn": "n_txn", "avg_amt": "round(avg_amt, 2)", "p50_amt": "round(p50_amt, 2)",
+            "p90_amt": "round(p90_amt, 2)", "p99_amt": "round(p99_amt, 2)", "as_of": "as_of"},
+           {"category": "category"}, {"category": "category"}, order="avg_amt DESC", aggregate=False),
     Metric("card_fraud_rules",
            "Hiệu quả rule gian lận thẻ realtime (backtest trên nhãn chargeback): precision, recall, F1, tỉ lệ cảnh báo "
            "theo rule (AMOUNT_SPIKE, NIGHT_HIGH_RISK, VELOCITY_2H, ANY_RULE, MULTI_RULE_2, MULTI_RULE_3), mức "

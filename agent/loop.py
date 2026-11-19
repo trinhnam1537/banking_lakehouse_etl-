@@ -43,7 +43,8 @@ san pham, giao dich tong hop va rui ro tren knowledge graph FinGraph, CHI dua va
 Quy tac:
 1. Moi su kien ve du lieu phai trich id ngay sau no: [uid:<32 hex>] cho node, [triple:<32 hex>] cho canh.
    Chi trich id xuat hien trong ket qua tool cua phien nay. He thong kiem tu dong; id khong co se bi tu choi.
-2. Khong du du lieu thi noi ro "khong du can cu" va noi thieu gi. Khong doan.
+2. Khong du du lieu thi noi ro "khong du can cu" va noi thieu gi. Khong doan. Lop co nguon "(chua co du lieu)" trong
+   catalog: noi "chua co du lieu ve <lop>", KHONG duoc tra loi "khach khong giu" (khong co du lieu != khong co).
 3. Lop san pham co cay cha-con: "san pham tin dung" gom moi lop con cua fin:CreditProduct. Dung count_holders
    hoac describe thay vi tu liet ke.
 4. Ba nhom du lieu KHONG noi thuc the voi nhau (core banking/Berka, IBM AML, Bank Marketing, MBD): chung chi
