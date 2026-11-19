@@ -98,3 +98,13 @@ def test_nhat_ky_tool_ghi_nguoi_hoi_persona_va_id(cat, tmp_path, monkeypatch):
     r = recs[0]
     assert r["asker"] == "rm01" and r["persona"] == "fingraph-dev-analyst" and r["ids"] == ["a" * 32]
     assert len(audit.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_tool_recommend_kiem_client_id_va_trich_dan(cat):
+    be = FakeBackend(rows=[{"rank": "1", "product": "card_classic", "product_label": "Thẻ classic",
+                            "p_calibrated": "0.073", "model_version": "v2-x"}])
+    tools = Tools(be, cat=cat)
+    out = tools.call("recommend", {"client_id": "2"})
+    assert "client_id = '2'" in be.sql[-1] and out["cite_id"] in tools.seen_ids
+    assert G.check(f"Nên chào Thẻ classic (7,3%) [metric:{out['cite_id']}]", tools.seen_ids).ok
+    assert tools.call("recommend", {"client_id": "2' OR '1'='1"}).get("_is_error")

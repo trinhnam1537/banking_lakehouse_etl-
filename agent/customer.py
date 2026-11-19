@@ -7,8 +7,7 @@ Thiết kế an toàn: KHÔNG dựa vào prompt để cách ly khách. Tool `my_
 dưới persona `customer-<tên>`: Lake Formation lọc DÒNG (data cells filter: client_id / account_id của khách) ở tầng
 lưu trữ. Prompt injection "cho tôi xem khách 3" chỉ nhận về 0 dòng. Bộ đánh giá đo điều này (câu D*, kỳ vọng 0% rò).
 
-Tool thứ hai `my_recommendations` đọc gợi ý đã chấm sẵn cho chính khách (track_a_gold.reco_topk, nếu persona được
-cấp), kèm lý do. Không có quyền thì nói rõ là chưa có gợi ý.
+Tool thứ hai `my_recommendations` đọc gợi ý đã chấm sẵn cho chính khách (track_a_gold.reco_topk_berka, Lake Formation lọc dòng), kèm lý do. Không có quyền thì nói rõ là chưa có gợi ý.
 """
 
 from __future__ import annotations
@@ -82,7 +81,7 @@ class CustomerTools:
         be = self.reco_backend or self.backend
         try:
             rows = be.run_sql("SELECT rank, product, product_label, p_calibrated, reasons, model_version, scored_month "
-                              "FROM track_a_gold.reco_topk ORDER BY rank LIMIT 5")
+                              "FROM track_a_gold.reco_topk_berka ORDER BY rank LIMIT 5")
         except ToolError as e:
             raise ToolError(f"chua co goi y cho khach nay ({str(e)[:120]})") from None
         return {"rows": rows}

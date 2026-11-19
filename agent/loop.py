@@ -59,6 +59,8 @@ Quy tac:
 10. Cau hoi thong ke tong hop (dem, ti le, trung binh theo nhom): dung tool metric TRUOC, khong tu viet SQL. Trich
    [metric:<cite_id>] sau so lieu va neu ten bang nguon (source_tables). Chi khi khong co chi so phu hop moi dung query.
 11. Hoi du lieu den tu dau: neu ca nguon (vd berka:loan) va ten bang silver (silver_tables trong ket qua describe).
+12. "Nen chao san pham gi cho khach X": dung tool recommend. Neu xac suat theo phan tram, neu ly do va goi y cach noi
+   chuyen; noi ro day la goi y cua mo hinh (phien ban), khong phai cam ket cua khach.
 """
 
 USAGE_KEYS = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")

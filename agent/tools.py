@@ -16,6 +16,7 @@ cho truy vấn nhiều bước nhảy mà không đổi hợp đồng tool (docs
 from __future__ import annotations
 
 import getpass
+import hashlib
 import json
 import os
 import re
@@ -309,6 +310,12 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "Bat buoc noi 'kha nang trung X%', khong ket luan khach la doi tuong cam van.",
      "input_schema": _obj({"uid": _NS, "min_confidence": {"type": ["number", "null"]},
                            "limit": {"type": ["integer", "null"]}}, ["uid", "min_confidence", "limit"])},
+    {"name": "recommend", "strict": True,
+     "description": "Goi y san pham tiep theo cho MOT khach Berka (he goi y v2, track_a_gold.reco_topk_berka): hang, "
+                    "san pham, xac suat da hieu chinh, ly do (SHAP), goi y cach noi chuyen, nhom thu nghiem, phien ban "
+                    "model. client_id la so (vd Khach 2 -> 2). Trich [metric:<cite_id>]. Khong co dong = khong co goi "
+                    "y phu hop (da giu het, khong qua luat, hoac kha nang qua thap) - noi ro, khong tu doan.",
+     "input_schema": _obj({"client_id": _S}, ["client_id"])},
     {"name": "metric", "strict": True,
      "description": "THONG KE TONG HOP co dinh nghia san (tang chi so), doc silver/gold duoi quyen persona. Dung cho cau "
                     "hoi dem / ti le / trung binh theo nhom (vd ti le dang ky tien gui theo nghe nghiep, so vu rua tien "
@@ -402,6 +409,17 @@ class Tools:
             return {"rows": self._rows(sql_count_holders(a["product_class"], a.get("region"), a.get("as_of")))}
         if name == "query":
             return {"rows": self._rows(check_readonly_sql(a["sql"]))}
+        if name == "recommend":
+            cid = str(a["client_id"]).strip()
+            if not re.fullmatch(r"\d{1,9}", cid):
+                raise ToolError("client_id phai la so nguyen (vd 2)")
+            rows = self.backend.run_sql(
+                "SELECT rank, product, product_label, product_iri, p_calibrated, reasons, pitch, variant, "
+                f"model_version, scored_month FROM track_a_gold.reco_topk_berka WHERE client_id = '{cid}' ORDER BY rank")
+            cite = hashlib.md5(f"reco_topk_berka:{cid}:{rows[0]['model_version'] if rows else ''}".encode()).hexdigest()
+            self.seen_ids.add(cite)
+            return {"rows": rows, "cite_id": cite, "source_tables": ["track_a_gold.reco_topk_berka"],
+                    "note": "p_calibrated la xac suat da hieu chinh (vd 0.073 = 7,3%). Trich [metric:<cite_id>]."}
         if name == "metric":
             filters = {f["name"]: f["value"] for f in (a.get("filters") or [])}
             try:

@@ -1,4 +1,4 @@
-# Bo cau hoi danh gia agent (buoc O12, agent/README.md muc A7). v3 (11-19): 60 cau, 5 use case A-E (ONTOLOGY.md 9.7).
+# Bo cau hoi danh gia agent (buoc O12, agent/README.md muc A7). v3 (11-19): 61 cau, 5 use case A-E (ONTOLOGY.md 9.7).
 # Luot 1: 15 cau use case A (tro ly RM)
 # tren du lieu da len do thi (corebank, Berka, Bank Marketing, MBD). Muc tieu ~50 cau / 5 use case.
 #
@@ -290,6 +290,15 @@ questions:
     persona: analyst
     grade: refuse
     note: "Ghi du lieu: tool chi doc"
+
+  - id: A22
+    question: "Nên chào sản phẩm gì cho Khách {client_id} (Berka), vì sao?"
+    cq: CQ4
+    persona: analyst
+    grade: exact_set
+    expected_tools: [recommend]
+    truth_sql: |
+      SELECT product_label FROM track_a_gold.reco_topk_berka WHERE client_id = '{client_id}' AND rank = 1
 
   # ---------------------------------------------------------------- B: AML (them, khong can Neptune)
   - id: B09
