@@ -158,8 +158,50 @@ xứng, mạng hồi quy).
 
 ## 5. Kết quả
 
-_(Điền từ `recsys/bench/reports/bench.md` sau lần chạy đầy đủ.)_
+Chạy đầy đủ ngày 19-11-2026 trên 8 lõi CPU, tổng khoảng 15 phút. Số liệu máy sinh nằm ở
+`recsys/bench/reports/bench.md` và `bench.json`. Tập test gồm 200.448 dòng (2 tháng). Chỉ số xếp hạng tính trên 1.434
+dòng có ít nhất một sản phẩm được mua.
+
+**Xếp hạng sản phẩm cho từng khách (test):**
+
+| Mô hình | Hit@1 | MRR | MAP@3 | Δ MAP@3 so với LightGBM gốc (CI 95%) | Thời gian train |
+|---|---:|---:|---:|---|---:|
+| **LightGBM multi-task** | **0,508** | **0,711** | **0,697** | **+0,024 [+0,012; +0,036]** | 26 s |
+| LightGBM tinh chỉnh (16 thử) | 0,497 | 0,704 | 0,691 | +0,018 [+0,005; +0,031] | 412 s |
+| Ensemble (lgb_tuned + GRU) | 0,493 | 0,702 | 0,689 | +0,015 [+0,003; +0,027] | — |
+| LightGBM đặc trưng v2 | 0,476 | 0,696 | 0,682 | +0,009 [−0,005; +0,023] | 27 s |
+| LightGBM gốc (đặc trưng v1) | 0,460 | 0,686 | 0,674 | 0 | 10 s |
+| GRU theo chuỗi | 0,461 | 0,682 | 0,668 | −0,005 [−0,018; +0,008] | 224 s |
+| XGBoost | 0,453 | 0,680 | 0,667 | −0,007 [−0,016; +0,002] | 34 s |
+| Luật lặp lại (repeat) | 0,421 | 0,663 | 0,650 | −0,024 [−0,042; −0,006] | 0 |
+| Phổ biến (popularity) | 0,315 | 0,591 | 0,575 | — | 0 |
+| CatBoost | 0,240 | 0,526 | 0,472 | −0,202 [−0,219; −0,184] | 80 s |
+
+**Nhắm khách theo sản phẩm (trung bình 4 sản phẩm, test):** ROC-AUC của mọi họ cây nằm trong khoảng 0,745–0,770, lift@1%
+từ 17 đến 19 lần. Ensemble có ROC-AUC cao nhất (0,770). LightGBM tinh chỉnh có lift@1% cao nhất (19,0). Chênh lệch giữa
+các mô hình ở góc nhìn này nhỏ hơn nhiều so với góc nhìn xếp hạng theo khách.
+
+**Đọc kết quả:**
+- **Multi-task thắng vì chia sẻ thống kê giữa sản phẩm.** sp2 chỉ có khoảng 430 ca dương ở train. Mô hình riêng của sp2
+  dừng sớm và cho thang điểm nhiễu. Mô hình chung học quy luật "mua lại" từ cả 4 sản phẩm (đặc trưng `own_*`), nên sp2
+  đạt PR-AUC 0,0137 so với 0,0082 của mô hình gốc. Mô hình chung cũng cho **một thang điểm duy nhất**, đúng thứ mà xếp
+  hạng giữa các sản phẩm cần.
+- **Đặc trưng v2** giúp ít (+0,009, CI chứa 0). **Tinh chỉnh** giúp có ý nghĩa nhưng tốn gấp 16 lần thời gian.
+- **GRU** tốt ở valid (0,694) nhưng không giữ được trên test: chuỗi chỉ có 12 tháng với 2 đại lượng giao dịch, quá ít
+  tín hiệu cho mô hình chuỗi.
+- **CatBoost hỏng ở xếp hạng, không hỏng ở từng sản phẩm.** AUC từng sản phẩm vẫn từ 0,70 đến 0,80. Nguyên nhân: với
+  Logloss, CatBoost khởi đầu từ logit 0 (p = 0,5) thay vì tỉ lệ nền. sp2 dừng sớm ở vòng 13, nên điểm vẫn gần 0,5 và
+  luôn đứng đầu danh sách của mọi khách. Cách sửa (chưa chạy lại): `boost_from_average=True`, hoặc dừng sớm theo Logloss
+  thay vì PRAUC. Đây là ví dụ cho thấy **AUC theo sản phẩm không đủ để chọn mô hình gợi ý**: phải đo thêm chỉ số xếp
+  hạng và độ hiệu chỉnh.
 
 ## 6. Kết luận và khuyến nghị
 
-_(Điền sau khi có kết quả.)_
+1. **Chọn LightGBM multi-task làm mô hình chính (champion)** cho hệ gợi ý v2: tốt nhất trên test với cải thiện có ý
+   nghĩa thống kê, train nhanh nhất, và một mô hình thay cho bốn mô hình.
+2. Giữ **luật repeat làm đối chứng (control)** khi thử nghiệm online (A/B), vì đó là cách ngân hàng làm khi chưa có mô
+   hình.
+3. Chưa nên dùng ensemble: chỉ hơn ở valid, trên test không hơn multi-task, mà vận hành phức tạp hơn.
+4. Trước khi hiển thị xác suất cho người dùng, cần **hiệu chỉnh** trên tập valid (isotonic hoặc Platt) và đo Brier / ECE.
+   Hiệu chỉnh odds theo tỉ lệ lấy mẫu chỉ sửa lệch do lấy mẫu, không sửa lệch do mô hình.
+5. Muốn tăng tiếp thì phải thêm dữ liệu, không phải thêm mô hình: nạp phần `detail` của MBD (giao dịch, địa lý, hội thoại).
