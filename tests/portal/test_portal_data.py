@@ -89,3 +89,27 @@ def test_mbd_client_id_validation(monkeypatch):
     assert "CAST('abc123' AS varchar)" in s and s.endswith("LIMIT 1") and ";" not in s
     with pytest.raises(ValueError):
         D.sql_mbd_features("x' OR '1'='1")
+
+
+# ------------------------------------------------------------------ hệ gợi ý v2
+def test_sql_goi_y_chan_injection_va_chi_san_pham_hop_le():
+    from apps.portal import data as D
+
+    assert "client_id = '2'" in D.sql_reco_client("2")
+    for bad in ("2' OR '1'='1", "-1", "abc"):
+        with pytest.raises(ValueError):
+            D.sql_reco_client(bad)
+    assert "product = 'loan'" in D.sql_campaign("loan", 100) and "LIMIT 100" in D.sql_campaign("loan", 100)
+    assert "LIMIT 5000" in D.sql_campaign("card_gold", 99999)
+    with pytest.raises(ValueError):
+        D.sql_campaign("loan' --", 10)
+    assert "WHERE" not in D.SQL_MY_RECO          # khách: Lake Formation lọc dòng, portal không tự lọc
+
+
+def test_nhat_ky_su_kien_goi_y_ghi_file(tmp_path, monkeypatch):
+    from apps.portal import data as D
+    from recsys.v2.online import RecoEvent
+
+    monkeypatch.setenv("FINGRAPH_RECO_EVENTS", str(tmp_path / "ev.jsonl"))
+    D.reco_event_log().write(RecoEvent("2", "loan", "dismiss", "treatment", "v2-x", surface="portal_customer"))
+    assert D.reco_event_log().read()[0]["event_type"] == "dismiss"

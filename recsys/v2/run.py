@@ -75,8 +75,11 @@ def cmd_evaluate(ds: Dataset, m: Ranker, log=print) -> dict:
     Y, E = matrices(ds, te)
     P = m.predict(ds, te)
     Praw = m.predict(ds, te, calibrated=False)
+    R = m.rank_scores(ds, te)
     base = baselines(ds, te, log)
-    models = {"v2_multitask_calibrated": P, **base}
+    other = "raw" if m.meta.get("rank_with") == "calibrated" else "calibrated"
+    models = {f"v2 (xep theo {m.meta.get('rank_with')}, champion)": R,
+              f"v2 (xep theo {other}, so sanh)": Praw if other == "raw" else P, **base}
     res = {"domain": dom.name, "model_version": m.meta.get("version"), "n_test": len(te),
            "test_months": sorted(map(str, set(te["month"])))}
     res["ranking"] = [{"model": k, **EV.ranking(Y, S, E)} for k, S in models.items()]
@@ -92,8 +95,8 @@ def cmd_evaluate(ds: Dataset, m: Ranker, log=print) -> dict:
     if dom.name == "mbd":
         ever = np.column_stack([(te[f"t{c}_cnt"].fillna(0) > 0).to_numpy() for c in dom.codes]).astype(int)
     res["beyond"] = {k: EV.beyond_accuracy(S, E, ever) for k, S in models.items()}
-    res["segments"] = {name: EV.by_segment(te[col].astype(str).to_numpy(), Y, P, E) for name, col in ds.segments.items()}
-    res["by_month"] = EV.by_month(te["month"].astype(str).to_numpy(), Y, P, E)
+    res["segments"] = {name: EV.by_segment(te[col].astype(str).to_numpy(), Y, R, E) for name, col in ds.segments.items()}
+    res["by_month"] = EV.by_month(te["month"].astype(str).to_numpy(), Y, R, E)
     tr = ds.split("train").sample(min(len(ds.split("train")), 200000), random_state=0)
     Ptr = m.predict(ds, tr)
     Etr = matrices(ds, tr)[1]
@@ -103,7 +106,7 @@ def cmd_evaluate(ds: Dataset, m: Ranker, log=print) -> dict:
         s = E[:, j]
         res["campaign"][p.code] = EV.campaign(Y[s, j], P[s, j], p.value, dom.contact_cost)
     pop = Y.sum(0) / np.maximum(E.sum(0), 1)
-    target = np.argmax(np.where(E, P, -np.inf), 1)
+    target = np.argmax(np.where(E, R, -np.inf), 1)
     res["off_policy"] = EV.off_policy(Y, E, target, P, pop)
     imp = m.booster.feature_importance("gain")
     res["importance"] = dict(sorted(zip(m.fcols, (imp / max(imp.sum(), 1e-9)).round(4).tolist()), key=lambda kv: -kv[1])[:15])
@@ -170,7 +173,7 @@ def cmd_online(ds: Dataset, m: Ranker, log=print, users_per_day: int = 1500, day
     te = ds.split("test")
     te = te[te["month"] == te["month"].max()].reset_index(drop=True)
     Y, E = matrices(ds, te)
-    P = m.predict(ds, te)
+    P = m.rank_scores(ds, te)
     base = baselines(ds, te, log=lambda *_: None)
     ctrl_name = "repeat" if "repeat" in base else "cooccurrence"
     O = {"v2": np.argsort(-np.where(E, P, -np.inf), 1), ctrl_name: np.argsort(-np.where(E, base[ctrl_name], -np.inf), 1),
@@ -234,11 +237,30 @@ def online_md(r: dict) -> str:
 
 # ---------------------------------------------------------------------------------------------- score
 def cmd_score(ds: Dataset, m: Ranker, k: int = 3, log=print):
+    """Bảng PHỤC VỤ: mỗi khách nhận danh sách của NHÓM thử nghiệm của mình (online.assign theo băm client_id):
+    treatment = v2 (giá trị kỳ vọng), control = sản phẩm phổ biến nhất (cách làm khi chưa có mô hình). Kèm bảng điểm
+    đầy đủ (mọi sản phẩm đủ điều kiện) cho trang chiến dịch."""
+    import pandas as pd
+
     d = SV.latest(ds)
     ev = ON.EventLog(EVENTS / f"{ds.domain.name}.jsonl").read()
-    out = SV.recommend(ds, d, m, k=k, events=ev)
+    grp = np.array([ON.assign(c) for c in d[ds.id_col].astype(str)])
+    tr = ds.split("train")
+    Ytr, Etr = matrices(ds, tr)
+    pop = Ytr.sum(0) / np.maximum(Etr.sum(0), 1)
+    parts = []
+    for v in ("treatment", "control"):
+        dv = d[grp == v].reset_index(drop=True)
+        rank_by = None if v == "treatment" else np.tile(pop, (len(dv), 1))
+        parts.append(SV.recommend(ds, dv, m, k=k, events=ev, variant=v, rank_by=rank_by,
+                                  policy_reason="sản phẩm được nhiều khách chọn nhất"))
+    out = pd.concat(parts, ignore_index=True)
     path = SV.save_local(out, REPORTS / ds.domain.name / "reco_topk.parquet")
-    log(f"  {out.client_id.nunique():,} khach, {len(out):,} goi y -> {path}; loc: {out.attrs['filtered']}")
+    full = SV.recommend(ds, d, m, k=len(ds.domain.codes), events=(), variant="all", explain=False)
+    SV.save_local(full[["domain", "client_id", "scored_month", "product", "product_label", "p_calibrated",
+                        "expected_value", "model_version"]], REPORTS / ds.domain.name / "reco_score.parquet")
+    log(f"  {out.client_id.nunique():,} khach, {len(out):,} goi y ({out.variant.value_counts().to_dict()}) -> {path}; "
+        f"bang diem {len(full):,} dong; loc treatment: {parts[0].attrs['filtered']}")
     return out
 
 
@@ -254,8 +276,8 @@ def main(argv=None) -> int:
     if a.cmd == "publish":
         import pandas as pd
 
-        df = pd.read_parquet(REPORTS / a.domain / "reco_topk.parquet")
-        SV.publish(df, table=f"reco_topk_{a.domain}")
+        for name in ("reco_topk", "reco_score"):
+            SV.publish(pd.read_parquet(REPORTS / a.domain / f"{name}.parquet"), table=f"{name}_{a.domain}")
         return 0
     ds = load(a.domain)
     print(f"{a.domain}: {len(ds.df):,} dong, {ds.df[ds.id_col].nunique():,} khach [{time.time() - t0:.0f}s]")
@@ -264,7 +286,7 @@ def main(argv=None) -> int:
         r = cmd_evaluate(ds, m)
         card = REGISTRY / a.domain / m.meta["version"] / "model_card.json"
         c = json.loads(card.read_text(encoding="utf-8"))
-        c["metrics"] = {"test_ranking": next(x for x in r["ranking"] if x["model"].startswith("v2")),
+        c["metrics"] = {"test_ranking": next(x for x in r["ranking"] if "champion" in x["model"]),
                         "calibration_ece_after": {k: v["after"]["ece"] for k, v in r["calibration"].items()},
                         "psi": r["psi"]}
         card.write_text(json.dumps(c, ensure_ascii=False, indent=1, default=float), encoding="utf-8")

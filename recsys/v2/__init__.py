@@ -8,4 +8,7 @@ tầng phục vụ có luật nghiệp vụ, giải thích, nhật ký sự ki�
     python -m recsys.v2.run publish   --domain berka         # đưa bảng gợi ý lên track_a_gold (persona analyst)
 """
 
-import lightgbm  # noqa: F401  (phải trước pandas/pyarrow trên Windows, xem recsys/__init__.py)
+try:  # phải trước pandas/pyarrow trên Windows (recsys/__init__.py); portal chỉ cần online/config, không cần lightgbm
+    import lightgbm  # noqa: F401
+except ImportError:  # pragma: no cover
+    pass

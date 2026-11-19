@@ -40,8 +40,16 @@ REASON_VI = {
     "số sản phẩm đang dùng", "end_balance": "số dư cuối tháng", "min_balance_3m": "số dư thấp nhất 3 tháng",
     "district_avg_salary": "lương trung bình khu vực", "has_household": "đang dùng thanh toán định kỳ",
     "has_insurance": "đang có bảo hiểm", "has_loan": "đang có khoản vay", "has_card_classic": "đang có thẻ classic",
-    "product": "đặc điểm chung của sản phẩm",
+    "avg_balance": "số dư bình quân tháng", "inflow": "tiền vào trong tháng", "outflow": "tiền ra trong tháng",
+    "txn_cnt": "số giao dịch trong tháng", "cash_wd_cnt": "số lần rút tiền mặt", "card_wd_cnt": "số lần rút bằng thẻ",
+    "min_balance": "số dư thấp nhất tháng", "overdraft_3m": "thấu chi 3 tháng", "n_accounts": "số tài khoản",
+    "district_unemployment_96": "tỉ lệ thất nghiệp khu vực", "district_urban_ratio": "mức đô thị hoá khu vực",
+    "district_inhabitants": "quy mô dân số khu vực", "district_entrepreneurs_per_1000": "mật độ doanh nghiệp khu vực",
+    "is_male": "giới tính", "region_code": "vùng sinh sống", "moy": "thời điểm trong năm",
+    "has_card_junior": "đang có thẻ junior", "has_card_gold": "đang có thẻ vàng",
 }
+# Không dùng làm lý do: 'product' chỉ là tỉ lệ nền của sản phẩm (giống nhau với mọi khách), không cá nhân hoá.
+NOT_A_REASON = {"product"}
 
 
 def reason_text(name: str) -> str:
@@ -75,7 +83,10 @@ def suppression(events: Iterable[Dict], domain: Domain, today: Optional[dt.date]
 
 
 def recommend(ds: Dataset, d: pd.DataFrame, model: Ranker, k: int = 3, events: Iterable[Dict] = (),
-              variant: str = "treatment", today: Optional[dt.date] = None, explain: bool = True) -> pd.DataFrame:
+              variant: str = "treatment", today: Optional[dt.date] = None, explain: bool = True,
+              rank_by: Optional[np.ndarray] = None, policy_reason: str = "") -> pd.DataFrame:
+    """rank_by: ma trận điểm thay cho giá trị kỳ vọng khi XẾP HẠNG (chính sách control của A/B, vd độ phổ biến).
+    Xác suất hiển thị vẫn là p_cal của mô hình, luật / cool-down / ngưỡng như nhau: hai nhóm chỉ khác thứ tự."""
     dom = ds.domain
     P = model.predict(ds, d)
     elig = d[[f"elig_{c}" for c in dom.codes]].astype(bool).to_numpy()
@@ -85,11 +96,13 @@ def recommend(ds: Dataset, d: pd.DataFrame, model: Ranker, k: int = 3, events: I
     blocked = np.array([[(ids[i], c) in sup for c in dom.codes] for i in range(len(d))]) if sup else np.zeros_like(elig)
     value = np.array([p.value for p in dom.products])
     ok = elig & rules & ~blocked & (P >= dom.min_p_show)
-    EV = np.where(ok, P * value[None, :], -np.inf)
-    order = np.argsort(-EV, axis=1, kind="stable")[:, :k]
+    # Giá trị kỳ vọng dùng p_cal (đọc được như xác suất); phá hoà bằng điểm xếp hạng của mô hình
+    EV = np.where(ok, P * value[None, :] + 1e-9 * model.rank_scores(ds, d), -np.inf)
+    R = EV if rank_by is None else np.where(ok, rank_by, -np.inf)
+    order = np.argsort(-R, axis=1, kind="stable")[:, :k]
     rows = []
     reasons = {}
-    if explain:
+    if explain and rank_by is None:
         for r in range(min(k, len(dom.codes))):
             reasons[r] = model.contributions(ds, d, order[:, r])
     for i in range(len(d)):
@@ -98,7 +111,8 @@ def recommend(ds: Dataset, d: pd.DataFrame, model: Ranker, k: int = 3, events: I
             if not np.isfinite(EV[i, j]):
                 continue
             prod = dom.products[j]
-            why = "; ".join(reason_text(n) for n, _ in reasons.get(r, [[]] * len(d))[i]) if explain else ""
+            why = ("; ".join(reason_text(n) for n, _ in reasons[r][i] if n not in NOT_A_REASON)
+                   if r in reasons else policy_reason)
             rows.append({"domain": dom.name, "client_id": ids[i], "scored_month": str(d[ds.month_col].iat[i]),
                          "rank": r + 1, "product": prod.code, "product_label": prod.label_vi, "product_iri": prod.iri,
                          "p_calibrated": float(P[i, j]), "expected_value": float(EV[i, j]), "reasons": why,
@@ -123,8 +137,9 @@ def publish(df: pd.DataFrame, table: str = "reco_topk", profile: str = "fg-analy
             log=print) -> str:
     """Ghi bảng gợi ý vào track_a_gold dưới persona ANALYST (quyền ghi gold đã có: IAM S3GhiGold + LF CREATE_TABLE).
 
-    Cách làm: parquet -> s3://<gold>/_staging/<table>/<run>/ -> bảng external tạm -> CTAS Iceberg <table> (thay bản cũ)
-    -> xoá bảng tạm. Bảng do analyst tạo nên analyst có ALL trên nó (drop/thay được), không đụng bảng của pipeline."""
+    Cách làm: parquet -> s3://<gold>/_staging/<table>/<run>/ -> bảng external tạm -> lần đầu CTAS Iceberg <table>,
+    các lần sau DELETE + INSERT (giữ quyền LF) -> xoá bảng tạm. Bảng do analyst tạo nên analyst có ALL trên nó,
+    không đụng bảng của pipeline."""
     import io
 
     import boto3
@@ -147,9 +162,19 @@ def publish(df: pd.DataFrame, table: str = "reco_topk", profile: str = "fg-analy
     cols = ", ".join(f"`{c}` {types.get(str(t), 'string')}" for c, t in df.dtypes.items())
     be.run_sql(f"CREATE EXTERNAL TABLE {database}.{stage} ({cols}) STORED AS PARQUET "
                f"LOCATION 's3://{bucket}/{prefix}/_staging/{table}/{run}/'")
-    be.run_sql(f"DROP TABLE IF EXISTS {database}.{table}")
-    be.run_sql(f"CREATE TABLE {database}.{table} WITH (table_type = 'ICEBERG', is_external = false, "
-               f"location = 's3://{bucket}/{prefix}/{table}/{run}/', format = 'PARQUET') AS SELECT * FROM {database}.{stage}")
+    try:
+        glue.get_table(DatabaseName=database, Name=table)
+        exists = True
+    except glue.exceptions.EntityNotFoundException:
+        exists = False
+    if exists:
+        # KHÔNG drop: drop bảng làm Lake Formation xoá filter dòng + quyền của persona khách trên bảng này.
+        # DELETE + INSERT trên Iceberg = một snapshot mới mỗi lần chấm (time travel theo phiên bản mô hình).
+        be.run_sql(f"DELETE FROM {database}.{table}")
+        be.run_sql(f"INSERT INTO {database}.{table} SELECT * FROM {database}.{stage}")
+    else:
+        be.run_sql(f"CREATE TABLE {database}.{table} WITH (table_type = 'ICEBERG', is_external = false, "
+                   f"location = 's3://{bucket}/{prefix}/{table}/', format = 'PARQUET') AS SELECT * FROM {database}.{stage}")
     be.run_sql(f"DROP TABLE IF EXISTS {database}.{stage}")
     n = be.run_sql(f"SELECT count(*) AS n FROM {database}.{table}")[0]["n"]
     log(f"  {database}.{table}: {n} dong (Iceberg)")

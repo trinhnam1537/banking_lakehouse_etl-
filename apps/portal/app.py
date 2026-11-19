@@ -306,10 +306,164 @@ def page_my_account():
         st.dataframe(ln, use_container_width=True, hide_index=True)
 
 
+# ------------------------------------------------------------------ hệ gợi ý v2: người dùng cuối
+
+def _reco_event(client_id, row, event_type: str, surface: str):
+    """Ghi sự kiện cho đánh giá online (recsys/v2/online.py). Impression chỉ ghi một lần mỗi phiên."""
+    from recsys.v2.online import RecoEvent
+
+    key = ("imp", str(client_id), row["product"], surface)
+    if event_type == "impression":
+        if key in st.session_state:
+            return
+        st.session_state[key] = True
+    D.reco_event_log().write(RecoEvent(
+        client_id=str(client_id), product=str(row["product"]), event_type=event_type, variant=str(row["variant"]),
+        model_version=str(row["model_version"]), rank=int(row["rank"]), p_shown=float(row["p_calibrated"]),
+        surface=surface, actor=P.key))
+
+
+def _reco_cards(client_id, df: pd.DataFrame, surface: str, customer: bool):
+    for _, r in df.iterrows():
+        _reco_event(client_id, r, "impression", surface)
+        with st.container(border=True):
+            c1, c2 = st.columns([3, 1])
+            c1.markdown(f"**{int(r['rank'])}. {r['product_label']}**")
+            c2.metric("Khả năng quan tâm", f"{float(r['p_calibrated']):.1%}")
+            st.caption(("Vì sao bạn thấy gợi ý này: " if customer else "Lý do (SHAP): ") + str(r["reasons"] or "-"))
+            if not customer and r.get("pitch"):
+                st.caption(f"Gợi ý cách nói chuyện: {r['pitch']}")
+            b1, b2, b3 = st.columns(3)
+            if customer:
+                labels = (("Tôi quan tâm", "accept"), ("Ẩn gợi ý này", "dismiss"), ("Xem chi tiết", "click"))
+            else:
+                labels = (("Khách đồng ý", "accept"), ("Khách không quan tâm", "dismiss"), ("Đã giới thiệu", "click"))
+            for col, (text, ev) in zip((b1, b2, b3), labels):
+                if col.button(text, key=f"{surface}_{client_id}_{r['product']}_{ev}"):
+                    _reco_event(client_id, r, ev, surface)
+                    st.toast("Đã ghi nhận" + (": sẽ không chào lại sản phẩm này trong 60 ngày" if ev == "dismiss" else ""))
+
+
+def page_reco_rm():
+    st.header("Gợi ý sản phẩm cho khách (RM)")
+    st.caption("Mô hình v2 (LightGBM multi-task + hiệu chỉnh xác suất), chấm tháng mới nhất, đã áp luật đủ điều kiện và "
+               "chính sách liên hệ. Khách được chia ổn định vào nhóm thử nghiệm A/B: nhóm control nhận gợi ý theo độ "
+               "phổ biến. Mọi thao tác dưới đây được ghi để đo hiệu quả online (trang Giám sát gợi ý).")
+    cid = st.text_input("Mã khách Berka (client_id)", value="2", key="reco_cid")
+    if not cid:
+        return
+    try:
+        sql = D.sql_reco_client(cid)
+    except ValueError as e:
+        st.warning(str(e))
+        return
+    df = query(P, sql)
+    if df is None:
+        return
+    if df.empty:
+        st.info("Không có gợi ý cho khách này: đã giữ mọi sản phẩm, không qua luật đủ điều kiện, đang trong thời gian "
+                "chờ sau khi từ chối, hoặc khả năng quá thấp (không gợi ý còn hơn gợi ý tồi).")
+        return
+    df = num(df, ["rank", "p_calibrated", "expected_value"])
+    st.caption(f"Nhóm thử nghiệm: **{df.variant.iat[0]}** · mô hình `{df.model_version.iat[0]}` · "
+               f"tháng {df.scored_month.iat[0]}")
+    _reco_cards(cid, df, "portal_rm", customer=False)
+
+
+def page_reco_campaign():
+    st.header("Chiến dịch: chọn khách cho một sản phẩm")
+    st.caption("Xếp khách theo xác suất đã hiệu chỉnh: tổng xác suất của danh sách = số khách kỳ vọng sẽ nhận. "
+               "So với chọn ngẫu nhiên cùng số khách để thấy giá trị của mô hình.")
+    from recsys.v2.config import BERKA
+
+    c1, c2, c3 = st.columns(3)
+    prod = c1.selectbox("Sản phẩm", D.RECO_PRODUCTS, format_func=lambda c: BERKA.product(c).label_vi)
+    n = c2.number_input("Số khách liên hệ", 10, 5000, 200, step=50)
+    cost = c3.number_input(f"Chi phí một lần liên hệ ({BERKA.currency})", 0.0, 10000.0, float(BERKA.contact_cost))
+    size = query(P, D.sql_campaign_size(prod))
+    top = query(P, D.sql_campaign(prod, int(n)))
+    if size is None or top is None or top.empty:
+        return
+    size = num(size, ["n", "expected"])
+    top = num(top, ["p_calibrated", "expected_value"])
+    pool, pool_exp = float(size.n.iat[0]), float(size.expected.iat[0] or 0)
+    exp = float(top.p_calibrated.sum())
+    rnd = pool_exp / pool * len(top) if pool else 0
+    value = BERKA.product(prod).value
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Khách đủ điều kiện", f"{pool:,.0f}")
+    m2.metric("Kỳ vọng nhận (mô hình)", f"{exp:,.1f}", f"{(exp / rnd - 1):+.0%} so với ngẫu nhiên" if rnd else None)
+    m3.metric("Doanh thu kỳ vọng", f"{exp * value:,.0f}")
+    m4.metric("ROI kỳ vọng", f"{(exp * value - len(top) * cost) / max(len(top) * cost, 1e-9):.1f}x")
+    st.dataframe(top, use_container_width=True, hide_index=True,
+                 column_config={"p_calibrated": st.column_config.NumberColumn(format="%.4f")})
+    st.download_button("Tải danh sách (CSV)", top.to_csv(index=False).encode("utf-8"), f"chien_dich_{prod}.csv")
+    st.caption("Giá trị sản phẩm và chi phí liên hệ là tham số giả định (recsys/v2/config.py).")
+
+
+def page_reco_monitor():
+    st.header("Giám sát hệ gợi ý")
+    card = D.reco_model_card("berka")
+    if not card:
+        st.info("Chưa có mô hình trong registry: chạy `python -m recsys.v2.run all --domain berka`.")
+        return
+    st.subheader("Model card")
+    m = card.get("metrics", {})
+    tr = m.get("test_ranking", {})
+    c = st.columns(4)
+    c[0].metric("Phiên bản", card.get("version", "-"))
+    c[1].metric("MAP@3 (test)", f"{tr.get('map@3', 0):.3f}")
+    c[2].metric("Hit@1 (test)", f"{tr.get('hit@1', 0):.3f}")
+    c[3].metric("Xếp hạng theo", card.get("rank_with", "-"))
+    st.caption(f"Huấn luyện {card.get('trained_at', '')} · train {card.get('train_months')} · valid "
+               f"{card.get('valid_months')} · ECE sau hiệu chỉnh {m.get('calibration_ece_after')} · PSI {m.get('psi')}")
+    st.subheader("Đo online từ nhật ký sự kiện")
+    from recsys.v2.online import online_metrics, srm, two_proportion
+
+    ev = D.reco_event_log().read()
+    if not ev:
+        st.info("Chưa có sự kiện: mở trang Gợi ý cho khách / Ưu đãi cho bạn và bấm phản hồi để sinh dữ liệu.")
+    else:
+        om = online_metrics(ev)
+        st.dataframe(pd.DataFrame(om["rows"]), use_container_width=True, hide_index=True)
+        pu = om["per_user"]
+        a, b = pu.get("control", {}), pu.get("treatment", {})
+        if a and b:
+            t = two_proportion(a["users_accept"], a["users"], b["users_accept"], b["users"])
+            s = srm(a["users"], b["users"])
+            st.write(f"Tỉ lệ khách nhận: control {t['rate_a']:.2%} vs treatment {t['rate_b']:.2%}, "
+                     f"p = {t['p_value']:.3f}; SRM p = {s['p_value']:.3f} "
+                     f"({'đạt' if s['ok'] else 'HỎNG: không đọc kết quả'}).")
+            st.caption("Cần đủ cỡ mẫu trước khi kết luận (docs/RECSYS-V2.md mục 6); "
+                       "đừng dừng thử nghiệm khi vừa thấy p < 0,05.")
+    st.subheader("Báo cáo đánh giá offline")
+    rep = ROOT / "recsys" / "v2" / "reports" / "berka" / "offline.md"
+    if rep.exists():
+        with st.expander("Mở báo cáo đầy đủ"):
+            st.markdown(rep.read_text(encoding="utf-8"))
+
+
+def page_my_offers():
+    st.header("Ưu đãi dành cho bạn")
+    st.caption("Gợi ý dựa trên giao dịch và sản phẩm bạn đang dùng tại ngân hàng. Dữ liệu không chia sẻ cho bên thứ "
+               "ba. Bạn có thể ẩn một gợi ý: chúng tôi sẽ không chào lại sản phẩm đó trong 60 ngày.")
+    df = query(P, D.SQL_MY_RECO)
+    if df is None:
+        st.info("Vai trò của bạn chưa được cấp quyền xem gợi ý (Lake Formation, repo hạ tầng: customer_gold_tables).")
+        return
+    if df.empty:
+        st.info("Hiện chưa có ưu đãi phù hợp với bạn.")
+        return
+    df = num(df, ["rank", "p_calibrated", "expected_value"])
+    _reco_cards("me", df.head(2), "portal_customer", customer=True)
+
+
 if P.customer:
-    pages = {"Tài khoản của tôi": page_my_account}
+    pages = {"Tài khoản của tôi": page_my_account, "Ưu đãi cho bạn": page_my_offers}
 else:
     pages = {"Tổng quan": page_overview, "Khách hàng 360": page_customer360, "Điều tra AML": page_aml,
+             "Gợi ý cho khách (RM)": page_reco_rm, "Chiến dịch gợi ý": page_reco_campaign,
+             "Giám sát gợi ý": page_reco_monitor,
              "Gian lận thẻ": page_fraud, "Truy vấn SQL": page_sql, "Trợ lý AI": page_assistant}
 # Chỉ chạy trang đang mở: st.tabs chạy MỌI tab mỗi lần tương tác (≈ 10 truy vấn Athena, 30 s).
 with st.sidebar:

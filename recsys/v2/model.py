@@ -109,7 +109,21 @@ class Ranker:
         for j, c in enumerate(m.codes):
             sel = (Lva["product"] == j).to_numpy()
             m.calibrators[c] = Isotonic().fit(pv[sel], Lva["y"].to_numpy(float)[sel])
+        # Chọn điểm XẾP HẠNG trên VALID (không nhìn test): isotonic theo từng sản phẩm đổi thứ tự GIỮA sản phẩm,
+        # có miền lợi (Berka), có miền hại (MBD: bậc thang tạo điểm bằng nhau). Xác suất hiển thị luôn là p_cal.
+        from .evaluate import ranking
+
+        from .data import matrices
+
+        Yv, Ev = matrices(ds, va)
+        m.meta = {"neg_rate": NEG_RATE}
+        mv = {w: next(v for k, v in ranking(Yv, m.predict(ds, va, calibrated=(w == "calibrated")), Ev).items()
+                  if k.startswith("map@")) for w in ("raw", "calibrated")}
+        rank_with = max(mv, key=mv.get)
+        log(f"  {ds.domain.name}: valid MAP xep theo diem tho {mv['raw']:.4f}, theo p_cal {mv['calibrated']:.4f} "
+            f"-> xep theo {rank_with}")
         m.meta = {"model": "lgb_multitask", "domain": ds.domain.name, "best_iter": m.booster.best_iteration,
+                  "rank_with": rank_with, "valid_map": mv,
                   "valid_ap": float(m.booster.best_score["valid_0"]["average_precision"]), "neg_rate": NEG_RATE,
                   "params": {**PARAMS, **(params or {})}, "n_train_rows": int(keep.sum()), "n_valid_rows": len(Lva),
                   "train_months": [str(tr["month"].min()), str(tr["month"].max())],
@@ -134,7 +148,14 @@ class Ranker:
             P[L["_row"].to_numpy()[sel], j] = self.calibrators[c](v) if calibrated else v
         return P
 
-    def contributions(self, ds: Dataset, d: pd.DataFrame, product_idx: np.ndarray, top: int = 3) -> List[List[tuple]]:
+    def rank_scores(self, ds: Dataset, d: pd.DataFrame) -> np.ndarray:
+        """Điểm dùng để XẾP HẠNG sản phẩm cho từng khách (chọn trên valid khi huấn luyện), phá hoà bằng điểm thô."""
+        raw = self.predict(ds, d, calibrated=False)
+        if self.meta.get("rank_with", "calibrated") == "raw":
+            return raw
+        return self.predict(ds, d) + 1e-9 * raw
+
+    def contributions(self, ds: Dataset, d: pd.DataFrame, product_idx: np.ndarray, top: int = 4) -> List[List[tuple]]:
         """SHAP: với mỗi dòng, `top` đặc trưng đẩy điểm của sản phẩm product_idx[i] lên nhiều nhất [(tên, đóng góp)]."""
         L = to_long(ds, d, only_eligible=False)
         n = len(d)
