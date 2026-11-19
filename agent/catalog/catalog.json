@@ -13,7 +13,16 @@
    "label_vi": "Tài khoản",
    "materialized_in": [],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": [
+    "silver_aml.account",
+    "silver_aml.laundering_attempt",
+    "silver_aml.transfer",
+    "silver_berka.account",
+    "silver_berka.trans",
+    "silver_corebank.account",
+    "silver_corebank.trans"
+   ]
   },
   {
    "children": [
@@ -33,7 +42,8 @@
    "notations": [],
    "parents": [
     "fin:Product"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -50,7 +60,8 @@
    ],
    "parents": [
     "fin:AnonymousProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -67,7 +78,8 @@
    ],
    "parents": [
     "fin:AnonymousProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -84,7 +96,8 @@
    ],
    "parents": [
     "fin:AnonymousProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -101,7 +114,8 @@
    ],
    "parents": [
     "fin:AnonymousProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -118,6 +132,13 @@
    "notations": [],
    "parents": [
     "fin:Organization"
+   ],
+   "silver_tables": [
+    "silver_aml.account",
+    "silver_aml.laundering_attempt",
+    "silver_aml.transfer",
+    "silver_berka.trans",
+    "silver_corebank.trans"
    ]
   },
   {
@@ -137,7 +158,8 @@
    ],
    "parents": [
     "fin:CreditCard"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -153,6 +175,10 @@
    "notations": [],
    "parents": [
     "fin:Location"
+   ],
+   "silver_tables": [
+    "silver_berka.district",
+    "silver_corebank.district"
    ]
   },
   {
@@ -175,7 +201,8 @@
    ],
    "parents": [
     "fin:CreditProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [
@@ -195,6 +222,12 @@
    "notations": [],
    "parents": [
     "fin:Product"
+   ],
+   "silver_tables": [
+    "silver_berka.disp",
+    "silver_berka.loan",
+    "silver_corebank.disp",
+    "silver_corebank.loan"
    ]
   },
   {
@@ -218,6 +251,12 @@
    ],
    "parents": [
     "fin:DepositProduct"
+   ],
+   "silver_tables": [
+    "silver_berka.account",
+    "silver_berka.disp",
+    "silver_corebank.account",
+    "silver_corebank.disp"
    ]
   },
   {
@@ -236,6 +275,17 @@
    "notations": [],
    "parents": [
     "fin:Party"
+   ],
+   "silver_tables": [
+    "silver_bank_marketing.contact_additional",
+    "silver_bank_marketing.contact_full",
+    "silver_berka.account",
+    "silver_berka.client",
+    "silver_berka.disp",
+    "silver_corebank.account",
+    "silver_corebank.client",
+    "silver_corebank.disp",
+    "silver_mbd.target_month"
    ]
   },
   {
@@ -247,7 +297,8 @@
    "label_vi": "Bộ dữ liệu",
    "materialized_in": [],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": []
   },
   {
    "children": [
@@ -271,6 +322,14 @@
    "notations": [],
    "parents": [
     "fin:Product"
+   ],
+   "silver_tables": [
+    "silver_bank_marketing.contact_additional",
+    "silver_bank_marketing.contact_full",
+    "silver_berka.account",
+    "silver_berka.disp",
+    "silver_corebank.account",
+    "silver_corebank.disp"
    ]
   },
   {
@@ -286,7 +345,8 @@
    ],
    "parents": [
     "fin:InvestmentProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -302,6 +362,10 @@
    "notations": [],
    "parents": [
     "fin:Location"
+   ],
+   "silver_tables": [
+    "silver_berka.district",
+    "silver_corebank.district"
    ]
   },
   {
@@ -317,7 +381,8 @@
    ],
    "parents": [
     "fin:DepositProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -332,7 +397,8 @@
    ],
    "parents": [
     "fin:InvestmentProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -345,7 +411,8 @@
    "notations": [],
    "parents": [
     "fin:Location"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -364,7 +431,8 @@
    ],
    "parents": [
     "fin:CreditCard"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -379,7 +447,8 @@
    ],
    "parents": [
     "fin:CreditProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -398,7 +467,8 @@
    ],
    "parents": [
     "fin:Product"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [
@@ -416,7 +486,8 @@
    "notations": [],
    "parents": [
     "fin:Product"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -431,7 +502,8 @@
    ],
    "parents": [
     "fin:DepositProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -450,7 +522,8 @@
    ],
    "parents": [
     "fin:CreditCard"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -463,7 +536,11 @@
    "label_vi": "Vụ rửa tiền",
    "materialized_in": [],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": [
+    "silver_aml.laundering_attempt",
+    "silver_aml.transfer"
+   ]
   },
   {
    "children": [
@@ -485,6 +562,12 @@
    ],
    "parents": [
     "fin:CreditProduct"
+   ],
+   "silver_tables": [
+    "silver_berka.disp",
+    "silver_berka.loan",
+    "silver_corebank.disp",
+    "silver_corebank.loan"
    ]
   },
   {
@@ -504,7 +587,11 @@
    "label_vi": "Vị trí",
    "materialized_in": [],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": [
+    "silver_berka.district",
+    "silver_corebank.district"
+   ]
   },
   {
    "children": [],
@@ -519,7 +606,8 @@
    ],
    "parents": [
     "fin:TermDeposit"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -534,7 +622,8 @@
    ],
    "parents": [
     "fin:TermDeposit"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -545,7 +634,8 @@
    "label_vi": "Nhóm merchant",
    "materialized_in": [],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -560,7 +650,8 @@
    ],
    "parents": [
     "fin:Loan"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [
@@ -581,6 +672,15 @@
    "notations": [],
    "parents": [
     "fin:Party"
+   ],
+   "silver_tables": [
+    "silver_aml.account",
+    "silver_aml.laundering_attempt",
+    "silver_aml.transfer",
+    "silver_berka.trans",
+    "silver_corebank.trans",
+    "silver_mbd.target_month",
+    "silver_opensanctions.entity"
    ]
   },
   {
@@ -604,7 +704,24 @@
    "label_vi": "Bên tham gia",
    "materialized_in": [],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": [
+    "silver_aml.account",
+    "silver_aml.laundering_attempt",
+    "silver_aml.transfer",
+    "silver_bank_marketing.contact_additional",
+    "silver_bank_marketing.contact_full",
+    "silver_berka.account",
+    "silver_berka.client",
+    "silver_berka.disp",
+    "silver_berka.trans",
+    "silver_corebank.account",
+    "silver_corebank.client",
+    "silver_corebank.disp",
+    "silver_corebank.trans",
+    "silver_mbd.target_month",
+    "silver_opensanctions.entity"
+   ]
   },
   {
    "children": [
@@ -625,7 +742,8 @@
    "notations": [],
    "parents": [
     "fin:Product"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -640,7 +758,8 @@
    ],
    "parents": [
     "fin:DepositProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -655,7 +774,8 @@
    ],
    "parents": [
     "fin:PaymentService"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -670,7 +790,8 @@
    ],
    "parents": [
     "fin:InvestmentProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -688,7 +809,8 @@
    ],
    "parents": [
     "fin:PaymentService"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -706,6 +828,17 @@
    "notations": [],
    "parents": [
     "fin:Party"
+   ],
+   "silver_tables": [
+    "silver_bank_marketing.contact_additional",
+    "silver_bank_marketing.contact_full",
+    "silver_berka.account",
+    "silver_berka.client",
+    "silver_berka.disp",
+    "silver_corebank.account",
+    "silver_corebank.client",
+    "silver_corebank.disp",
+    "silver_opensanctions.entity"
    ]
   },
   {
@@ -729,7 +862,17 @@
    "label_vi": "Sản phẩm",
    "materialized_in": [],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": [
+    "silver_bank_marketing.contact_additional",
+    "silver_bank_marketing.contact_full",
+    "silver_berka.account",
+    "silver_berka.disp",
+    "silver_berka.loan",
+    "silver_corebank.account",
+    "silver_corebank.disp",
+    "silver_corebank.loan"
+   ]
   },
   {
    "children": [],
@@ -748,7 +891,22 @@
     "track_a_onto.triple"
    ],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": [
+    "silver_bank_marketing.contact_additional",
+    "silver_bank_marketing.contact_full",
+    "silver_berka.account",
+    "silver_berka.card",
+    "silver_berka.disp",
+    "silver_berka.loan",
+    "silver_berka.trans",
+    "silver_corebank.account",
+    "silver_corebank.card",
+    "silver_corebank.disp",
+    "silver_corebank.loan",
+    "silver_corebank.trans",
+    "silver_mbd.target_month"
+   ]
   },
   {
    "children": [],
@@ -759,7 +917,8 @@
    "label_vi": "Gợi ý sản phẩm",
    "materialized_in": [],
    "notations": [],
-   "parents": []
+   "parents": [],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -779,7 +938,8 @@
    ],
    "parents": [
     "fin:PaymentService"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -795,6 +955,10 @@
    "notations": [],
    "parents": [
     "fin:Location"
+   ],
+   "silver_tables": [
+    "silver_berka.district",
+    "silver_corebank.district"
    ]
   },
   {
@@ -810,6 +974,9 @@
    "notations": [],
    "parents": [
     "fin:Party"
+   ],
+   "silver_tables": [
+    "silver_opensanctions.entity"
    ]
   },
   {
@@ -826,7 +993,8 @@
    ],
    "parents": [
     "fin:DepositProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -841,7 +1009,8 @@
    ],
    "parents": [
     "fin:InvestmentProduct"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -856,7 +1025,8 @@
    ],
    "parents": [
     "fin:TermDeposit"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [],
@@ -871,7 +1041,8 @@
    ],
    "parents": [
     "fin:PaymentService"
-   ]
+   ],
+   "silver_tables": []
   },
   {
    "children": [
@@ -892,6 +1063,10 @@
    ],
    "parents": [
     "fin:DepositProduct"
+   ],
+   "silver_tables": [
+    "silver_bank_marketing.contact_additional",
+    "silver_bank_marketing.contact_full"
    ]
   },
   {
@@ -907,7 +1082,8 @@
    "notations": [],
    "parents": [
     "skos:Concept"
-   ]
+   ],
+   "silver_tables": []
   }
  ],
  "ontology_version": "1.0.0",

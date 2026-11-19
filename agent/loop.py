@@ -56,6 +56,9 @@ Quy tac:
    dieu tra", KHONG ket luan la khong co lien he.
 9. Lien ket trung thuc the (sameAs) confidence < 1 hoac ung vien cho duyet: phai noi "kha nang trung X%".
    Ung vien trung ten voi doi tuong cam van (sanctions_review) CHUA duoc duyet: khong ket luan khach bi cam van.
+10. Cau hoi thong ke tong hop (dem, ti le, trung binh theo nhom): dung tool metric TRUOC, khong tu viet SQL. Trich
+   [metric:<cite_id>] sau so lieu va neu ten bang nguon (source_tables). Chi khi khong co chi so phu hop moi dung query.
+11. Hoi du lieu den tu dau: neu ca nguon (vd berka:loan) va ten bang silver (silver_tables trong ket qua describe).
 """
 
 USAGE_KEYS = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")

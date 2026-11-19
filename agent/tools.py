@@ -20,6 +20,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from . import catalog as C
+from . import metrics as MT
 
 DB = "track_a_onto"
 UID = re.compile(r"^[0-9a-f]{32}$")
@@ -293,6 +294,16 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "Bat buoc noi 'kha nang trung X%', khong ket luan khach la doi tuong cam van.",
      "input_schema": _obj({"uid": _NS, "min_confidence": {"type": ["number", "null"]},
                            "limit": {"type": ["integer", "null"]}}, ["uid", "min_confidence", "limit"])},
+    {"name": "metric", "strict": True,
+     "description": "THONG KE TONG HOP co dinh nghia san (tang chi so), doc silver/gold duoi quyen persona. Dung cho cau "
+                    "hoi dem / ti le / trung binh theo nhom (vd ti le dang ky tien gui theo nghe nghiep, so vu rua tien "
+                    "theo kieu hinh, so doanh nghiep MBD mua ca 4 san pham, precision/recall rule gian lan the). "
+                    "by: toi da 2 chieu; filters: [{name, value}] (bo loc dang co thi value 'true'). Ket qua co cite_id "
+                    "va source_tables: trich [metric:<cite_id>] va neu ten bang nguon. Chi so: " + MT.spec_text(),
+     "input_schema": _obj({"metric": {"type": "string", "enum": sorted(MT.METRICS)},
+                           "by": {"type": ["array", "null"], "items": {"type": "string"}},
+                           "filters": {"type": ["array", "null"], "items": _obj({"name": _S, "value": _S}, ["name", "value"])}},
+                          ["metric", "by", "filters"])},
 ]
 
 
@@ -362,6 +373,14 @@ class Tools:
             return {"rows": self._rows(sql_count_holders(a["product_class"], a.get("region"), a.get("as_of")))}
         if name == "query":
             return {"rows": self._rows(check_readonly_sql(a["sql"]))}
+        if name == "metric":
+            filters = {f["name"]: f["value"] for f in (a.get("filters") or [])}
+            try:
+                out = MT.run(self.backend, a["metric"], a.get("by"), filters)
+            except MT.MetricError as e:
+                raise ToolError(str(e)) from None
+            self.seen_ids.add(out["cite_id"])
+            return out
         if name == "sanctions_review":
             rows = self._rows(sql_sanctions_review(a.get("uid"), a.get("min_confidence"), a.get("limit") or 20))
             self._collect(rows)
