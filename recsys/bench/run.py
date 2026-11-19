@@ -54,6 +54,9 @@ def bootstrap_diff(Y, S_a, S_b, n=1000, seed=0):
 
 
 def main(argv=None) -> int:
+    import sys
+
+    sys.stdout.reconfigure(encoding="utf-8")   # console Windows cp1252 khong in duoc tieng Viet (11-19)
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true", help="it trial tune, it epoch GRU (thu nhanh)")
     ap.add_argument("--skip", default="", help="vd: gru,cat")
