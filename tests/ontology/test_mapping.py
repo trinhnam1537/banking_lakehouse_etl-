@@ -113,3 +113,15 @@ def test_uid_on_dinh_va_nhay_theo_tung_truong():
     assert t != ids.make_triple_id(a, "fin:holdsAccount", "x", "1995-02-01", "silver_berka.disp")
     assert t != ids.make_triple_id(a, "fin:holdsAccount", "x", "1995-01-01", "silver_corebank.disp")
     assert ids.natural_key(["a", "b"], [None, "x"]) == "a=|b=x"
+
+
+def test_canh_thieu_valid_from_phai_khai_quy_tac_o6():
+    """O6: mọi cạnh/holding không có valid_from phải thuộc M.TIMELESS (có lý do). Thêm cạnh mới thiếu thời điểm mà
+    không khai thì test đỏ, thay vì lặng lẽ sinh cạnh không dùng được cho đặc trưng point-in-time."""
+    undated = set()
+    for m in M.load_all():
+        undated |= {e.predicate for e in m.edges if not e.valid_from}
+        if any(not h.valid_from for h in m.holdings):
+            undated |= {"fin:hasHolding", "fin:ofProduct"}
+    assert undated <= set(M.TIMELESS), f"canh thieu valid_from chua khai quy tac: {sorted(undated - set(M.TIMELESS))}"
+    assert all(len(v) > 10 for v in M.TIMELESS.values())

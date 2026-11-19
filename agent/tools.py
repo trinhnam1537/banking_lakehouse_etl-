@@ -15,11 +15,16 @@ cho truy vấn nhiều bước nhảy mà không đổi hợp đồng tool (docs
 
 from __future__ import annotations
 
+import getpass
+import hashlib
+import json
+import os
 import re
 import time
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from . import catalog as C
+from . import metrics as MT
 
 DB = "track_a_onto"
 UID = re.compile(r"^[0-9a-f]{32}$")
@@ -29,6 +34,18 @@ READ_DBS = ("track_a_onto", "track_a_gold")
 FORBIDDEN = re.compile(r"\b(insert|update|delete|merge|drop|create|alter|grant|revoke|unload|msck|call|optimize|vacuum)\b",
                        re.IGNORECASE)
 MAX_ROWS = 200
+
+
+def _ids_in(obj: Any, out: set) -> None:
+    """Mọi id 32 hex (uid, triple_id, cite_id của metric) trong kết quả tool, kể cả lồng nhau."""
+    if isinstance(obj, dict):
+        for v in obj.values():
+            _ids_in(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            _ids_in(v, out)
+    elif isinstance(obj, str) and UID.match(obj):
+        out.add(obj)
 
 
 class ToolError(ValueError):
@@ -293,6 +310,22 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "Bat buoc noi 'kha nang trung X%', khong ket luan khach la doi tuong cam van.",
      "input_schema": _obj({"uid": _NS, "min_confidence": {"type": ["number", "null"]},
                            "limit": {"type": ["integer", "null"]}}, ["uid", "min_confidence", "limit"])},
+    {"name": "recommend", "strict": True,
+     "description": "Goi y san pham tiep theo cho MOT khach Berka (he goi y v2, track_a_gold.reco_topk_berka): hang, "
+                    "san pham, xac suat da hieu chinh, ly do (SHAP), goi y cach noi chuyen, nhom thu nghiem, phien ban "
+                    "model. client_id la so (vd Khach 2 -> 2). Trich [metric:<cite_id>]. Khong co dong = khong co goi "
+                    "y phu hop (da giu het, khong qua luat, hoac kha nang qua thap) - noi ro, khong tu doan.",
+     "input_schema": _obj({"client_id": _S}, ["client_id"])},
+    {"name": "metric", "strict": True,
+     "description": "THONG KE TONG HOP co dinh nghia san (tang chi so), doc silver/gold duoi quyen persona. Dung cho cau "
+                    "hoi dem / ti le / trung binh theo nhom (vd ti le dang ky tien gui theo nghe nghiep, so vu rua tien "
+                    "theo kieu hinh, so doanh nghiep MBD mua ca 4 san pham, precision/recall rule gian lan the). "
+                    "by: toi da 2 chieu; filters: [{name, value}] (bo loc dang co thi value 'true'). Ket qua co cite_id "
+                    "va source_tables: trich [metric:<cite_id>] va neu ten bang nguon. Chi so: " + MT.spec_text(),
+     "input_schema": _obj({"metric": {"type": "string", "enum": sorted(MT.METRICS)},
+                           "by": {"type": ["array", "null"], "items": {"type": "string"}},
+                           "filters": {"type": ["array", "null"], "items": _obj({"name": _S, "value": _S}, ["name", "value"])}},
+                          ["metric", "by", "filters"])},
 ]
 
 
@@ -300,12 +333,17 @@ class Tools:
     """Thực thi tool. Ghi lại mọi id đã trả về trong phiên -> dữ liệu cho kiểm grounding."""
 
     def __init__(self, backend: Backend, cat: Optional[Dict[str, Any]] = None,
-                 log: Optional[Callable[[Dict[str, Any]], None]] = None, graph: Optional[GraphBackend] = None):
+                 log: Optional[Callable[[Dict[str, Any]], None]] = None, graph: Optional[GraphBackend] = None,
+                 asker: Optional[str] = None, persona: Optional[str] = None):
         self.backend = backend
         self.graph = graph
         self.cat = cat if cat is not None else C.load()
         self.seen_ids: set = set()
         self.log = log or (lambda rec: None)
+        # Nhật ký kiểm toán (checklist O11): người hỏi, persona, tool, id trả về. Mặc định persona = workgroup Athena.
+        self.asker = asker or os.environ.get("FINGRAPH_ASKER") or getpass.getuser()
+        self.persona = persona or getattr(backend, "workgroup", None)
+        self.audit_path = os.environ.get("FINGRAPH_AGENT_AUDIT")   # JSONL; không đặt thì chỉ gọi self.log
 
     def _rows(self, sql: str) -> List[Dict[str, Any]]:
         rows = self.backend.run_sql(sql)
@@ -341,8 +379,17 @@ class Tools:
             ok = True
         except ToolError as e:
             out, ok = {"error": str(e)}, False
-        self.log({"tool": name, "args": args, "ok": ok, "rows": len(out.get("rows", [])) if ok else 0,
-                  "ms": int((time.monotonic() - t0) * 1000)})
+        ids: set = set()
+        if ok:
+            _ids_in(out, ids)
+            self.seen_ids |= ids
+        rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "asker": self.asker, "persona": self.persona, "tool": name,
+               "args": args, "ok": ok, "rows": len(out.get("rows", [])) if ok else 0,
+               "ids": sorted(ids)[:50], "ms": int((time.monotonic() - t0) * 1000)}
+        self.log(rec)
+        if self.audit_path:
+            with open(self.audit_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
         return out if ok else {**out, "_is_error": True}
 
     def _dispatch(self, name: str, a: Dict[str, Any]) -> Dict[str, Any]:
@@ -362,6 +409,25 @@ class Tools:
             return {"rows": self._rows(sql_count_holders(a["product_class"], a.get("region"), a.get("as_of")))}
         if name == "query":
             return {"rows": self._rows(check_readonly_sql(a["sql"]))}
+        if name == "recommend":
+            cid = str(a["client_id"]).strip()
+            if not re.fullmatch(r"\d{1,9}", cid):
+                raise ToolError("client_id phai la so nguyen (vd 2)")
+            rows = self.backend.run_sql(
+                "SELECT rank, product, product_label, product_iri, p_calibrated, reasons, pitch, variant, "
+                f"model_version, scored_month FROM track_a_gold.reco_topk_berka WHERE client_id = '{cid}' ORDER BY rank")
+            cite = hashlib.md5(f"reco_topk_berka:{cid}:{rows[0]['model_version'] if rows else ''}".encode()).hexdigest()
+            self.seen_ids.add(cite)
+            return {"rows": rows, "cite_id": cite, "source_tables": ["track_a_gold.reco_topk_berka"],
+                    "note": "p_calibrated la xac suat da hieu chinh (vd 0.073 = 7,3%). Trich [metric:<cite_id>]."}
+        if name == "metric":
+            filters = {f["name"]: f["value"] for f in (a.get("filters") or [])}
+            try:
+                out = MT.run(self.backend, a["metric"], a.get("by"), filters)
+            except MT.MetricError as e:
+                raise ToolError(str(e)) from None
+            self.seen_ids.add(out["cite_id"])
+            return out
         if name == "sanctions_review":
             rows = self._rows(sql_sanctions_review(a.get("uid"), a.get("min_confidence"), a.get("limit") or 20))
             self._collect(rows)

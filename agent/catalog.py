@@ -38,14 +38,19 @@ def build(tb: Optional[Dict[str, Any]] = None, mappings: Optional[List[M.Mapping
             children.setdefault(p, []).append(c["iri"])
     # Lớp nào có dữ liệu từ nguồn nào (theo mapping), để agent biết hỏi được gì và không hỏi được gì
     sources: Dict[str, set] = {}
+    # Bảng silver nguồn của mỗi lớp (câu A10, 11-18: agent nêu được berka:loan nhưng không nêu được tên bảng)
+    tables: Dict[str, set] = {}
     for m in mappings:
         for e in m.entities.values():
             for cls in [e.cls, *e.also]:
                 sources.setdefault(cls, set()).add(m.source_system)
+                tables.setdefault(cls, set()).update(e.source.tables)
         for h in m.holdings:
             sources.setdefault("fin:ProductHolding", set()).add(m.source_system)
+            tables.setdefault("fin:ProductHolding", set()).update(h.source.tables)
             if h.product:
                 sources.setdefault(h.product, set()).add(m.source_system)
+                tables.setdefault(h.product, set()).update(h.source.tables)
     notations = M.resolve_notations(tb)
     for code, cls in notations.items():
         src = code.split(":", 1)[0]
@@ -57,6 +62,8 @@ def build(tb: Optional[Dict[str, Any]] = None, mappings: Optional[List[M.Mapping
         for a in anc - {cls}:
             if sources.get(cls):
                 sources.setdefault(a, set()).update(sources[cls])
+            if tables.get(cls):
+                tables.setdefault(a, set()).update(tables[cls])
     preds: Dict[str, set] = {}
     for m in mappings:
         for e in m.edges:
@@ -83,7 +90,8 @@ def build(tb: Optional[Dict[str, Any]] = None, mappings: Optional[List[M.Mapping
     classes = [{
         "iri": c["iri"], "label_vi": c["label_vi"], "label_en": c["label_en"], "definition": c["definition"],
         "parents": c["parents"], "children": sorted(children.get(c["iri"], [])), "notations": c["notations"],
-        "graph_sources": sorted(sources.get(c["iri"], [])), "materialized_in": c["materialized_in"],
+        "graph_sources": sorted(sources.get(c["iri"], [])), "silver_tables": sorted(tables.get(c["iri"], [])),
+        "materialized_in": c["materialized_in"],
     } for c in sorted(tb["classes"], key=lambda c: c["iri"])]
     props = [{
         "iri": p["iri"], "kind": p["kind"], "label_vi": p["label_vi"], "definition": p["definition"],
@@ -123,7 +131,9 @@ def describe(cat: Dict[str, Any], term: str) -> List[Dict[str, Any]]:
     hits = []
     for c in cat["classes"]:
         labels = (_fold(c["label_vi"]), _fold(c["label_en"]))
-        keys = {_fold(c["iri"]), *labels, *[_fold(n) for n in c["notations"]]}
+        # mã nguồn đầy đủ (berka:k_symbol=SIPO) và phần đuôi (SIPO, k_symbol=SIPO): câu E04 lần 1 tra "SIPO" không ra
+        tails = {_fold(n.split("=", 1)[-1]) for n in c["notations"]} | {_fold(n.split(":", 1)[-1]) for n in c["notations"]}
+        keys = {_fold(c["iri"]), *labels, *[_fold(n) for n in c["notations"]], *tails}
         if t in keys or (len(t) >= 3 and any(t in k for k in labels)):
             hits.append({"type": "class", **c})
     for p in cat["properties"]:

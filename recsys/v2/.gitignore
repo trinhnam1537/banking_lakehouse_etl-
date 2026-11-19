@@ -1,0 +1,3 @@
+registry/**/model.lgb.txt
+reports/**/*.parquet
+events/
