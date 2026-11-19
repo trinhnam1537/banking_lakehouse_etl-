@@ -82,3 +82,19 @@ def test_spec_tool_metric_strict():
     spec = next(t for t in TOOL_SPECS if t["name"] == "metric")
     assert spec["strict"] and set(spec["input_schema"]["required"]) == {"metric", "by", "filters"}
     assert spec["input_schema"]["properties"]["metric"]["enum"] == sorted(MT.METRICS)
+
+
+def test_nhat_ky_tool_ghi_nguoi_hoi_persona_va_id(cat, tmp_path, monkeypatch):
+    """Checklist O11: mọi lời gọi tool ghi log (người hỏi, persona, tool, id trả về), ghi được ra file kiểm toán."""
+    audit = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("FINGRAPH_AGENT_AUDIT", str(audit))
+    be = FakeBackend(rows=[{"uid": "a" * 32, "label": "Khach 2"}])
+    be.workgroup = "fingraph-dev-analyst"
+    recs = []
+    tools = Tools(be, cat=cat, log=recs.append, asker="rm01")
+    tools.call("find_entity", {"text": "Khach 2", "class_iri": None, "limit": 5})
+    tools.call("find_entity", {"text": "", "class_iri": None, "limit": 5})          # loi tham so cung ghi
+    assert [r["ok"] for r in recs] == [True, False]
+    r = recs[0]
+    assert r["asker"] == "rm01" and r["persona"] == "fingraph-dev-analyst" and r["ids"] == ["a" * 32]
+    assert len(audit.read_text(encoding="utf-8").splitlines()) == 2

@@ -15,6 +15,9 @@ cho truy vấn nhiều bước nhảy mà không đổi hợp đồng tool (docs
 
 from __future__ import annotations
 
+import getpass
+import json
+import os
 import re
 import time
 from typing import Any, Callable, Dict, List, Optional, Protocol
@@ -30,6 +33,18 @@ READ_DBS = ("track_a_onto", "track_a_gold")
 FORBIDDEN = re.compile(r"\b(insert|update|delete|merge|drop|create|alter|grant|revoke|unload|msck|call|optimize|vacuum)\b",
                        re.IGNORECASE)
 MAX_ROWS = 200
+
+
+def _ids_in(obj: Any, out: set) -> None:
+    """Mọi id 32 hex (uid, triple_id, cite_id của metric) trong kết quả tool, kể cả lồng nhau."""
+    if isinstance(obj, dict):
+        for v in obj.values():
+            _ids_in(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            _ids_in(v, out)
+    elif isinstance(obj, str) and UID.match(obj):
+        out.add(obj)
 
 
 class ToolError(ValueError):
@@ -311,12 +326,17 @@ class Tools:
     """Thực thi tool. Ghi lại mọi id đã trả về trong phiên -> dữ liệu cho kiểm grounding."""
 
     def __init__(self, backend: Backend, cat: Optional[Dict[str, Any]] = None,
-                 log: Optional[Callable[[Dict[str, Any]], None]] = None, graph: Optional[GraphBackend] = None):
+                 log: Optional[Callable[[Dict[str, Any]], None]] = None, graph: Optional[GraphBackend] = None,
+                 asker: Optional[str] = None, persona: Optional[str] = None):
         self.backend = backend
         self.graph = graph
         self.cat = cat if cat is not None else C.load()
         self.seen_ids: set = set()
         self.log = log or (lambda rec: None)
+        # Nhật ký kiểm toán (checklist O11): người hỏi, persona, tool, id trả về. Mặc định persona = workgroup Athena.
+        self.asker = asker or os.environ.get("FINGRAPH_ASKER") or getpass.getuser()
+        self.persona = persona or getattr(backend, "workgroup", None)
+        self.audit_path = os.environ.get("FINGRAPH_AGENT_AUDIT")   # JSONL; không đặt thì chỉ gọi self.log
 
     def _rows(self, sql: str) -> List[Dict[str, Any]]:
         rows = self.backend.run_sql(sql)
@@ -352,8 +372,17 @@ class Tools:
             ok = True
         except ToolError as e:
             out, ok = {"error": str(e)}, False
-        self.log({"tool": name, "args": args, "ok": ok, "rows": len(out.get("rows", [])) if ok else 0,
-                  "ms": int((time.monotonic() - t0) * 1000)})
+        ids: set = set()
+        if ok:
+            _ids_in(out, ids)
+            self.seen_ids |= ids
+        rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "asker": self.asker, "persona": self.persona, "tool": name,
+               "args": args, "ok": ok, "rows": len(out.get("rows", [])) if ok else 0,
+               "ids": sorted(ids)[:50], "ms": int((time.monotonic() - t0) * 1000)}
+        self.log(rec)
+        if self.audit_path:
+            with open(self.audit_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
         return out if ok else {**out, "_is_error": True}
 
     def _dispatch(self, name: str, a: Dict[str, Any]) -> Dict[str, Any]:
