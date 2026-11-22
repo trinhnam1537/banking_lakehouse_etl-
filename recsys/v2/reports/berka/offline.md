@@ -27,17 +27,7 @@ Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ 
 - 0.0% số dòng chỉ có 1 sản phẩm đủ điều kiện: mọi mô hình đều đúng ở dòng này.
 - Trung bình 1.01 sản phẩm được mua mỗi dòng; Hit@1 kỳ vọng của đoán ngẫu nhiên = 0.2661.
 
-### 1b. Chỉ các dòng có ít nhất 2 sản phẩm đủ điều kiện (bài toán xếp hạng thật sự)
-
-| model | rows | hit@1 | mrr | map@3 | ndcg@3 | recall@3 |
-|---|---|---|---|---|---|---|
-| v2 (xep theo calibrated, so sanh) | 1369 | 0.8313 | 0.9108 | 0.9098 | 0.9323 | 0.9963 |
-| v2 (xep theo raw, champion) | 1369 | 0.7860 | 0.8863 | 0.8848 | 0.9132 | 0.9942 |
-| popularity | 1369 | 0.3514 | 0.6376 | 0.6180 | 0.6972 | 0.9233 |
-| cooccurrence | 1369 | 0.3514 | 0.6376 | 0.6180 | 0.6972 | 0.9233 |
-| random (trong san pham du dieu kien, TB 50 lan) | 1369 | 0.2652 | 0.5360 | 0.4811 | 0.5595 | 0.7860 |
-
-Champion so với `popularity` trên các dòng này: Δ Hit@1 +0.4350 [+0.4047; +0.4638], Δ MAP@3 +0.2669 [+0.2503; +0.2835] (CI 95%, bootstrap 1000 lần).
+Mọi dòng được chấm đều có ít nhất 2 sản phẩm đủ điều kiện: bảng trên đã là bài toán xếp hạng thật sự.
 
 
 ## 2. Nhắm khách theo sản phẩm (v2)

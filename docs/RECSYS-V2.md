@@ -19,6 +19,8 @@ So sánh tám họ mô hình nằm ở [RECSYS-BENCH.md](RECSYS-BENCH.md).
 | Đánh giá online (nhật ký sự kiện, A/B, interleaving, bandit) | `recsys/v2/online.py` |
 | Tầng phục vụ (luật, cool-down, giá trị kỳ vọng, lý do, xuất lake) | `recsys/v2/serve.py` |
 | Điều phối | `recsys/v2/run.py` |
+| Đặc trưng đồ thị từ knowledge graph + thí nghiệm O10 (có / không đồ thị) | `recsys/v2/graph.py`, `recsys/v2/ablation.py` |
+| Pilot người dùng thật (so sánh mù, chấm lý do, SUS) | `recsys/v2/pilot.py`, [RECSYS-PILOT.md](RECSYS-PILOT.md) |
 | Báo cáo máy sinh | `recsys/v2/reports/<miền>/offline.md`, `online_sim.md` |
 | Portal (RM, chiến dịch, giám sát, khách) | `apps/portal/app.py` |
 | Agent (`recommend`, `my_recommendations`) | `agent/tools.py`, `agent/customer.py` |
@@ -142,6 +144,63 @@ khác với dữ liệu dùng để chấm.
    chuyện cho RM.
 
 Số dòng bị lọc ở mỗi bước ghi ở `out.attrs["filtered"]`, giúp trả lời câu hỏi "vì sao khách X không có gợi ý".
+
+### 3.4 Đặc trưng đồ thị (O10): có giúp không?
+
+Câu hỏi của phần ontology trong luận văn: knowledge graph có làm mô hình gợi ý tốt hơn không? Thí nghiệm
+(`python -m recsys.v2.ablation`, báo cáo `reports/berka/graph_ablation.md`) giữ nguyên tập test thời gian, mô hình
+champion và tham số; chỉ khác có hay không có đặc trưng đọc từ `track_a_onto` (không đọc lại silver).
+
+Đặc trưng tại (khách, tháng t) chỉ dùng cạnh có `valid_from` trước đầu tháng t+1:
+
+| Nhóm | Đường đi trên đồ thị | Ý nghĩa |
+|---|---|---|
+| `g_district`, `g_region` | Customer –locatedIn→ District –partOf*→ Region (bao đóng) | Tỉ lệ khách cùng quận / vùng đang giữ sản phẩm, bỏ chính khách đó |
+| `g_cohold` | Customer –holdsAccount / isAuthorizedOn→ Account ←… Customer | Người cùng tài khoản có giữ sản phẩm không |
+| `g_partner` | Customer → Account –transfersTo→ Account ←transfersTo– … | Tỉ lệ "hàng xóm chuyển tiền" (chuyển tới cùng tài khoản đối tác) đang giữ sản phẩm |
+| `g_trans` | `product_transition` (chỉ khoảng train) | max P(mua sản phẩm trong 3 tháng \| đang giữ A) |
+
+Kết quả (test 1998-01 .. 1998-09, 3 seed, trung bình ± độ lệch chuẩn):
+
+| | Không đồ thị | Đồ thị, tỉ lệ thô | Đồ thị, chuẩn hoá theo tháng |
+|---|---:|---:|---:|
+| Hit@1 | 0,813 ± 0,012 | 0,800 ± 0,009 | 0,814 ± 0,015 |
+| MAP@3 | 0,899 ± 0,008 | **0,883 ± 0,007** | 0,899 ± 0,011 |
+| PR-AUC thẻ classic | 0,090 | 0,084 | **0,097** |
+
+Kết luận: **trên Berka, đặc trưng đồ thị không cải thiện xếp hạng.** Bản tỉ lệ thô còn làm kém đi một cách nhất quán
+(bootstrap seed 0: Δ MAP@3 −0,017 [−0,025; −0,008]). Có bốn nguyên nhân, đều đo được:
+
+1. **Trôi theo thời gian.** "Tỉ lệ khách trong vùng đang giữ thẻ" là đại lượng cộng dồn, tăng theo tháng. Ở test, giá
+   trị nằm ngoài khoảng đã thấy khi train (PSI 8–12), nên mô hình học "thời gian" chứ không học "vùng". Chuẩn hoá
+   (chia cho tỉ lệ toàn ngân hàng cùng tháng) đưa kết quả về ngang bản không đồ thị, nhưng PSI vẫn 0,2–6. Lý do là
+   Berka phát hành phần lớn thẻ trong giai đoạn 1997–98, nên cơ cấu thay đổi chứ không chỉ mức chung.
+2. **Đồ thị nông.** Thông tin quận / vùng đã có sẵn trong đặc trưng gốc (`region_code`, thống kê quận).
+3. **Láng giềng thưa.** Chỉ 19% khách có người cùng tài khoản. Đồ thị chuyển tiền gần như không có đối tác chung: chỉ
+   25 trên 6.064 tài khoản đối tác có từ 2 khách trở lên, vì Berka ẩn danh tài khoản ngoài ngân hàng.
+4. **Quy luật chuyển tiếp yếu.** Mọi lift trong `product_transition` của Berka đều nhỏ hơn 1 (ONTOLOGY-BUILD O9).
+
+Bài học phương pháp: với một seed, bootstrap cho bản chuẩn hoá Δ MAP@3 −0,020 "có ý nghĩa"; qua 3 seed thì hai bản
+ngang nhau. **CI bootstrap chỉ phản ánh nhiễu của tập test, không phản ánh nhiễu do huấn luyện.** Mọi so sánh mô
+hình cần lặp nhiều seed. Champion đang phục vụ (`v2-20261119-2256`, MAP@3 0,885) nằm ở cận dưới của phân bố theo seed
+(0,899 ± 0,008).
+
+Giá trị của knowledge graph trong đồ án nằm ở agent (đúng 90% so với 68% khi không có ontology, [AI-AGENT.md](AI-AGENT.md))
+và ở kiểm toán gợi ý (mục 3.5), không nằm ở độ chính xác gợi ý trên Berka. Đặc trưng đồ thị đáng thử lại trên miền có
+láng giềng dày (chuyển tiền nội bộ, MBD với giao dịch giữa doanh nghiệp). Mô hình đang phục vụ giữ nguyên, không
+dùng đặc trưng đồ thị.
+
+### 3.5 Ghi gợi ý ngược vào đồ thị
+
+Mapping `berka.yml` có node `fin:Recommendation`, đọc từ `track_a_gold.reco_topk_berka`. Mỗi dòng gợi ý sinh một node
+(khoá: khách, sản phẩm, tháng chấm, phiên bản mô hình) và bốn cạnh: `fin:forCustomer` → khách, `fin:recommends` → lớp
+sản phẩm, `fin:score`, `fin:modelVersion`. Lớp sản phẩm được tra qua `skos:notation` bằng tham chiếu mới
+`{product: <biểu thức>}` trong mapping: `card_gold` → `berka:card_type=gold` → `fin:GoldCard`. Không tra được thì cạnh
+trỏ vào IRI không tồn tại, và bất biến "cạnh mồ côi" sẽ chặn job.
+
+Nhờ vậy, agent và Neptune trả lời được "ai được gợi ý gì, khi nào, bởi mô hình nào" trên cùng đồ thị với lịch sử sản
+phẩm của khách. Muốn đồ thị có gợi ý mới phải publish trước rồi dựng lại `track_a_onto` (`onto.build_graph`), vì đồ
+thị là ảnh chụp tại lần dựng.
 
 ---
 
@@ -322,6 +381,11 @@ Báo cáo đầy đủ: `recsys/v2/reports/{mbd,berka}/offline.md` và `online_s
 | Berka | v2 xếp theo p_cal (so sánh) | 0,831 | 0,910 | 0,932 | +0,292 [+0,275; +0,308] |
 | Berka | popularity (= cooccurrence) | 0,351 | 0,618 | 0,697 | — |
 
+**Độ khó của bài toán (đối chứng ngẫu nhiên, 11-22).** Mỗi dòng Berka được chấm có trung bình 3,85 sản phẩm đủ
+điều kiện (không dòng nào chỉ có 1). Đoán ngẫu nhiên trong các sản phẩm đủ điều kiện đạt Hit@1 0,265 và MAP@3 0,481.
+Vậy Hit@1 0,786 của v2 gấp 3 lần mức ngẫu nhiên, không phải do bài toán dễ. MBD: 4 sản phẩm luôn đủ điều kiện, ngẫu nhiên đạt Hit@1 0,258 và
+MAP@3 0,460, so với 0,508 và 0,697 của v2.
+
 Với Berka, cách xếp được chọn trên valid (điểm thô, valid 0,896 so với 0,888) KHÔNG phải cách tốt nhất trên test (p_cal,
 0,910). Hệ thống vẫn giữ lựa chọn theo valid, vì chọn lại theo test là dùng test để huấn luyện. Chênh lệch trên valid
 nhỏ (0,009). Đây là tín hiệu để lần sau dùng nhiều tháng valid hơn khi chọn.
@@ -414,18 +478,23 @@ Chi phí Athena khi publish dưới 0,01 USD (bảng vài trăm KB). Không cầ
 | Drop bảng làm mất quyền Lake Formation | Thiết kế publish | `DELETE` + `INSERT` trên bảng Iceberg có sẵn |
 | A/B không đủ cỡ mẫu cho sản phẩm hiếm | MBD: +32%, p = 0,26 | Dùng offline có CI và off-policy làm công cụ chính |
 | Nhìn trộm p-value làm dương tính giả tăng gấp ba | A/A Berka: 16% so với 5% | Cố định cỡ mẫu; trang Giám sát có cảnh báo |
+| Đặc trưng đồ thị thô làm giảm xếp hạng | Berka: MAP@3 0,899 → 0,883 (3 seed); PSI tỉ lệ vùng 8–12 | Chuẩn hoá theo tháng (về ngang); không đưa vào champion (mục 3.4) |
+| Bootstrap một seed bỏ sót nhiễu huấn luyện | Bản đồ thị chuẩn hoá: −0,020 "có ý nghĩa" ở seed 0, ngang nhau qua 3 seed | So mô hình bằng nhiều seed + bootstrap |
+| Nghi Hit@1 cao do ít sản phẩm đủ điều kiện | Kiểm: 3,85 sản phẩm / dòng, ngẫu nhiên 0,265 | Báo đối chứng ngẫu nhiên trong mọi báo cáo offline |
 | Nhãn "mua" khác với "nhận lời vì được gợi ý" | Mọi chỉ số offline chỉ đo dự đoán hành vi tự nhiên | Nhật ký sự kiện + A/B để đo tác động |
 
 ## 10. Hạn chế và bước tiếp theo
 
-1. **Chưa có người dùng thật.** Kết quả online là mô phỏng với tham số giả định. Hạ tầng (sự kiện, gán nhóm, kiểm
-   định) đã chạy trên portal.
-2. **Persona khách chưa đọc được gợi ý.** Cần apply Terraform `customer_gold_tables` bằng lệnh `-target` (SETUP-LOG,
-   mục 11-19).
+1. **Chưa có người dùng thật ở quy mô A/B.** Kết quả online là mô phỏng với tham số giả định. Hạ tầng (sự kiện, gán
+   nhóm, kiểm định) đã chạy trên portal. Bộ công cụ pilot 6–10 người đã sẵn sàng ([RECSYS-PILOT.md](RECSYS-PILOT.md)),
+   chờ tổ chức buổi làm.
+2. ~~Persona khách chưa đọc được gợi ý~~. Đã apply 11-22: persona `customer-client-2` chỉ đọc được 1 dòng, của
+   chính khách 2.
 3. **Nhật ký sự kiện là file cục bộ.** Bước tiếp: `track_a_gold.reco_event` (Iceberg) hoặc một topic Kafka.
-4. **Gợi ý chưa vào knowledge graph** (checklist O10). Cần mapping `fin:Recommendation` (`fin:forCustomer`,
-   `fin:recommends`, `fin:score`, `fin:modelVersion`) đọc từ `reco_topk_berka`, tham chiếu node khách của `berka.yml`,
-   rồi dựng lại `track_a_onto` (`onto.build_graph`, Glue, khoảng 6 phút).
+4. **Gợi ý vào knowledge graph:** mapping đã có (mục 3.5, test Spark cục bộ). Chờ merge và deploy `etl.zip`, rồi
+   dựng lại `track_a_onto` (`onto.build_graph`, Glue, khoảng 6 phút).
+8. **Đặc trưng đồ thị không giúp trên Berka** (mục 3.4). Nên thử lại trên miền có láng giềng dày, và chọn mô hình
+   bằng nhiều seed.
 5. **Giá trị sản phẩm và chi phí liên hệ là giả định.** ROI tuyệt đối chưa có nghĩa; chỉ so sánh tương đối có nghĩa.
 6. **MBD trôi mạnh (PSI 0,47) và sp2 không bao giờ lên top-1.** Cần lịch huấn luyện lại theo PSI, và hạn ngạch hoặc
    giá trị riêng cho sản phẩm hiếm.
@@ -439,6 +508,8 @@ Chi phí Athena khi publish dưới 0,01 USD (bảng vài trăm KB). Không cầ
 .\.venv\Scripts\python.exe -m recsys.v2.run all --domain berka     # huấn luyện + offline + chấm điểm (~30 s)
 .\.venv\Scripts\python.exe -m recsys.v2.run online --domain berka  # online mô phỏng Berka (~15 s)
 .\.venv\Scripts\python.exe -m recsys.v2.run publish --domain berka # ghi track_a_gold.reco_topk_berka, reco_score_berka
+.\.venv\Scripts\python.exe -m recsys.v2.ablation                # O10: có / không đặc trưng đồ thị (~4 phút)
+.\.venv\Scripts\python.exe -m recsys.v2.pilot build --participants 8   # pilot người dùng (RECSYS-PILOT.md)
 .\.venv\Scripts\python.exe -m pytest tests/recsys tests/portal -q  # không cần AWS
 ..\portal-venv\Scripts\streamlit.exe run apps\portal\app.py         # portal
 ```

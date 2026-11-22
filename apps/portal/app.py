@@ -458,12 +458,81 @@ def page_my_offers():
     _reco_cards("me", df.head(2), "portal_customer", customer=True)
 
 
+def page_reco_pilot():
+    """Pilot người dùng thật (docs/RECSYS-PILOT.md): so sánh mù hai danh sách gợi ý, rồi chấm lời giải thích."""
+    import json
+    import time as _t
+
+    from recsys.v2 import pilot as PL
+    from recsys.v2.config import BERKA
+
+    st.header("Đánh giá mù hệ gợi ý (pilot)")
+    st.caption("Bạn đóng vai cán bộ quan hệ khách hàng. Mỗi bài: xem hồ sơ khách, chọn danh sách gợi ý A hay B phù hợp "
+               "hơn (hai danh sách do hai cách khác nhau tạo ra, thứ tự ngẫu nhiên), rồi chấm lời giải thích. "
+               "Không có đáp án đúng sai: chúng tôi đo hệ thống, không đo bạn.")
+    if not PL.TASKS.exists():
+        st.info("Chưa có bài: chạy `python -m recsys.v2.pilot build --participants 8`.")
+        return
+    tasks = pd.read_parquet(PL.TASKS)
+    who = st.text_input("Mã người tham gia (vd P01)", key="pilot_who").strip().upper()
+    if not who:
+        return
+    mine = PL.assignment(tasks.task_id.tolist(), who)
+    done = {r["task_id"] for r in PL.read_responses() if r["participant"] == who}
+    todo = [t for t in mine if t not in done]
+    st.progress(len(done & set(mine)) / len(mine), text=f"Đã làm {len(done & set(mine))} / {len(mine)} bài")
+    if not todo:
+        st.success("Bạn đã làm xong. Cảm ơn! Mời bạn điền bảng hỏi SUS (docs/RECSYS-PILOT.md, phụ lục).")
+        return
+    t = tasks.set_index("task_id").loc[todo[0]]
+    side = PL.v2_side(who, todo[0])
+    lists = {"v2": json.loads(t.list_v2), "pop": json.loads(t.list_pop)}
+    show = {"A": lists["v2"] if side == "A" else lists["pop"], "B": lists["pop"] if side == "A" else lists["v2"]}
+    st.subheader(f"Bài {todo[0]}")
+    prof = json.loads(t.profile)
+    cols = st.columns(4)
+    for i, (k, v) in enumerate(prof.items()):
+        cols[i % 4].metric(k, f"{v:,.0f}" if isinstance(v, (int, float)) and k != "Nam" else
+                           ("có" if v == 1 else "không") if k == "Nam" else str(v))
+    t0_key = f"pilot_t0_{who}_{todo[0]}"
+    st.session_state.setdefault(t0_key, _t.time())
+    c1, c2 = st.columns(2)
+    for col, name in ((c1, "A"), (c2, "B")):
+        with col.container(border=True):
+            st.markdown(f"**Danh sách {name}**")
+            for r, code in enumerate(show[name], 1):
+                st.write(f"{r}. {BERKA.product(code).label_vi}")
+    stage = f"pilot_stage_{who}_{todo[0]}"
+    if not st.session_state.get(stage):
+        with st.form(f"pilot_choose_{todo[0]}"):
+            choice = st.radio("Danh sách nào phù hợp với khách này hơn?", ["A", "B", "Như nhau"], horizontal=True)
+            pitch = st.selectbox("Nếu chỉ được chào MỘT sản phẩm, bạn chào sản phẩm nào?",
+                                 sorted(set(lists["v2"]) | set(lists["pop"])),
+                                 format_func=lambda c: BERKA.product(c).label_vi)
+            if st.form_submit_button("Tiếp"):
+                st.session_state[stage] = {"choice": "same" if choice == "Như nhau" else choice, "pitch": pitch}
+                st.rerun()
+        return
+    st.info(f"Mô hình đưa ra lý do cho gợi ý **{BERKA.product(t.top_v2).label_vi}**: {t.reason_v2 or '-'}")
+    with st.form(f"pilot_reason_{todo[0]}"):
+        useful = st.slider("Lý do này giúp bạn nói chuyện với khách đến mức nào? (1 = không giúp, 5 = rất giúp)", 1, 5, 3)
+        fits = st.radio("Lý do có khớp với hồ sơ khách ở trên không?", ["Có", "Một phần", "Không"], horizontal=True)
+        comment = st.text_input("Góp ý (không bắt buộc)")
+        if st.form_submit_button("Lưu và sang bài tiếp"):
+            s = st.session_state.pop(stage)
+            PL.write_response(PL.Response(
+                participant=who, task_id=todo[0], choice=s["choice"], v2_side=side, reason_useful=int(useful),
+                reason_fits={"Có": "yes", "Một phần": "partly", "Không": "no"}[fits], pitch=s["pitch"],
+                seconds=round(_t.time() - st.session_state.pop(t0_key, _t.time()), 1), comment=comment))
+            st.rerun()
+
+
 if P.customer:
     pages = {"Tài khoản của tôi": page_my_account, "Ưu đãi cho bạn": page_my_offers}
 else:
     pages = {"Tổng quan": page_overview, "Khách hàng 360": page_customer360, "Điều tra AML": page_aml,
              "Gợi ý cho khách (RM)": page_reco_rm, "Chiến dịch gợi ý": page_reco_campaign,
-             "Giám sát gợi ý": page_reco_monitor,
+             "Giám sát gợi ý": page_reco_monitor, "Đánh giá mù (pilot)": page_reco_pilot,
              "Gian lận thẻ": page_fraud, "Truy vấn SQL": page_sql, "Trợ lý AI": page_assistant}
 # Chỉ chạy trang đang mở: st.tabs chạy MỌI tab mỗi lần tương tác (≈ 10 truy vấn Athena, 30 s).
 with st.sidebar:

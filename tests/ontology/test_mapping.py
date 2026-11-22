@@ -49,10 +49,12 @@ def test_moi_mapping_hop_le_voi_tbox(tb):
 
 
 def test_berka_va_corebank_cung_cau_truc():
-    """corebank.yml sao từ berka.yml: cùng tập mục, cùng định nghĩa sản phẩm."""
+    """corebank.yml sao từ berka.yml: cùng tập mục, cùng định nghĩa sản phẩm. Riêng Berka có thêm node gợi ý
+    (O10, `recommendation*`): hệ gợi ý v2 chỉ phục vụ miền Berka."""
     b, c = M.load_all(["berka"])[0], M.load_all(["corebank"])[0]
-    assert set(b.entities) == set(c.entities)
-    assert [e.id for e in b.edges] == [e.id for e in c.edges]
+    o10 = lambda x: x.startswith("recommendation")  # noqa: E731
+    assert {e for e in b.entities if not o10(e)} == set(c.entities)
+    assert [e.id for e in b.edges if not o10(e.id)] == [e.id for e in c.edges]
     assert [(h.id, h.product, h.product_notation) for h in b.holdings] == \
            [(h.id, h.product, h.product_notation) for h in c.holdings]
     assert all(t.startswith("silver_corebank.") for t in c.tables())

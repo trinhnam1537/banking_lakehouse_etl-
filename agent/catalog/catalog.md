@@ -44,7 +44,7 @@ Lop | nhan | cha | nguon co du lieu:
 - fin:Person | Cá nhân / Person | fin:Party | bank_marketing,berka,corebank,opensanctions
 - fin:Product | Sản phẩm / Product | - | bank_marketing,berka,corebank,mbd
 - fin:ProductHolding | Việc giữ sản phẩm / Product holding | - | bank_marketing,berka,corebank,mbd
-- fin:Recommendation | Gợi ý sản phẩm / Recommendation | - | (chua co du lieu)
+- fin:Recommendation | Gợi ý sản phẩm / Recommendation | - | berka
 - fin:RecurringPayment | Thanh toán định kỳ / Recurring payment | fin:PaymentService | berka,corebank
 - fin:Region | Vùng / Region | fin:Location | berka,corebank
 - fin:SanctionedEntity | Đối tượng bị cấm vận / Sanctioned entity | fin:Party | opensanctions
@@ -59,7 +59,7 @@ Quan he | nhan | domain -> range | nguon:
 - fin:atBank | mở tại ngân hàng | fin:Account -> fin:Bank | aml,berka,corebank
 - fin:birthYear | năm sinh | fin:Person -> xsd:integer | (chua co du lieu)
 - fin:derivedFrom | lấy từ | - -> fin:Dataset | (chua co du lieu)
-- fin:forCustomer | cho khách | fin:Recommendation -> fin:Customer | (chua co du lieu)
+- fin:forCustomer | cho khách | fin:Recommendation -> fin:Customer | berka
 - fin:frequentlyFollowedBy | thường được mua sau bởi | - -> - | (chua co du lieu)
 - fin:gender | giới tính | fin:Person -> xsd:string | (chua co du lieu)
 - fin:hasHolding | có việc giữ sản phẩm | fin:Customer -> fin:ProductHolding | bank_marketing,berka,corebank,mbd
@@ -71,13 +71,13 @@ Quan he | nhan | domain -> range | nguon:
 - fin:isDirectlyOwnedBy | được sở hữu trực tiếp bởi | fin:Party -> fin:Party | opensanctions
 - fin:isHeldBy | thuộc về bên | fin:Account -> fin:Party | aml
 - fin:locatedIn | ở tại | - -> fin:Location | berka,corebank
-- fin:modelVersion | phiên bản model | fin:Recommendation -> xsd:string | (chua co du lieu)
+- fin:modelVersion | phiên bản model | fin:Recommendation -> xsd:string | berka
 - fin:occupation | nghề nghiệp | fin:Person -> xsd:string | bank_marketing
 - fin:ofProduct | thuộc sản phẩm | fin:ProductHolding -> - | bank_marketing,berka,corebank,mbd
 - fin:partOf | thuộc | fin:Location -> fin:Location | berka,corebank
-- fin:recommends | gợi ý sản phẩm | fin:Recommendation -> - | (chua co du lieu)
+- fin:recommends | gợi ý sản phẩm | fin:Recommendation -> - | berka
 - fin:sameAs | cùng là | fin:Party -> fin:Party | berka,corebank
-- fin:score | điểm | fin:Recommendation -> xsd:double | (chua co du lieu)
+- fin:score | điểm | fin:Recommendation -> xsd:double | berka
 - fin:segment | phân khúc | fin:Customer -> xsd:string | (chua co du lieu)
 - fin:spendsAt | chi tiêu ở nhóm | fin:Customer -> fin:MerchantCategory | (chua co du lieu)
 - fin:transfersTo | chuyển tiền tới | fin:Account -> fin:Account | aml,berka,corebank

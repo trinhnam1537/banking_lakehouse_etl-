@@ -473,16 +473,32 @@ phục duy nhất là cùng tập test thời gian, cùng model, chỉ khác có
 4. Điểm model ghi ngược thành `fin:Recommendation` (khách, sản phẩm, điểm, `model_version`, `scored_at`) để agent đọc và kiểm toán được.
 5. Lý do gợi ý: 2–3 đường đi có `weight` cao nhất từ khách tới sản phẩm, mỗi đường có `triple_id` ([ONTOLOGY.md mục 8.3](ONTOLOGY.md)).
 
-| Chỉ số | Không đồ thị | Có đồ thị |
-|---|---|---|
-| AUC-PR theo từng lớp sản phẩm | | |
-| Recall@3, MAP@7 theo khách | | |
+Kết quả 11-22 (Berka, test 1998-01 .. 09, 3 seed; `python -m recsys.v2.ablation`, chi tiết ở
+`recsys/v2/reports/berka/graph_ablation.md` và [RECSYS-V2.md mục 3.4](RECSYS-V2.md)). Pre-train dùng hệ gợi ý v2
+(`recsys/v2`) thay cho `uc2_next_product.py --GRAPH_FEATURES`; đặc trưng đọc từ `track_a_onto` (`recsys/v2/graph.py`):
+
+| Chỉ số | Không đồ thị | Có đồ thị (tỉ lệ thô) | Có đồ thị (chuẩn hoá theo tháng) |
+|---|---|---|---|
+| MAP@3 theo khách | 0,899 ± 0,008 | 0,883 ± 0,007 | 0,899 ± 0,011 |
+| Recall@3 theo khách | 0,994 | 0,981 | 0,994 |
+| PR-AUC vay / classic / junior / vàng | 0,171 / 0,090 / 0,134 / 0,042 | 0,174 / 0,084 / 0,144 / 0,028 | 0,172 / 0,097 / 0,149 / 0,039 |
+
+Kết luận: trên Berka, đặc trưng đồ thị không cải thiện xếp hạng. Có bốn nguyên nhân:
+
+- tỉ lệ nhóm cộng dồn trôi theo thời gian (PSI 8–12);
+- quận / vùng đã có trong đặc trưng gốc;
+- láng giềng thưa: 19% khách có người cùng tài khoản, chỉ 25 tài khoản đối tác chung;
+- lift `product_transition` đều nhỏ hơn 1.
+
+Đây là một kết quả âm, ghi vào luận văn kèm nguyên nhân.
 
 **Checklist O10**
 - [x] Chia tập theo **thời gian**, không chia ngẫu nhiên (chia ngẫu nhiên là rò tương lai)  
   → recsys MBD và Berka chia theo tháng (docs/RECSYS.md, RECSYS-BENCH.md) (11-19)
-- [ ] Bảng kết quả điền đủ, kèm `model_version` và phiên bản đồ thị (snapshot Iceberg)
-- [ ] `Recommendation` có trong `triple` và `recommend(uid)` (O11) đọc được
+- [x] Bảng kết quả điền đủ, kèm `model_version` và phiên bản đồ thị (snapshot Iceberg)  
+  → `graph_ablation.json`: 3 seed × 3 bản, bootstrap, bỏ / giữ từng nhóm, PSI, độ phủ, tương quan với nhãn (< 0,5); đồ thị `graph_run_id` của lần dựng 11-07 (11-22)
+- [ ] `Recommendation` có trong `triple` và `recommend(uid)` (O11) đọc được  
+  → mapping `berka.yml` (`recommendation*`, tham chiếu `{product: ...}`) + `test_o10_goi_y_thanh_node_recommendation` (Spark cục bộ) (11-22). Chờ deploy `etl.zip` và dựng lại `track_a_onto` trên Glue. Tool `recommend` hiện đọc thẳng `reco_topk_berka`
 
 ---
 

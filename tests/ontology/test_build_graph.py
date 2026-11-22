@@ -34,7 +34,7 @@ def _table(spark, full, rows, schema):
 
 @pytest.fixture(scope="module")
 def silver(spark):
-    for db in ("silver_berka", "silver_mbd", "silver_bank_marketing"):
+    for db in ("silver_berka", "silver_mbd", "silver_bank_marketing", "track_a_gold"):
         spark.sql(f"CREATE NAMESPACE IF NOT EXISTS glue_catalog.{db}")
     _table(spark, "silver_berka.district", [
         (1, "Hl.m. Praha", "Prague", 1204953, 12541, Decimal("100.0"), Decimal("0.43")),
@@ -65,6 +65,12 @@ def silver(spark):
         (5, 20, D(1996, 7, 15), "DEBIT", Decimal("20"), None, None, None),
     ], "trans_id bigint, account_id int, trans_date date, direction string, amount decimal(18,2), "
        "k_symbol string, counterparty_bank string, counterparty_account bigint")
+    # O10: bang phuc vu cua he goi y v2 (client_id CHUOI, nhu ban that)
+    _table(spark, "track_a_gold.reco_topk_berka", [
+        ("2", "1998-09-01", 1, "card_gold", "Thẻ vàng", 0.031, 124.5, "treatment", "v2-test"),
+        ("2", "1998-09-01", 2, "loan", "Khoản vay", 0.012, 80.0, "treatment", "v2-test"),
+    ], "client_id string, scored_month string, rank int, product string, product_label string, "
+       "p_calibrated double, expected_value double, variant string, model_version string")
     # MBD: khach a mua SP1 o thang 1 va 2 (mot holding, purchase_months=2), SP3 o thang 2; khach b khong mua
     _table(spark, "silver_mbd.target_month", [
         ("a" * 64, D(2022, 1, 31), True, False, False, False, 0),
@@ -142,9 +148,9 @@ def test_so_node_va_canh_dung_dap_an(graph):
     by_class = {r[0]: r[1] for r in spark.sql(
         "SELECT class_iri, count(*) FROM entity WHERE source_system <> 'ontology' GROUP BY 1").collect()}
     # Berka: 1 nuoc, 2 vung, 2 quan, 2 NH doi tac; KH 3 + MBD 2 + BM 3; TK 2 + 2 ngoai
-    # holding: berka TK 2 + vay 1 + the 2 + POJISTNE/SIPO 2; MBD 2; BM 2
+    # holding: berka TK 2 + vay 1 + the 2 + POJISTNE/SIPO 2; MBD 2; BM 2; goi y (O10) 2 dong reco_topk_berka
     assert by_class == {"fin:Country": 1, "fin:Region": 2, "fin:District": 2, "fin:Bank": 2,
-                        "fin:Customer": 8, "fin:Account": 4, "fin:ProductHolding": 11}
+                        "fin:Customer": 8, "fin:Account": 4, "fin:ProductHolding": 11, "fin:Recommendation": 2}
     by_pred = {r[0]: r[1] for r in spark.sql("SELECT predicate_iri, count(*) FROM triple GROUP BY 1").collect()}
     assert by_pred["fin:holdsAccount"] == 2 and by_pred["fin:isAuthorizedOn"] == 1
     assert by_pred["fin:transfersTo"] == 3          # acc10->AB-555 thang 2 va 3, CD-777->acc20 thang 7
@@ -152,6 +158,7 @@ def test_so_node_va_canh_dung_dap_an(graph):
     assert by_pred["fin:viaAccount"] == 7           # chi holding Berka co tai khoan
     assert by_pred["fin:occupation"] == 2           # 'unknown' -> NULL -> khong co canh
     assert by_pred["fin:partOf"] == 4               # 2 quan -> vung, 2 vung -> nuoc
+    assert by_pred["fin:forCustomer"] == by_pred["fin:recommends"] == by_pred["fin:modelVersion"] == 2
     assert all(r["expected"] == r["got"] for r in report["reconciliation"])
     assert {r["mapping_id"] for r in report["reconciliation"]} >= {"berka.holds_account", "berka.loan", "berka.card",
                                                                       "bank_marketing.term_deposit"}
@@ -459,3 +466,21 @@ def test_opensanctions_so_huu_va_khop_ten_vao_hang_doi_duyet(corebank):
     # O9: bao dong so huu
     clo = DV.closure(triple).where("predicate_iri = 'fin:isDirectlyOwnedBy'").collect()
     assert [(r.start_uid, r.node_uid, r.depth) for r in clo] == [(nk3, nk1, 1)]
+
+
+def test_o10_goi_y_thanh_node_recommendation(graph):
+    """O10: mỗi dòng reco_topk_berka -> node fin:Recommendation + forCustomer (khách), recommends (lớp sản phẩm
+    tra qua skos:notation), score, modelVersion. Không cạnh mồ côi (check_invariants đã chạy trong fixture)."""
+    spark, entity, triple, report = graph
+    rec = entity.where("class_iri = 'fin:Recommendation'").collect()
+    assert len(rec) == 2 and all("Khách 2" in r.label for r in rec)
+    cust = ids.make_uid("fin:Customer", "berka", "client_id=2")
+    gold, loan = ids.product_uid("fin:GoldCard"), ids.product_uid("fin:Loan")
+    t = {(r.predicate_iri, r.object_uid or r.object_literal) for r in triple.where(
+        "subject_uid IN (SELECT uid FROM entity WHERE class_iri = 'fin:Recommendation')").collect()}
+    assert ("fin:forCustomer", cust) in t
+    assert ("fin:recommends", gold) in t and ("fin:recommends", loan) in t
+    assert ("fin:modelVersion", "v2-test") in t
+    assert any(p == "fin:score" for p, _ in t)
+    recon = {r["mapping_id"]: (r["expected"], r["got"]) for r in report["reconciliation"]}
+    assert recon["berka.recommendation_product"] == (2, 2)
