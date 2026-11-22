@@ -190,3 +190,52 @@ def test_luat_nghiep_vu_berka():
     assert not M[0, j["card_gold"]] and M[1, j["card_gold"]]
     assert M[0, j["loan"]] and not M[1, j["loan"]]
     assert M[0, j["card_junior"]] and not M[1, j["card_junior"]]
+
+
+# ---------------------------------------------------------------------------------------------- O10 + pilot
+def test_dac_trung_do_thi_khong_ro_ri_va_bo_chinh_minh():
+    from recsys.v2 import graph as G
+
+    codes = ["loan", "card_gold"]
+    d = lambda s: pd.Timestamp(s)  # noqa: E731
+    g = {"hold": pd.DataFrame({"client_id": [1, 2, 3], "iri": ["fin:Loan"] * 3, "code": ["loan"] * 3,
+                               "acquired": [d("1997-01-10"), d("1997-01-20"), d("1997-03-05")]}),
+         "loc": pd.DataFrame({"client_id": [1, 2, 3, 4], "district": ["X", "X", "X", "Y"], "region": ["R"] * 4}),
+         "acc": pd.DataFrame({"client_id": [1, 2, 3, 4], "account": ["a", "a", "b", "c"],
+                              "since": [d("1996-01-01")] * 4}),
+         "partner": pd.DataFrame({"client_id": [3, 4], "partner": ["p", "p"], "since": [d("1996-06-01")] * 2, "n": [1, 1]}),
+         "trans": pd.DataFrame({"from_product": ["fin:Loan"], "to_product": ["fin:GoldCard"], "p": [0.2], "n_from": [50],
+                                "lift": [2.0], "train_cutoffs": ["x"]})}
+    df = pd.DataFrame({"client_id": [3, 3, 4], "month": ["1997-01-01", "1997-03-01", "1997-01-01"]})
+    out, own = G.build(df, g, codes, relative=False)
+    assert own["loan"]["own_g_district"] == "g_district_loan"
+    # khách 3, tháng 01/1997: quận X có khách 1, 2 đã vay trong tháng -> 2/2 (bỏ chính khách 3)
+    assert out.g_district_loan.iloc[0] == pytest.approx(1.0)
+    # tháng 03: khách 3 vay 05/03 -> chính mình KHÔNG được tính vào tỉ lệ nhóm (leave-one-out) -> vẫn 2/2
+    assert out.g_district_loan.iloc[1] == pytest.approx(1.0)
+    # khách 3 chưa giữ vay ở tháng 01 -> không có P(gold | loan); tháng 03 đã giữ -> 0,2
+    assert np.isnan(out.g_trans_card_gold.iloc[0]) and out.g_trans_card_gold.iloc[1] == pytest.approx(0.2)
+    # khách 4 cùng đối tác với khách 3 (chưa vay ở tháng 01) -> tỉ lệ hàng xóm vay = 0
+    assert out.g_partner_loan.iloc[2] == 0 and out.g_partner_deg.iloc[2] == 1
+    # khách 1 và 2 cùng tài khoản a; khách 3 không có ai cùng tài khoản -> NaN
+    assert np.isnan(out.g_cohold_loan.iloc[0])
+
+
+def test_pilot_phan_cong_on_dinh_bai_chung_va_phan_tich():
+    from recsys.v2 import pilot as PL
+
+    ids = [f"T{i:03d}" for i in range(40)]
+    a, b = PL.assignment(ids, "P01"), PL.assignment(ids, "P02")
+    assert a == PL.assignment(ids, "P01") and len(a) == PL.TASKS_PER_PERSON
+    assert set(ids[:PL.ANCHORS]) <= set(a) & set(b)              # bài chung cho mọi người
+    tasks = pd.DataFrame({"task_id": ["T0", "T1"], "list_v2": ['["loan"]', '["card_gold"]'],
+                          "list_pop": ['["card_gold"]', '["loan"]'], "bought": ['["loan"]', "[]"]})
+    rs = [{"participant": p, "task_id": t, "choice": "A", "v2_side": "A" if p != "P3" else "B",
+           "reason_useful": 4, "reason_fits": "yes", "pitch": "loan", "seconds": 10.0}
+          for p in ("P1", "P2", "P3") for t in ("T0", "T1")]
+    rs.append({**rs[0], "choice": "B"})                         # bấm lại: chỉ giữ lần cuối
+    r = PL.analyze(rs, tasks, sus_rows=[[3] * 10, [5, 1] * 5])
+    assert r["responses"] == 6 and r["preference"]["v2_wins"] == 3 and r["preference"]["pop_wins"] == 3
+    assert r["hit_vs_truth"]["v2"]["hit@1"] == 1.0 and r["hit_vs_truth"]["popularity"]["hit@1"] == 0.0
+    assert r["sus"]["mean"] == pytest.approx((50 + 100) / 2)
+    assert 0 < r["preference"]["p_sign_test"] <= 1
