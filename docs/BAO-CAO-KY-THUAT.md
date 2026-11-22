@@ -495,6 +495,12 @@ Thông lượng silver lớn nhất là `aml_transfer`, khoảng 69,6 nghìn dò
 
 ---
 
+## 7b. Cập nhật 19-11-2026
+
+- **AI agent, đánh giá v3** ([AI-AGENT.md](AI-AGENT.md) mục 9.6): 61 câu, 5 use case, có tầng chỉ số (tool `metric`) và agent khách hàng. Lượt 1: agent ontology đạt 90%, đối chứng 68% trên 50 câu chung (+22 điểm, CI 95% [+8; +38], McNemar p = 0,015). Câu khách hàng: 0 dòng của khách khác bị rò.
+- **Hệ gợi ý v2** ([RECSYS-V2.md](RECSYS-V2.md)): champion LightGBM multi-task, hiệu chỉnh isotonic, đánh giá offline 7 nhóm và off-policy, online (A/B, A/A nhìn trộm, interleaving, bandit), phục vụ qua portal và agent. MBD: MAP@3 0,697 (+0,024, CI [+0,012; +0,036] so với v1). Berka: MAP@3 0,885, so với 0,618 của popularity.
+- **Nghiệm thu đồ thị** ([onto-acceptance.md](onto-acceptance.md)): đối soát trên AWS, 37 mục checklist ONTOLOGY-BUILD đã đánh dấu kèm bằng chứng.
+
 ## 8. Hạn chế và hướng tiếp theo
 
 1. **Agent:**

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
@@ -302,3 +303,53 @@ def recommend_mbd(session, workgroup: str, client_id: str, k: int = 3):
     for c in mbd.FEATURES:
         df[c] = pd.to_numeric(df[c], errors="coerce")
     return R.score(df, R.load_models(), k)
+
+
+# ------------------------------------------------------------------ hệ gợi ý v2 (recsys/v2, docs/RECSYS-V2.md)
+# Bảng do `python -m recsys.v2.run publish --domain berka` ghi (persona analyst). Khách đọc reco_topk_berka qua filter
+# dòng Lake Formation (repo hạ tầng, customer_gold_tables): portal KHÔNG tự lọc, không có đường vòng.
+RECO_TABLE = "track_a_gold.reco_topk_berka"
+RECO_SCORE_TABLE = "track_a_gold.reco_score_berka"
+RECO_PRODUCTS = ("loan", "card_classic", "card_junior", "card_gold")
+RECO_COLS = "rank, product, product_label, p_calibrated, expected_value, reasons, pitch, variant, model_version, scored_month"
+
+
+def sql_reco_client(client_id: Any) -> str:
+    return f"SELECT {RECO_COLS} FROM {RECO_TABLE} WHERE client_id = '{_int(client_id, 'client_id')}' ORDER BY rank"
+
+
+SQL_MY_RECO = f"SELECT {RECO_COLS} FROM {RECO_TABLE} ORDER BY rank"      # LF chỉ trả dòng của khách đăng nhập
+
+
+def sql_campaign(product: str, limit: Any) -> str:
+    if product not in RECO_PRODUCTS:
+        raise ValueError(f"san pham phai thuoc {RECO_PRODUCTS}")
+    n = max(1, min(_int(limit, "limit"), 5000))
+    return (f"SELECT client_id, p_calibrated, expected_value, scored_month, model_version FROM {RECO_SCORE_TABLE} "
+            f"WHERE product = '{product}' ORDER BY p_calibrated DESC LIMIT {n}")
+
+
+def sql_campaign_size(product: str) -> str:
+    if product not in RECO_PRODUCTS:
+        raise ValueError(f"san pham phai thuoc {RECO_PRODUCTS}")
+    return (f"SELECT count(*) AS n, sum(p_calibrated) AS expected FROM {RECO_SCORE_TABLE} WHERE product = '{product}'")
+
+
+def reco_event_log():
+    """Nhật ký sự kiện gợi ý (impression / click / accept / dismiss) cho đánh giá online. File JSONL cục bộ;
+    đổi bằng FINGRAPH_RECO_EVENTS. Không chứa PII: chỉ mã khách, sản phẩm, nhóm thử nghiệm."""
+    from recsys.v2.online import EventLog
+
+    root = Path(__file__).resolve().parents[2]
+    return EventLog(Path(os.environ.get("FINGRAPH_RECO_EVENTS", root / "recsys" / "v2" / "events" / "berka.jsonl")))
+
+
+def reco_model_card(domain: str = "berka") -> Optional[Dict[str, Any]]:
+    import json
+
+    reg = Path(__file__).resolve().parents[2] / "recsys" / "v2" / "registry" / domain
+    champ = reg / "CHAMPION"
+    if not champ.exists():
+        return None
+    card = reg / champ.read_text(encoding="utf-8").strip() / "model_card.json"
+    return json.loads(card.read_text(encoding="utf-8")) if card.exists() else None

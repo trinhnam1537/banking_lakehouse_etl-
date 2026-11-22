@@ -63,6 +63,22 @@ class Ref:
 SCHEME_CLASS = {"fin:typologyScheme": "fin:Typology"}
 
 
+# Quy tắc O6: cạnh KHÔNG xác định được thời điểm phải khai ở đây kèm lý do (test chặn cạnh mới thiếu valid_from mà
+# chưa khai). Nghiệm thu 11-19 (scripts/onto_acceptance.py): 4,3 triệu cạnh valid_from NULL, đều thuộc các nhóm dưới.
+TIMELESS: Dict[str, str] = {
+    "fin:partOf": "địa lý tĩnh (quận -> vùng -> nước): đúng ở mọi thời điểm của dữ liệu",
+    "fin:atBank": "tài khoản AML thuộc ngân hàng: thuộc tính tĩnh của tài khoản, nguồn không có ngày mở",
+    "fin:isHeldBy": "chủ sở hữu tài khoản AML: bảng tham chiếu tĩnh, nguồn không có ngày",
+    "fin:isDirectlyOwnedBy": "sở hữu theo OpenSanctions: nguồn không ghi ngày bắt đầu",
+    "fin:involvedIn": "tài khoản tham gia vụ AML: có thể lấy source_ts của giao dịch đầu (việc sau), hiện chưa gán",
+    "fin:hasTypology": "kiểu hình của vụ AML: thuộc tính tĩnh của vụ",
+    "fin:hasHolding": "chỉ Bank Marketing: nguồn có tháng gọi nhưng không có năm (mappings/bank_marketing.yml)",
+    "fin:ofProduct": "đi cùng hasHolding: holding -> sản phẩm, tĩnh",
+    "fin:occupation": "chỉ Bank Marketing: thuộc tính tại lúc gọi, không có năm",
+    "fin:sameAs": "định danh (cùng một thực thể): không phụ thuộc thời gian",
+}
+
+
 @dataclass
 class Entity:
     id: str

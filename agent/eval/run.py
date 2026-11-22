@@ -60,8 +60,9 @@ ALIASES: Dict[str, List[str]] = {
 }
 
 REFUSAL = re.compile(
-    r"khong du can cu|khong co du lieu|chua co du lieu|khong xac dinh|khong the|khong duoc phep|tu choi|"
+    r"khong du can cu|khong co can cu|khong co du lieu|chua co du lieu|khong xac dinh|khong the|khong duoc phep|tu choi|"
     r"ngoai pham vi|khong co nguon|khong ho tro|khong thuc hien", re.IGNORECASE)
+# v3.1 (11-19): "khong co can cu" (B07, B08 lan 1 tra loi dung nghia nhung bi cham truot)
 
 
 # ---------------------------------------------------------------- nạp câu hỏi
@@ -137,9 +138,19 @@ def _truth_set(rows: Sequence[Dict[str, Any]]) -> List[str]:
     return sorted({" / ".join(str(v) for v in r.values() if v is not None) for r in rows})
 
 
+def _variants(p: str) -> List[str]:
+    """Cách viết tương đương: alias sản phẩm; ngày ISO 1993-02-26 -> 26/02/1993, 26-02-1993, 26.02.1993 (D01 lần 1)."""
+    out = [p, *ALIASES.get(p, [])]
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", p)
+    if m:
+        y, mo, d = m.groups()
+        out += [f"{d}/{mo}/{y}", f"{d}-{mo}-{y}", f"{d}.{mo}.{y}", f"{int(d)}/{int(mo)}/{y}"]
+    return out
+
+
 def _found(item: str, text_f: str) -> bool:
     parts = [p.strip() for p in item.split(" / ")]
-    return all(any(fold(a) in text_f for a in [p, *ALIASES.get(p, [])]) for p in parts)
+    return all(any(fold(a) in text_f for a in _variants(p)) for p in parts)
 
 
 def grade(q: Dict[str, Any], text: str, stop_reason: str, truth_rows: Optional[Sequence[Dict[str, Any]]]
@@ -183,9 +194,17 @@ def cost_usd(usage: Dict[str, int], price: Optional[Dict[str, float]] = None) ->
 
 # ---------------------------------------------------------------- chạy
 
-def run_one(q: Dict[str, Any], ask, truth_backend, price: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
-    """ask(question) -> loop.Answer. truth_backend.run_sql hoặc None."""
+def run_one(q: Dict[str, Any], ask, truth_backend, price: Optional[Dict[str, float]] = None,
+            leak_backend=None) -> Dict[str, Any]:
+    """ask(question) -> loop.Answer. truth_backend.run_sql hoặc None. leak_backend: persona khách (câu D) để chạy
+    `leak_sql` TRỰC TIẾP (không qua LLM): đo Lake Formation có trả dòng của khách khác hay không."""
     truth_rows, truth_err = None, None
+    leak_rows = None
+    if q.get("leak_sql") and leak_backend is not None:
+        try:
+            leak_rows = int(list(leak_backend.run_sql(q["leak_sql"].strip())[0].values())[0])
+        except Exception as e:  # noqa: BLE001
+            leak_rows = f"loi: {str(e)[:120]}"
     if q.get("truth_sql") and truth_backend is not None:
         try:
             truth_rows = truth_backend.run_sql(q["truth_sql"].strip())
@@ -205,7 +224,8 @@ def run_one(q: Dict[str, Any], ask, truth_backend, price: Optional[Dict[str, flo
                 "passed": None, "detail": f"loi goi agent: {err}", "manual_check": False, "answer": "",
                 "grounded": False, "grounded_first_try": False, "turns": 0, "stop_reason": "error", "tools": [],
                 "expected_tools_used": False, "usage": {}, "usd": 0.0,
-                "seconds": round(time.monotonic() - t0, 1), "truth_rows": truth_rows, "truth_error": truth_err}
+                "seconds": round(time.monotonic() - t0, 1), "truth_rows": truth_rows, "truth_error": truth_err,
+                "persona": q.get("persona"), "leak_rows": leak_rows}
     secs = round(time.monotonic() - t0, 1)
     used = [r["tool"] for r in ans.tool_log]
     g = grade(q, ans.text, ans.stop_reason, truth_rows)
@@ -215,7 +235,8 @@ def run_one(q: Dict[str, Any], ask, truth_backend, price: Optional[Dict[str, flo
             "turns": ans.turns, "stop_reason": ans.stop_reason, "tools": used,
             "expected_tools_used": all(t in used for t in q.get("expected_tools", [])),
             "usage": ans.usage, "usd": round(cost_usd(ans.usage, price), 4), "seconds": secs,
-            "truth_rows": truth_rows[:20] if truth_rows else truth_rows, "truth_error": truth_err}
+            "truth_rows": truth_rows[:20] if truth_rows else truth_rows, "truth_error": truth_err,
+            "persona": q.get("persona"), "leak_rows": leak_rows}
 
 
 def summarize(results: List[Dict[str, Any]], meta: Dict[str, Any]) -> str:
@@ -285,6 +306,12 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default=str(HERE / "results"))
     ap.add_argument("--regrade", default=None,
                     help="cham LAI file .jsonl da chay (khong goi model), ghi <file>-regrade.md; dung khi sua bo cham")
+    ap.add_argument("--customer-workgroup", default=None,
+                    help="workgroup persona khach (cau persona: customer, use case D), vd fingraph-dev-customer-client-2")
+    ap.add_argument("--customer-profile", default=None, help="profile AWS persona khach, vd fg-client2-mcp")
+    ap.add_argument("--repeat", type=int, default=1, help="chay lap N luot (khoang tin cay: agent/eval/aggregate.py)")
+    ap.add_argument("--truth-only", action="store_true",
+                    help="chi chay truth_sql (kiem dap an), khong goi model, khong ton tien model")
     ap.add_argument("--yes", action="store_true", help="THUC SU goi model (ton tien); khong co thi chi in ke hoach")
     a = ap.parse_args(argv)
 
@@ -299,6 +326,13 @@ def main(argv=None) -> int:
         qs = [q for q in qs if q["id"] in want or any(len(w) == 1 and q["id"].startswith(w) for w in want)]
     if a.baseline and a.neptune:
         ap.error("--baseline khong dung Neptune")
+    if not a.customer_workgroup:
+        sk = [q["id"] for q in qs if q.get("persona") == "customer"]
+        qs = [q for q in qs if q.get("persona") != "customer"]
+        if sk:
+            print(f"Bo qua (can --customer-workgroup): {', '.join(sk)}")
+    elif a.baseline:
+        qs = [q for q in qs if q.get("persona") != "customer"]   # cau D dung chung agent khach, khong so sanh
     if not a.neptune:
         skipped = [q["id"] for q in qs if q.get("needs") == "neptune"]
         qs = [q for q in qs if q.get("needs") != "neptune"]
@@ -306,6 +340,28 @@ def main(argv=None) -> int:
             print(f"Bo qua (can --neptune): {', '.join(skipped)}")
     qs = [render(q, params) for q in qs]
     print(f"{len(qs)} cau, tham so {params}. Uoc tinh <= {len(qs) * EST_USD_PER_QUESTION:.2f} USD (gia Claude API).")
+    if a.truth_only:
+        import boto3
+
+        from ..tools import AthenaBackend
+
+        tb = AthenaBackend(a.truth_workgroup or "fingraph-dev-data-engineer",
+                           session=boto3.Session(profile_name=a.truth_profile) if a.truth_profile else None,
+                           region=a.region, timeout_s=180)
+        bad = 0
+        for q in qs:
+            if not q.get("truth_sql"):
+                print(f"  {q['id']} [{q.get('grade')}] (khong co truth_sql) "
+                      f"{q.get('expect_contains') or q.get('expect_set') or ''}")
+                continue
+            try:
+                rows = tb.run_sql(q["truth_sql"].strip())
+                print(f"  {q['id']} [{q.get('grade')}] {len(rows)} dong: {json.dumps(rows[:4], ensure_ascii=False)[:200]}")
+                bad += not rows
+            except Exception as e:  # noqa: BLE001
+                bad += 1
+                print(f"  {q['id']} LOI {str(e)[:200]}")
+        return 1 if bad else 0
     if not a.yes:
         for q in qs:
             print(f"  {q['id']} [{q.get('grade')}] {q['question']}")
@@ -322,6 +378,8 @@ def main(argv=None) -> int:
     truth = AthenaBackend(a.truth_workgroup, session=sess(a.truth_profile), region=a.region) if a.truth_workgroup else None
     agent_be = AthenaBackend(a.workgroup, session=sess(a.agent_profile), region=a.region)
     graph = NeptuneBackend(a.neptune, region=a.region) if a.neptune else None
+    cust_be = (AthenaBackend(a.customer_workgroup, session=sess(a.customer_profile), region=a.region)
+               if a.customer_workgroup else None)
 
     if a.baseline:
         from .. import baseline as BL
@@ -335,23 +393,47 @@ def main(argv=None) -> int:
             # Mỗi câu một phiên Tools mới: seen_ids (grounding) không mang từ câu này sang câu khác
             return L.ask(question, Tools(agent_be, graph=graph), client, model, a.provider)
 
-    started = time.strftime("%Y%m%d-%H%M%S") + ("-baseline" if a.baseline else "")
+    def ask_customer(question: str):
+        from .. import customer as CU
+
+        return CU.ask(question, cust_be, client, model, a.provider)
+
+    stamp = time.strftime("%Y%m%d-%H%M%S") + ("-baseline" if a.baseline else "")
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    results = []
-    with open(out / f"{started}.jsonl", "w", encoding="utf-8") as f:
-        for q in qs:
-            r = run_one(q, ask, truth, price_for(model))
-            results.append(r)
-            f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
-            f.flush()
-            print(f"  {r['id']}: {r['passed']} ({r['detail']}) {r['seconds']}s {r['usd']} USD")
-    meta = {"started": started, "agent": "baseline text-to-SQL" if a.baseline else "ontology", "model": model, "provider": a.provider, "questions_version": spec.get("version"),
-            "params": params, "agent_workgroup": a.workgroup, "truth_workgroup": a.truth_workgroup,
-            "neptune": a.neptune}
-    (out / f"{started}.md").write_text(summarize(results, meta), encoding="utf-8")
-    print(f"Ket qua: {out / started}.md")
+    truth_cache: Dict[str, Any] = {}
+    for rep_i in range(1, a.repeat + 1):
+        started = stamp + (f"-r{rep_i}" if a.repeat > 1 else "")
+        results = []
+        with open(out / f"{started}.jsonl", "w", encoding="utf-8") as f:
+            for q in qs:
+                cust = q.get("persona") == "customer"
+                r = run_one(q, ask_customer if cust else ask, _CachedTruth(truth, truth_cache) if truth else None,
+                            price_for(model), leak_backend=cust_be if cust else None)
+                r["run"] = rep_i
+                results.append(r)
+                f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
+                f.flush()
+                print(f"  [{rep_i}/{a.repeat}] {r['id']}: {r['passed']} ({r['detail']}) {r['seconds']}s {r['usd']} USD")
+        meta = {"started": started, "agent": "baseline text-to-SQL" if a.baseline else "ontology", "model": model,
+                "provider": a.provider, "questions_version": spec.get("version"), "params": params,
+                "agent_workgroup": a.workgroup, "truth_workgroup": a.truth_workgroup, "neptune": a.neptune,
+                "customer_workgroup": a.customer_workgroup, "run": f"{rep_i}/{a.repeat}"}
+        (out / f"{started}.md").write_text(summarize(results, meta), encoding="utf-8")
+        print(f"Ket qua: {out / started}.md")
     return 0
+
+
+class _CachedTruth:
+    """Đáp án chỉ chạy một lần cho mọi lượt lặp (cùng câu SQL -> cùng kết quả, không tốn Athena lặp lại)."""
+
+    def __init__(self, backend, cache: Dict[str, Any]):
+        self.backend, self.cache = backend, cache
+
+    def run_sql(self, sql: str):
+        if sql not in self.cache:
+            self.cache[sql] = self.backend.run_sql(sql)
+        return self.cache[sql]
 
 
 if __name__ == "__main__":

@@ -136,9 +136,12 @@ core banking, IBM AML, PaySim, và các bộ UC2. Ontology nối chúng ở **t�
 taxonomy sản phẩm), **không** bịa cạnh giữa thực thể của hai vũ trụ.
 
 **Checklist O0**
-- [ ] Ghi phạm vi giai đoạn 1 và 2 vào mục O12 (bảng nghiệm thu)
-- [ ] Xác nhận nguồn đã có silver: `silver_corebank`, `silver_berka`, `silver_bank_marketing`, `silver_mbd`, `silver_cards`, `silver_aml`, `silver_opensanctions`, `silver_paysim`, `silver_fx`
-- [ ] Ghi nguồn còn thiếu và ảnh hưởng: **Santander** (taxonomy 24 sản phẩm, nguồn UC2 lớn nhất) và **Home Credit**. Cả hai bị chặn vì chưa chấp nhận luật thi Kaggle
+- [x] Ghi phạm vi giai đoạn 1 và 2 vào mục O12 (bảng nghiệm thu)  
+  → bảng nghiệm thu = [docs/onto-acceptance.md](onto-acceptance.md) + bộ câu agent v3 (11-19)
+- [x] Xác nhận nguồn đã có silver: `silver_corebank`, `silver_berka`, `silver_bank_marketing`, `silver_mbd`, `silver_cards`, `silver_aml`, `silver_opensanctions`, `silver_paysim`, `silver_fx`  
+  → đủ 9 database, kiểm 11-19 qua `agent/catalog/raw_schema.json` và Glue (11-19)
+- [x] Ghi nguồn còn thiếu và ảnh hưởng: **Santander** (taxonomy 24 sản phẩm, nguồn UC2 lớn nhất) và **Home Credit**. Cả hai bị chặn vì chưa chấp nhận luật thi Kaggle  
+  → lớp chỉ Santander có mã (fin:Fund, fin:Mortgage...) hiện `graph_sources = []`; agent phải nói "chưa có dữ liệu" (câu A12, C11, E06) (11-19)
 
 ---
 
@@ -167,9 +170,12 @@ Lưu ở `ontology/competency_questions.yml`.
 | CQ12 | Tỉ lệ đăng ký tiền gửi có kỳ hạn theo nghề nghiệp? | A | Bank Marketing → `TermDeposit`, thuộc tính hồ sơ |
 
 **Checklist O1**
-- [ ] ≥ 20 câu hỏi, có cả M và A, phủ đủ 5 use case agent ([ONTOLOGY.md mục 9.7](ONTOLOGY.md))
-- [ ] Mỗi câu có đáp án **chấm được** bằng SQL trên silver/gold (dùng lại ở O12)
-- [ ] Mỗi khái niệm trong cột cuối xuất hiện trong O3. Khái niệm không câu hỏi nào cần thì không thêm
+- [x] ≥ 20 câu hỏi, có cả M và A, phủ đủ 5 use case agent ([ONTOLOGY.md mục 9.7](ONTOLOGY.md))  
+  → 20 CQ trong `ontology/competency_questions.yml`; bộ đánh giá v3 có 60 câu, đủ 5 use case A-E (11-19)
+- [x] Mỗi câu có đáp án **chấm được** bằng SQL trên silver/gold (dùng lại ở O12)  
+  → `agent/eval/questions.yml`: 31 câu có `truth_sql` trên silver/gold, còn lại đáp án cố định hoặc phải từ chối; `--truth-only` kiểm mọi đáp án chạy được (11-19) (11-19)
+- [x] Mỗi khái niệm trong cột cuối xuất hiện trong O3. Khái niệm không câu hỏi nào cần thì không thêm  
+  → `test_moi_khai_niem_cua_cau_hoi_nang_luc_co_trong_tbox` (11-19)
 
 ---
 
@@ -197,9 +203,12 @@ học chéo), quan hệ nào nối được, quan hệ nào không.
 thức. Đánh dấu ô "không có" và ô "suy ra được" (ví dụ bảo hiểm của Berka suy từ giao dịch `k_symbol = POJISTNE`).
 
 **Checklist O2**
-- [ ] Mọi khái niệm của O1 có ít nhất một ô điền
-- [ ] Ghi rõ khoá nối thật giữa nguồn: corebank↔Berka (`client_id` gốc), thẻ↔corebank (`card_token`), AML account↔entity (`entity_id`). Không có khoá thì ghi "không nối"
-- [ ] Ước lượng số node và cạnh cho mỗi nguồn. AML: đếm số cặp `(from, to)` khác nhau trước khi quyết định mức gộp
+- [x] Mọi khái niệm của O1 có ít nhất một ô điền  
+  → catalog `graph_sources`; lớp chỉ Santander để trống có chủ đích (11-19)
+- [x] Ghi rõ khoá nối thật giữa nguồn: corebank↔Berka (`client_id` gốc), thẻ↔corebank (`card_token`), AML account↔entity (`entity_id`). Không có khoá thì ghi "không nối"  
+  → `ALLOWED_SAMEAS` trong `scripts/onto_acceptance.py`; quy tắc 4 của agent (11-19)
+- [x] Ước lượng số node và cạnh cho mỗi nguồn. AML: đếm số cặp `(from, to)` khác nhau trước khi quyết định mức gộp  
+  → số THẬT: 3,22 triệu node, 8,0 triệu cạnh, [docs/onto-acceptance.md](onto-acceptance.md) (11-19)
 
 ---
 
@@ -228,11 +237,16 @@ Bổ sung so với thiết kế gốc, theo silver mới có: `fin:Bank` (IBM AM
 (`holdsAccount`), mọi lá taxonomy có `skos:notation` = mã gốc ở nguồn.
 
 **Checklist O3**
-- [ ] Mỗi lớp/quan hệ trả lời ít nhất một CQ (truy vết ngược được về O1)
-- [ ] Mỗi lớp có nhãn vi + en và định nghĩa một câu. Catalog cho agent (O11) sinh từ đây, thiếu là agent thiếu
-- [ ] Mỗi lá taxonomy có `skos:notation` theo nguồn và `fin:sourceDataset`
-- [ ] Không vòng `subClassOf`. Reasoner (HermiT qua `owlready2`) báo nhất quán
-- [ ] `ontology_version` = `1.0.0` trong CHANGELOG
+- [x] Mỗi lớp/quan hệ trả lời ít nhất một CQ (truy vết ngược được về O1)  
+  → 53/53 lớp truy được về CQ qua lớp cha/con (kiểm 11-19); 9 thuộc tính giá trị (amount, gender...) là thuộc tính phụ của node đã có CQ (11-19)
+- [x] Mỗi lớp có nhãn vi + en và định nghĩa một câu. Catalog cho agent (O11) sinh từ đây, thiếu là agent thiếu  
+  → `test_moi_lop_va_quan_he_co_nhan_vi_en_va_dinh_nghia` (11-19)
+- [x] Mỗi lá taxonomy có `skos:notation` theo nguồn và `fin:sourceDataset`  
+  → `test_la_taxonomy_san_pham_deu_co_ma_nguon`, `test_mot_ma_nguon_chi_thuoc_mot_lop` (11-19)
+- [x] Không vòng `subClassOf`. Reasoner (HermiT qua `owlready2`) báo nhất quán  
+  → `test_khong_vong_subclass` + `test_reasoner_tbox_nhat_quan` (HermiT, Java 21) đạt 11-19 (11-19)
+- [x] `ontology_version` = `1.0.0` trong CHANGELOG  
+  → `ontology/CHANGELOG.md` (11-19)
 
 ---
 
@@ -258,8 +272,10 @@ lỗi hiện ra trên máy, trước khi tốn một đồng Glue nào.
 Thư viện chỉ cho test, không đóng gói vào Glue: `rdflib`, `pyshacl`, `owlready2` (thêm vào `requirements-dev.txt`).
 
 **Checklist O4**
-- [ ] `pytest tests/ontology` xanh trên máy và trên CI
-- [ ] Một mapping cố tình sai (lớp không tồn tại) làm test đỏ. Viết đúng một test như vậy để chứng minh hàng rào chạy
+- [x] `pytest tests/ontology` xanh trên máy và trên CI  
+  → máy: 96 test (ontology + transforms + agent) đạt 11-19; CI: `.github/workflows/ci.yml` chạy `pytest -q` (11-19)
+- [x] Một mapping cố tình sai (lớp không tồn tại) làm test đỏ. Viết đúng một test như vậy để chứng minh hàng rào chạy  
+  → `test_lop_khong_co_trong_tbox_lam_do` (11-19)
 
 ---
 
@@ -315,9 +331,12 @@ Thứ tự viết mapping theo phạm vi O0:
 - **Chỉ đọc phiên bản hiện hành** của bảng SCD2 khi dựng trạng thái hiện tại. Lịch sử đi vào `valid_from/valid_to`.
 
 **Checklist O5**
-- [ ] Mỗi mapping có người duyệt (ghi tên trong file)
-- [ ] pytest O4 xanh với mapping mới
-- [ ] Định nghĩa sản phẩm của Berka/corebank khớp `track_a_gold.berka_product_event` (test đối chiếu số dòng ở O7)
+- [ ] Mỗi mapping có người duyệt (ghi tên trong file)  
+  → CHƯA: 6 file đều ghi `reviewed_by: "namth (cho duyet)"`: **chưa có người duyệt thật**, cần ký duyệt (11-19)
+- [x] pytest O4 xanh với mapping mới  
+  → `tests/ontology/test_mapping.py` 11 test đạt (11-19)
+- [x] Định nghĩa sản phẩm của Berka/corebank khớp `track_a_gold.berka_product_event` (test đối chiếu số dòng ở O7)  
+  → 6/6 sản phẩm Berka khớp số khách với gold (loan 682, classic 659, junior 145, gold 88, household 3.297, insurance 510), [docs/onto-acceptance.md](onto-acceptance.md) (11-19)
 
 ---
 
@@ -337,8 +356,10 @@ dẫn agent đã đưa ra, mọi embedding đã train, mọi `Recommendation` đ
 | Trục thời gian | Theo trục chung của simulator (Berka dời +24 năm, `SIM_EPOCH` 2023-01-01) | Các nguồn so sánh được trên một trục ([sourcing/README.md mục 2.1](sourcing/README.md)) |
 
 **Checklist O6**
-- [ ] Hàm `make_uid` và `make_triple_id` có test: cùng đầu vào cùng kết quả, đổi một trường thì đổi kết quả
-- [ ] Mọi cạnh có `valid_from`. Cạnh không xác định được thời điểm thì ghi rõ quy tắc (ví dụ: ngày mở tài khoản)
+- [x] Hàm `make_uid` và `make_triple_id` có test: cùng đầu vào cùng kết quả, đổi một trường thì đổi kết quả  
+  → `test_uid_on_dinh_va_nhay_theo_tung_truong`, `test_dung_lai_cho_cung_uid_va_triple_id` (11-19)
+- [x] Mọi cạnh có `valid_from`. Cạnh không xác định được thời điểm thì ghi rõ quy tắc (ví dụ: ngày mở tài khoản)  
+  → 4,3 triệu cạnh không thời điểm đều thuộc quy tắc `mapping.TIMELESS` (có lý do); `test_canh_thieu_valid_from_phai_khai_quy_tac_o6` chặn cạnh mới chưa khai (11-19)
 
 ---
 
@@ -371,10 +392,14 @@ tài khoản, vài triệu cạnh gộp) cỡ M.
 | `uid` duy nhất trong `entity`, `triple_id` duy nhất trong `triple` | Trích dẫn không mơ hồ |
 
 **Checklist O7**
-- [ ] Chạy local trên Spark + Iceberg với mẫu nhỏ (như test silver), có test cho từng loại mapping (node, cạnh, n-ary, gộp)
-- [ ] Chạy trên AWS, bảng đối soát ra đúng
-- [ ] **Dựng được hồ sơ 360 của một khách chỉ bằng SQL trên `entity` + `triple`** (nghiệm thu giai đoạn 2 của ONTOLOGY.md)
-- [ ] Ghi số node/cạnh theo lớp và predicate vào [sourcing/ingest-progress.md](sourcing/ingest-progress.md) hoặc tài liệu riêng
+- [x] Chạy local trên Spark + Iceberg với mẫu nhỏ (như test silver), có test cho từng loại mapping (node, cạnh, n-ary, gộp)  
+  → `tests/ontology/test_build_graph.py` (node, cạnh gộp, n-ary holding, AML, sameAs) (11-19)
+- [x] Chạy trên AWS, bảng đối soát ra đúng  
+  → job dừng nếu lệch (`test_doi_soat_lech_lam_job_that_bai`); run hiện hành `entity`/`triple` cùng một run_id (11-19)
+- [x] **Dựng được hồ sơ 360 của một khách chỉ bằng SQL trên `entity` + `triple`** (nghiệm thu giai đoạn 2 của ONTOLOGY.md)  
+  → Khách 2 (Berka): 5 dòng holding/holdsAccount/locatedIn, [docs/onto-acceptance.md](onto-acceptance.md); câu agent A01, A02 đạt (11-19)
+- [x] Ghi số node/cạnh theo lớp và predicate vào [sourcing/ingest-progress.md](sourcing/ingest-progress.md) hoặc tài liệu riêng  
+  → [docs/onto-acceptance.md](onto-acceptance.md) (11-19)
 
 ---
 
@@ -396,9 +421,12 @@ với liên kết yếu hơn.
 Đáp án để đo chất lượng khớp có sẵn: `corebank.seed --sanction-hits N` gieo N ca trúng, đáp án ở `data/ground_truth/`.
 
 **Checklist O8**
-- [ ] Precision/recall của khớp OpenSanctions đo trên đáp án gieo sẵn
-- [ ] Hàng đợi duyệt cho `confidence` trong [0.6, 0.9): bảng `track_a_onto.same_as_review`
-- [ ] Không có `same_as` nào giữa hai vũ trụ không có khoá chung
+- [ ] Precision/recall của khớp OpenSanctions đo trên đáp án gieo sẵn  
+  → CHƯA: **chưa đo được**: corebank trên AWS không được gieo theo `data/ground_truth/sanction_hits.csv` (file sinh local 10-11; tên 3 khách đáp án không khớp dữ liệu AWS). 14 ứng viên hiện có (confidence 0,61-0,80) là trùng tên tự nhiên. Cần seed lại corebank với `--sanction-hits` rồi đo (11-19)
+- [x] Hàng đợi duyệt cho `confidence` trong [0.6, 0.9): bảng `track_a_onto.same_as_review`  
+  → 14 ứng viên, confidence 0,607-0,80, [docs/onto-acceptance.md](onto-acceptance.md) (11-19)
+- [x] Không có `same_as` nào giữa hai vũ trụ không có khoá chung  
+  → chỉ cặp berka-corebank (5.369 cạnh, confidence 1,0), [docs/onto-acceptance.md](onto-acceptance.md) (11-19)
 
 ---
 
@@ -422,9 +450,12 @@ Cạnh suy diễn (`frequentlyFollowedBy`) ghi vào `triple` với `is_inferred 
 biệt "dữ liệu nói" với "hệ thống suy ra".
 
 **Checklist O9**
-- [ ] Test rò rỉ: đổi dữ liệu **sau** `VALID_START` không làm đổi bất kỳ giá trị nào của `product_transition`, `graph_feature` trong khoảng train
-- [ ] `closure` không có chu trình, độ sâu ≤ `MAX_DEPTH`
-- [ ] Mỗi cạnh suy diễn truy ngược được về luật và các cạnh gốc
+- [x] Test rò rỉ: đổi dữ liệu **sau** `VALID_START` không làm đổi bất kỳ giá trị nào của `product_transition`, `graph_feature` trong khoảng train  
+  → `test_o9_product_transition_va_khong_ro_ri` (11-19)
+- [x] `closure` không có chu trình, độ sâu ≤ `MAX_DEPTH`  
+  → 5.209 dòng, độ sâu lớn nhất 6, 0 vòng về chính nó, [docs/onto-acceptance.md](onto-acceptance.md) (11-19)
+- [x] Mỗi cạnh suy diễn truy ngược được về luật và các cạnh gốc  
+  → 5.369 cạnh sameAs suy diễn đều có `mapping_id` (luật) và `source_key`, [docs/onto-acceptance.md](onto-acceptance.md) (11-19)
 
 ---
 
@@ -448,7 +479,8 @@ phục duy nhất là cùng tập test thời gian, cùng model, chỉ khác có
 | Recall@3, MAP@7 theo khách | | |
 
 **Checklist O10**
-- [ ] Chia tập theo **thời gian**, không chia ngẫu nhiên (chia ngẫu nhiên là rò tương lai)
+- [x] Chia tập theo **thời gian**, không chia ngẫu nhiên (chia ngẫu nhiên là rò tương lai)  
+  → recsys MBD và Berka chia theo tháng (docs/RECSYS.md, RECSYS-BENCH.md) (11-19)
 - [ ] Bảng kết quả điền đủ, kèm `model_version` và phiên bản đồ thị (snapshot Iceberg)
 - [ ] `Recommendation` có trong `triple` và `recommend(uid)` (O11) đọc được
 
@@ -474,11 +506,16 @@ Thứ tự: catalog → `describe` + `find_entity` → `customer_360` + `neighbo
 use case A (trợ lý RM, UC2) → B (AML) → C (BA) → D (khách) → E (quản trị dữ liệu).
 
 **Checklist O11**
-- [ ] Catalog sinh từ TBox trong CI; sửa TBox là catalog đổi theo
-- [ ] Không dữ liệu khách nào trong system prompt
-- [ ] Tool `query` chỉ đọc, chạy dưới workgroup persona có trần quét
-- [ ] Mọi lời gọi tool ghi log (người hỏi, persona, tool, id trả về)
-- [ ] Persona `customer_*` không lấy được dòng của khách khác (bộ prompt injection, kỳ vọng 0% rò)
+- [x] Catalog sinh từ TBox trong CI; sửa TBox là catalog đổi theo  
+  → `test_catalog_commit_khop_tbox_va_mapping` (CI chạy pytest) (11-19)
+- [x] Không dữ liệu khách nào trong system prompt  
+  → `test_catalog_on_dinh_va_khong_co_du_lieu_khach` (11-19)
+- [x] Tool `query` chỉ đọc, chạy dưới workgroup persona có trần quét  
+  → `check_readonly_sql` + workgroup persona; câu A15, A21 đạt (11-19)
+- [x] Mọi lời gọi tool ghi log (người hỏi, persona, tool, id trả về)  
+  → `Tools.call` ghi ts, asker, persona (workgroup), tool, args, ok, rows, ids; file JSONL kiểm toán qua `FINGRAPH_AGENT_AUDIT`; `test_nhat_ky_tool_ghi_nguoi_hoi_persona_va_id` (11-19)
+- [x] Persona `customer_*` không lấy được dòng của khách khác (bộ prompt injection, kỳ vọng 0% rò)  
+  → agent khách hàng (`agent/customer.py`), câu D06-D08: Lake Formation trả 0 dòng của khách khác (`leak_sql`), xem docs/AI-AGENT.md (11-19)
 
 ---
 

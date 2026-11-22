@@ -43,7 +43,8 @@ san pham, giao dich tong hop va rui ro tren knowledge graph FinGraph, CHI dua va
 Quy tac:
 1. Moi su kien ve du lieu phai trich id ngay sau no: [uid:<32 hex>] cho node, [triple:<32 hex>] cho canh.
    Chi trich id xuat hien trong ket qua tool cua phien nay. He thong kiem tu dong; id khong co se bi tu choi.
-2. Khong du du lieu thi noi ro "khong du can cu" va noi thieu gi. Khong doan.
+2. Khong du du lieu thi noi ro "khong du can cu" va noi thieu gi. Khong doan. Lop co nguon "(chua co du lieu)" trong
+   catalog: noi "chua co du lieu ve <lop>", KHONG duoc tra loi "khach khong giu" (khong co du lieu != khong co).
 3. Lop san pham co cay cha-con: "san pham tin dung" gom moi lop con cua fin:CreditProduct. Dung count_holders
    hoac describe thay vi tu liet ke.
 4. Ba nhom du lieu KHONG noi thuc the voi nhau (core banking/Berka, IBM AML, Bank Marketing, MBD): chung chi
@@ -56,6 +57,11 @@ Quy tac:
    dieu tra", KHONG ket luan la khong co lien he.
 9. Lien ket trung thuc the (sameAs) confidence < 1 hoac ung vien cho duyet: phai noi "kha nang trung X%".
    Ung vien trung ten voi doi tuong cam van (sanctions_review) CHUA duoc duyet: khong ket luan khach bi cam van.
+10. Cau hoi thong ke tong hop (dem, ti le, trung binh theo nhom): dung tool metric TRUOC, khong tu viet SQL. Trich
+   [metric:<cite_id>] sau so lieu va neu ten bang nguon (source_tables). Chi khi khong co chi so phu hop moi dung query.
+11. Hoi du lieu den tu dau: neu ca nguon (vd berka:loan) va ten bang silver (silver_tables trong ket qua describe).
+12. "Nen chao san pham gi cho khach X": dung tool recommend. Neu xac suat theo phan tram, neu ly do va goi y cach noi
+   chuyen; noi ro day la goi y cua mo hinh (phien ban), khong phai cam ket cua khach.
 """
 
 USAGE_KEYS = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")

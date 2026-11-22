@@ -5,4 +5,7 @@ lightgbm PHẢI được import trước pyarrow/pandas: trên Windows, nạp li
 module trong package đều theo đúng thứ tự.
 """
 
-import lightgbm  # noqa: F401  (thu tu import co chu dich, xem tren)
+try:
+    import lightgbm  # noqa: F401  (thu tu import co chu dich, xem tren)
+except ImportError:  # portal: venv rieng khong co lightgbm, chi dung recsys.v2.online / config
+    pass
