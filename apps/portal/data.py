@@ -318,7 +318,7 @@ def sql_reco_client(client_id: Any) -> str:
     return f"SELECT {RECO_COLS} FROM {RECO_TABLE} WHERE client_id = '{_int(client_id, 'client_id')}' ORDER BY rank"
 
 
-SQL_MY_RECO = f"SELECT {RECO_COLS} FROM {RECO_TABLE} ORDER BY rank"      # LF chỉ trả dòng của khách đăng nhập
+SQL_MY_RECO = f"SELECT client_id, {RECO_COLS} FROM {RECO_TABLE} ORDER BY rank"      # LF chỉ trả dòng của khách đăng nhập
 
 
 def sql_campaign(product: str, limit: Any) -> str:

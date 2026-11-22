@@ -455,7 +455,10 @@ def page_my_offers():
         st.info("Hiện chưa có ưu đãi phù hợp với bạn.")
         return
     df = num(df, ["rank", "p_calibrated", "expected_value"])
-    _reco_cards("me", df.head(2), "portal_customer", customer=True)
+    # client_id THẬT của dòng (LF chỉ trả dòng của khách đăng nhập), không dùng hằng số: chỉ số online tính theo khách
+    # và kiểm SRM cần phân biệt từng khách (lỗi 11-22: mọi khách bị ghi chung là "me")
+    cid = str(df["client_id"].iat[0])
+    _reco_cards(cid, df.head(2), "portal_customer", customer=True)
 
 
 def page_reco_pilot():
