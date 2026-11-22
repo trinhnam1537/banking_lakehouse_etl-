@@ -383,7 +383,8 @@ Báo cáo đầy đủ: `recsys/v2/reports/{mbd,berka}/offline.md` và `online_s
 
 **Độ khó của bài toán (đối chứng ngẫu nhiên, 11-22).** Mỗi dòng Berka được chấm có trung bình 3,85 sản phẩm đủ
 điều kiện (không dòng nào chỉ có 1). Đoán ngẫu nhiên trong các sản phẩm đủ điều kiện đạt Hit@1 0,265 và MAP@3 0,481.
-Vậy Hit@1 0,786 của v2 gấp 3 lần mức ngẫu nhiên, không phải do bài toán dễ.
+Vậy Hit@1 0,786 của v2 gấp 3 lần mức ngẫu nhiên, không phải do bài toán dễ. MBD: 4 sản phẩm luôn đủ điều kiện, ngẫu nhiên đạt Hit@1 0,258 và
+MAP@3 0,460, so với 0,508 và 0,697 của v2.
 
 Với Berka, cách xếp được chọn trên valid (điểm thô, valid 0,896 so với 0,888) KHÔNG phải cách tốt nhất trên test (p_cal,
 0,910). Hệ thống vẫn giữ lựa chọn theo valid, vì chọn lại theo test là dùng test để huấn luyện. Chênh lệch trên valid

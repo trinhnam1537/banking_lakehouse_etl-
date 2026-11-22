@@ -1,4 +1,4 @@
-# Đánh giá offline hệ gợi ý v2: mbd (2026-11-19)
+# Đánh giá offline hệ gợi ý v2: mbd (2026-11-22)
 
 Mô hình `v2-20261119-2300`; tập test 200,448 dòng (khách × tháng), tháng 2022-12-31, 2023-01-31.
 Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ số: docs/RECSYS-V2.md mục 4.
@@ -12,6 +12,7 @@ Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ 
 | v1_lgb_per_product | 1434 | 0.4596 | 0.6863 | 0.6736 | 0.7469 | 0.9562 |
 | repeat | 1434 | 0.4205 | 0.6633 | 0.6500 | 0.7296 | 0.9569 |
 | popularity | 1434 | 0.3145 | 0.5911 | 0.5746 | 0.6707 | 0.9468 |
+| random (trong san pham du dieu kien, TB 50 lan) | 1434 | 0.2581 | 0.5273 | 0.4604 | 0.5352 | 0.7470 |
 
 **Bootstrap ghép cặp 1000 lần, chênh lệch so với `v1_lgb_per_product` (CI 95%):**
 
@@ -21,6 +22,15 @@ Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ 
 | v2 (xep theo calibrated, so sanh) | +0.0220 | +0.0079 [-0.0052; +0.0197] | +0.0046 |
 | popularity | -0.1441 | -0.0984 [-0.1211; -0.0783] | -0.0757 |
 | repeat | -0.0388 | -0.0235 [-0.0420; -0.0058] | -0.0172 |
+
+**Độ khó của bài toán** (đọc mọi con số ở trên so với mức này, không so với 0):
+
+- Số sản phẩm đủ điều kiện mỗi dòng được chấm: trung bình 4.00 (4 sản phẩm: 1,434 dòng).
+- 0.0% số dòng chỉ có 1 sản phẩm đủ điều kiện: mọi mô hình đều đúng ở dòng này.
+- Trung bình 1.03 sản phẩm được mua mỗi dòng; Hit@1 kỳ vọng của đoán ngẫu nhiên = 0.2587.
+
+Mọi dòng được chấm đều có ít nhất 2 sản phẩm đủ điều kiện: bảng trên đã là bài toán xếp hạng thật sự.
+
 
 ## 2. Nhắm khách theo sản phẩm (v2)
 

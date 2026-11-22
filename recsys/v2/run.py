@@ -148,7 +148,10 @@ def offline_md(r: dict, dom) -> str:
               f"- {el['trivial_share']:.1%} số dòng chỉ có 1 sản phẩm đủ điều kiện: mọi mô hình đều đúng ở dòng này.",
               f"- Trung bình {el['mean_positive']:.2f} sản phẩm được mua mỗi dòng; Hit@1 kỳ vọng của đoán ngẫu nhiên = "
               f"{el['random_hit1_expected']:.4f}.", ""]
-    if r.get("ranking_nontrivial"):
+    same = r.get("ranking_nontrivial") and r["ranking_nontrivial"][0].get("rows") == r["ranking"][0].get("rows")
+    if same:
+        L += ["Mọi dòng được chấm đều có ít nhất 2 sản phẩm đủ điều kiện: bảng trên đã là bài toán xếp hạng thật sự.", ""]
+    elif r.get("ranking_nontrivial"):
         b = r["bootstrap_nontrivial"]
         L += ["### 1b. Chỉ các dòng có ít nhất 2 sản phẩm đủ điều kiện (bài toán xếp hạng thật sự)", "",
               table(sorted(r["ranking_nontrivial"], key=lambda x: -x.get("map@3", 0)),
