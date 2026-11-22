@@ -168,9 +168,17 @@ def main(argv=None) -> int:
     ap.add_argument("--provider", choices=PROVIDERS, default="bedrock")
     ap.add_argument("--region", default="ap-southeast-1")
     ap.add_argument("--neptune", default=None, help="ten Lambda neptune-ops de bat tool AML, vd fingraph-dev-neptune-ops")
+    ap.add_argument("--agent-profile", default=None,
+                    help="profile AWS cua PERSONA cho truy van du lieu (vd fg-analyst-mcp); model van goi bang "
+                         "credential mac dinh. Sau lockdown, TerraformAdmin khong doc duoc du lieu")
     a = ap.parse_args(argv)
     client, model = make_client(a.provider, a.region)
-    tools = Tools(AthenaBackend(a.workgroup, region=a.region),
+    sess = None
+    if a.agent_profile:
+        import boto3
+
+        sess = boto3.Session(profile_name=a.agent_profile, region_name=a.region)
+    tools = Tools(AthenaBackend(a.workgroup, session=sess, region=a.region),
                   graph=NeptuneBackend(a.neptune, region=a.region) if a.neptune else None,
                   log=lambda r: print(f"  [tool] {json.dumps(r, ensure_ascii=False)}", file=sys.stderr))
     ans = ask(a.question, tools, client, model, a.provider)
