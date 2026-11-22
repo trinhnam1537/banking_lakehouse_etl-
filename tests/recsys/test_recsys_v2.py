@@ -85,6 +85,19 @@ def test_ranking_ndcg_va_map():
     assert worst["hit@1"] == 0 and worst["ndcg@3"] == pytest.approx(0.5)
 
 
+def test_doi_chung_ngau_nhien_va_do_kho():
+    # dòng 0: 1 sản phẩm đủ điều kiện (tầm thường); dòng 1: 4 đủ điều kiện, 1 được mua; dòng 2: không ai mua (bỏ)
+    Y = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 0]])
+    E = np.array([[1, 0, 0, 0], [1, 1, 1, 1], [1, 1, 1, 1]], bool)
+    el = EV.eligibility(Y, E)
+    assert el["rows"] == 2 and el["eligible_dist"] == {1: 1, 4: 1}
+    assert el["trivial_share"] == 0.5
+    assert el["random_hit1_expected"] == pytest.approx((1 + 0.25) / 2)
+    r = EV.random_ranking(Y, E, draws=400)
+    assert r["hit@1"] == pytest.approx(0.625, abs=0.05)
+    assert EV.nontrivial(E).tolist() == [False, True, True]
+
+
 def test_calibration_hoan_hao_ece_gan_0():
     rng = np.random.default_rng(0)
     p = rng.random(50000) * 0.2
