@@ -2,17 +2,20 @@
 
 import datetime as dt
 
-import lightgbm  # noqa: F401  (thu tu import tren Windows)
-import numpy as np
-import pandas as pd
 import pytest
 
-from recsys.v2 import evaluate as EV
-from recsys.v2 import online as ON
-from recsys.v2 import serve as SV
-from recsys.v2.config import BERKA, Domain, Product
-from recsys.v2.data import Dataset, matrices
-from recsys.v2.model import Isotonic, Ranker
+# recsys/ khong chay tren Glue (3.9): CI chi cai recsys/requirements.txt o job 3.12, job 3.9 bo qua.
+lightgbm = pytest.importorskip("lightgbm")  # import truoc numpy/pandas (thu tu import tren Windows)
+
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+
+from recsys.v2 import evaluate as EV  # noqa: E402
+from recsys.v2 import online as ON  # noqa: E402
+from recsys.v2 import serve as SV  # noqa: E402
+from recsys.v2.config import BERKA, Domain, Product  # noqa: E402
+from recsys.v2.data import Dataset, matrices  # noqa: E402
+from recsys.v2.model import Isotonic, Ranker  # noqa: E402
 
 TOY = Domain("toy", [Product("a", "A", "fin:A", 100.0), Product("b", "B", "fin:B", 10.0)], "y_", "USD", 1.0,
              min_p_show=0.0)

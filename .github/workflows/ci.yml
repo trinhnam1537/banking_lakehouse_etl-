@@ -55,9 +55,15 @@ jobs:
           cache-dependency-path: |
             requirements-dev.txt
             sourcing/requirements.txt
+            recsys/requirements.txt
 
       - name: Cai thu vien
         run: pip install -r requirements-dev.txt
+
+      # recsys/ chi chay may ca nhan / portal, khong tren Glue 3.9: chi test o 3.12
+      - name: Cai thu vien recsys (3.12)
+        if: matrix.python == '3.12'
+        run: pip install -r recsys/requirements.txt
 
       - name: pytest
         run: python -m pytest -q
