@@ -104,6 +104,7 @@ def test_sql_goi_y_chan_injection_va_chi_san_pham_hop_le():
     with pytest.raises(ValueError):
         D.sql_campaign("loan' --", 10)
     assert "WHERE" not in D.SQL_MY_RECO          # khách: Lake Formation lọc dòng, portal không tự lọc
+    assert "client_id" in D.SQL_MY_RECO          # sự kiện online ghi mã khách thật (không phải hằng số "me")
 
 
 def test_nhat_ky_su_kien_goi_y_ghi_file(tmp_path, monkeypatch):
