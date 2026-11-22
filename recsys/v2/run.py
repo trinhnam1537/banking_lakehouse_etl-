@@ -30,6 +30,9 @@ REPORTS = HERE / "reports"
 EVENTS = HERE / "events"
 
 
+RANDOM = "random (trong san pham du dieu kien, TB 50 lan)"
+
+
 def _f(v, nd=4):
     return f"{v:.{nd}f}" if isinstance(v, float) else str(v)
 
@@ -83,9 +86,16 @@ def cmd_evaluate(ds: Dataset, m: Ranker, log=print) -> dict:
     res = {"domain": dom.name, "model_version": m.meta.get("version"), "n_test": len(te),
            "test_months": sorted(map(str, set(te["month"])))}
     res["ranking"] = [{"model": k, **EV.ranking(Y, S, E)} for k, S in models.items()]
+    res["ranking"].append({"model": RANDOM, **EV.random_ranking(Y, E)})
+    res["eligibility"] = EV.eligibility(Y, E)
     ref = "v1_lgb_per_product" if "v1_lgb_per_product" in models else "popularity"
     res["bootstrap_vs"] = ref
     res["bootstrap"] = {k: EV.bootstrap_diff(Y, S, models[ref], E) for k, S in models.items() if k != ref}
+    nt = EV.nontrivial(E)          # dòng có >= 2 sản phẩm đủ điều kiện: bài toán xếp hạng thật sự
+    res["ranking_nontrivial"] = [{"model": k, **EV.ranking(Y[nt], S[nt], E[nt])} for k, S in models.items()]
+    res["ranking_nontrivial"].append({"model": RANDOM, **EV.random_ranking(Y[nt], E[nt])})
+    champ = next(k for k in models if "champion" in k)
+    res["bootstrap_nontrivial"] = EV.bootstrap_diff(Y[nt], models[champ][nt], models[ref][nt], E[nt])
     res["per_product"] = EV.per_product(Y, P, E, dom.codes)
     res["calibration"] = {}
     for j, c in enumerate(dom.codes):
@@ -130,6 +140,22 @@ def offline_md(r: dict, dom) -> str:
     for k, b in r["bootstrap"].items():
         L.append(f"| {k} | {b['hit@1'][0]:+.4f} | {b['map@3'][0]:+.4f} [{b['map@3'][1]:+.4f}; {b['map@3'][2]:+.4f}] | "
                  f"{b['ndcg@3'][0]:+.4f} |")
+    el = r.get("eligibility")
+    if el:
+        dist = ", ".join(f"{k} sản phẩm: {v:,} dòng" for k, v in el["eligible_dist"].items())
+        L += ["", "**Độ khó của bài toán** (đọc mọi con số ở trên so với mức này, không so với 0):", "",
+              f"- Số sản phẩm đủ điều kiện mỗi dòng được chấm: trung bình {el['mean_eligible']:.2f} ({dist}).",
+              f"- {el['trivial_share']:.1%} số dòng chỉ có 1 sản phẩm đủ điều kiện: mọi mô hình đều đúng ở dòng này.",
+              f"- Trung bình {el['mean_positive']:.2f} sản phẩm được mua mỗi dòng; Hit@1 kỳ vọng của đoán ngẫu nhiên = "
+              f"{el['random_hit1_expected']:.4f}.", ""]
+    if r.get("ranking_nontrivial"):
+        b = r["bootstrap_nontrivial"]
+        L += ["### 1b. Chỉ các dòng có ít nhất 2 sản phẩm đủ điều kiện (bài toán xếp hạng thật sự)", "",
+              table(sorted(r["ranking_nontrivial"], key=lambda x: -x.get("map@3", 0)),
+                    ["model", "rows", "hit@1", "mrr", "map@3", "ndcg@3", "recall@3"]),
+              f"Champion so với `{r['bootstrap_vs']}` trên các dòng này: Δ Hit@1 {b['hit@1'][0]:+.4f} "
+              f"[{b['hit@1'][1]:+.4f}; {b['hit@1'][2]:+.4f}], Δ MAP@3 {b['map@3'][0]:+.4f} "
+              f"[{b['map@3'][1]:+.4f}; {b['map@3'][2]:+.4f}] (CI 95%, bootstrap 1000 lần).", ""]
     L += ["", "## 2. Nhắm khách theo sản phẩm (v2)", "",
           table(r["per_product"], ["product", "pos", "rate", "roc_auc", "pr_auc", "lift@1%", "recall@5%"]),
           "## 3. Hiệu chỉnh xác suất (trước / sau isotonic)", "",

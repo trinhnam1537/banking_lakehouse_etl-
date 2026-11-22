@@ -1,4 +1,4 @@
-# Đánh giá offline hệ gợi ý v2: berka (2026-11-19)
+# Đánh giá offline hệ gợi ý v2: berka (2026-11-22)
 
 Mô hình `v2-20261119-2256`; tập test 40,310 dòng (khách × tháng), tháng 1998-01-01, 1998-02-01, 1998-03-01, 1998-04-01, 1998-05-01, 1998-06-01, 1998-07-01, 1998-08-01, 1998-09-01.
 Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ số: docs/RECSYS-V2.md mục 4.
@@ -11,6 +11,7 @@ Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ 
 | v2 (xep theo raw, champion) | 1369 | 0.7860 | 0.8863 | 0.8848 | 0.9132 | 0.9942 |
 | popularity | 1369 | 0.3514 | 0.6376 | 0.6180 | 0.6972 | 0.9233 |
 | cooccurrence | 1369 | 0.3514 | 0.6376 | 0.6180 | 0.6972 | 0.9233 |
+| random (trong san pham du dieu kien, TB 50 lan) | 1369 | 0.2652 | 0.5360 | 0.4811 | 0.5595 | 0.7860 |
 
 **Bootstrap ghép cặp 1000 lần, chênh lệch so với `popularity` (CI 95%):**
 
@@ -19,6 +20,25 @@ Sinh bởi `python -m recsys.v2.run evaluate`. Giải thích từng nhóm chỉ 
 | v2 (xep theo raw, champion) | +0.4350 | +0.2669 [+0.2503; +0.2835] | +0.2160 |
 | v2 (xep theo calibrated, so sanh) | +0.4801 | +0.2918 [+0.2746; +0.3076] | +0.2350 |
 | cooccurrence | +0.0000 | +0.0000 [+0.0000; +0.0000] | +0.0000 |
+
+**Độ khó của bài toán** (đọc mọi con số ở trên so với mức này, không so với 0):
+
+- Số sản phẩm đủ điều kiện mỗi dòng được chấm: trung bình 3.85 (3 sản phẩm: 207 dòng, 4 sản phẩm: 1,162 dòng).
+- 0.0% số dòng chỉ có 1 sản phẩm đủ điều kiện: mọi mô hình đều đúng ở dòng này.
+- Trung bình 1.01 sản phẩm được mua mỗi dòng; Hit@1 kỳ vọng của đoán ngẫu nhiên = 0.2661.
+
+### 1b. Chỉ các dòng có ít nhất 2 sản phẩm đủ điều kiện (bài toán xếp hạng thật sự)
+
+| model | rows | hit@1 | mrr | map@3 | ndcg@3 | recall@3 |
+|---|---|---|---|---|---|---|
+| v2 (xep theo calibrated, so sanh) | 1369 | 0.8313 | 0.9108 | 0.9098 | 0.9323 | 0.9963 |
+| v2 (xep theo raw, champion) | 1369 | 0.7860 | 0.8863 | 0.8848 | 0.9132 | 0.9942 |
+| popularity | 1369 | 0.3514 | 0.6376 | 0.6180 | 0.6972 | 0.9233 |
+| cooccurrence | 1369 | 0.3514 | 0.6376 | 0.6180 | 0.6972 | 0.9233 |
+| random (trong san pham du dieu kien, TB 50 lan) | 1369 | 0.2652 | 0.5360 | 0.4811 | 0.5595 | 0.7860 |
+
+Champion so với `popularity` trên các dòng này: Δ Hit@1 +0.4350 [+0.4047; +0.4638], Δ MAP@3 +0.2669 [+0.2503; +0.2835] (CI 95%, bootstrap 1000 lần).
+
 
 ## 2. Nhắm khách theo sản phẩm (v2)
 
