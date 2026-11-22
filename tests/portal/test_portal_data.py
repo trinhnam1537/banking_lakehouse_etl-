@@ -107,6 +107,7 @@ def test_sql_goi_y_chan_injection_va_chi_san_pham_hop_le():
 
 
 def test_nhat_ky_su_kien_goi_y_ghi_file(tmp_path, monkeypatch):
+    pytest.importorskip("numpy")  # recsys.v2.online can numpy: chi cai o job 3.12 (recsys/requirements.txt)
     from apps.portal import data as D
     from recsys.v2.online import RecoEvent
 

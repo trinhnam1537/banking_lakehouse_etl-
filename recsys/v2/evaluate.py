@@ -47,6 +47,33 @@ def ranking(Y: np.ndarray, S: np.ndarray, E: Optional[np.ndarray] = None, k: int
             f"recall@{kk}": float((rel[:, :kk].sum(1) / Y.sum(1)).mean())}
 
 
+def random_ranking(Y: np.ndarray, E: np.ndarray, k: int = 3, draws: int = 50, seed: int = 0) -> Dict[str, float]:
+    """Đối chứng NGẪU NHIÊN trong các sản phẩm đủ điều kiện: trung bình `draws` lần xáo thứ tự. Đây là mức sàn thật
+    của bài toán: khi mỗi khách chỉ còn 1-3 sản phẩm đủ điều kiện, đoán bừa cũng đạt Hit@1 cao, nên mọi con số xếp
+    hạng phải đọc so với mức này chứ không phải so với 0."""
+    rng = np.random.default_rng(seed)
+    runs = [ranking(Y, rng.random(Y.shape), E, k) for _ in range(draws)]
+    return {key: (float(np.mean([r[key] for r in runs])) if key != "rows" else runs[0]["rows"]) for key in runs[0]}
+
+
+def eligibility(Y: np.ndarray, E: np.ndarray) -> Dict:
+    """Độ khó của bài toán xếp hạng: trên các dòng được chấm (có ≥ 1 sản phẩm đủ điều kiện được mua), mỗi dòng có bao
+    nhiêu sản phẩm đủ điều kiện. Dòng chỉ có 1 sản phẩm đủ điều kiện thì mọi mô hình đều đúng (Hit@1 = 1)."""
+    rows = (Y * E).sum(1) > 0
+    n = E[rows].sum(1)
+    pos = (Y * E)[rows].sum(1)
+    dist = {int(v): int((n == v).sum()) for v in sorted(set(n.tolist()))}
+    return {"rows": int(rows.sum()), "mean_eligible": float(n.mean()) if len(n) else 0.0,
+            "mean_positive": float(pos.mean()) if len(pos) else 0.0, "eligible_dist": dist,
+            "trivial_share": float((n == 1).mean()) if len(n) else 0.0,
+            "random_hit1_expected": float((pos / n).mean()) if len(n) else 0.0}
+
+
+def nontrivial(E: np.ndarray, min_eligible: int = 2) -> np.ndarray:
+    """Mặt nạ các dòng có ít nhất `min_eligible` sản phẩm đủ điều kiện (bài toán xếp hạng thật sự)."""
+    return E.sum(1) >= min_eligible
+
+
 # ---------------------------------------------------------------------------------------------- 2. theo sản phẩm
 def per_product(Y, S, E, codes) -> List[Dict]:
     out = []
