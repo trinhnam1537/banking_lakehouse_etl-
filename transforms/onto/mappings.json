@@ -310,6 +310,24 @@
     "attributes": {
      "external": "'true'"
     }
+   },
+   {
+    "id": "recommendation",
+    "class": "fin:Recommendation",
+    "from": "track_a_gold.reco_topk_berka",
+    "key": [
+     "client_id",
+     "product",
+     "scored_month",
+     "model_version"
+    ],
+    "label": "concat('Gợi ý ', product_label, ' cho Khách ', client_id)",
+    "valid_from": "scored_month",
+    "attributes": {
+     "rank": "rank",
+     "variant": "variant",
+     "expected_value": "expected_value"
+    }
    }
   ],
   "edges": [
@@ -492,6 +510,87 @@
     "valid_from": "month",
     "valid_to": "last_day(month)",
     "source_key": "concat('account_id=', account_id, '|cp=', counterparty_bank, '-', counterparty_account, '|month=', month)"
+   },
+   {
+    "id": "recommendation_for_customer",
+    "predicate": "fin:forCustomer",
+    "from": "track_a_gold.reco_topk_berka",
+    "subject": {
+     "entity": "recommendation",
+     "key": [
+      "client_id",
+      "product",
+      "scored_month",
+      "model_version"
+     ]
+    },
+    "object": {
+     "entity": "customer",
+     "key": [
+      "client_id"
+     ]
+    },
+    "valid_from": "scored_month",
+    "source_key": "concat('client_id=', client_id, '|product=', product, '|month=', scored_month, '|model=', model_version)",
+    "expect_rows": "SELECT count(*) FROM {track_a_gold.reco_topk_berka}"
+   },
+   {
+    "id": "recommendation_product",
+    "predicate": "fin:recommends",
+    "from": "track_a_gold.reco_topk_berka",
+    "subject": {
+     "entity": "recommendation",
+     "key": [
+      "client_id",
+      "product",
+      "scored_month",
+      "model_version"
+     ]
+    },
+    "object": {
+     "product": "CASE WHEN product = 'loan' THEN 'loan' ELSE concat('card_type=', regexp_replace(product, '^card_', '')) END"
+    },
+    "valid_from": "scored_month",
+    "source_key": "concat('client_id=', client_id, '|product=', product, '|month=', scored_month, '|model=', model_version)",
+    "expect_rows": "SELECT count(*) FROM {track_a_gold.reco_topk_berka}"
+   },
+   {
+    "id": "recommendation_score",
+    "predicate": "fin:score",
+    "from": "track_a_gold.reco_topk_berka",
+    "subject": {
+     "entity": "recommendation",
+     "key": [
+      "client_id",
+      "product",
+      "scored_month",
+      "model_version"
+     ]
+    },
+    "object_literal": {
+     "expr": "p_calibrated",
+     "datatype": "xsd:double"
+    },
+    "valid_from": "scored_month"
+   },
+   {
+    "id": "recommendation_model_version",
+    "predicate": "fin:modelVersion",
+    "from": "track_a_gold.reco_topk_berka",
+    "subject": {
+     "entity": "recommendation",
+     "key": [
+      "client_id",
+      "product",
+      "scored_month",
+      "model_version"
+     ]
+    },
+    "object_literal": {
+     "expr": "model_version",
+     "datatype": "xsd:string"
+    },
+    "valid_from": "scored_month"
    }
   ],
   "holdings": [

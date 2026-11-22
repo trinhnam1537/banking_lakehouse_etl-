@@ -911,14 +911,18 @@
   {
    "children": [],
    "definition": "Diem model goi y mot san pham cho mot khach, kem phien ban model va thoi diem cham.",
-   "graph_sources": [],
+   "graph_sources": [
+    "berka"
+   ],
    "iri": "fin:Recommendation",
    "label_en": "Recommendation",
    "label_vi": "Gợi ý sản phẩm",
    "materialized_in": [],
    "notations": [],
    "parents": [],
-   "silver_tables": []
+   "silver_tables": [
+    "track_a_gold.reco_topk_berka"
+   ]
   },
   {
    "children": [],
@@ -1138,7 +1142,9 @@
   {
    "definition": "Khach nhan goi y.",
    "domain": "fin:Recommendation",
-   "graph_sources": [],
+   "graph_sources": [
+    "berka"
+   ],
    "iri": "fin:forCustomer",
    "kind": "object",
    "label_vi": "cho khách",
@@ -1283,7 +1289,9 @@
   {
    "definition": "Phien ban model sinh diem.",
    "domain": "fin:Recommendation",
-   "graph_sources": [],
+   "graph_sources": [
+    "berka"
+   ],
    "iri": "fin:modelVersion",
    "kind": "datatype",
    "label_vi": "phiên bản model",
@@ -1333,7 +1341,9 @@
   {
    "definition": "Lop san pham duoc goi y.",
    "domain": "fin:Recommendation",
-   "graph_sources": [],
+   "graph_sources": [
+    "berka"
+   ],
    "iri": "fin:recommends",
    "kind": "object",
    "label_vi": "gợi ý sản phẩm",
@@ -1356,7 +1366,9 @@
   {
    "definition": "Diem model (xac suat mua).",
    "domain": "fin:Recommendation",
-   "graph_sources": [],
+   "graph_sources": [
+    "berka"
+   ],
    "iri": "fin:score",
    "kind": "datatype",
    "label_vi": "điểm",

@@ -57,6 +57,8 @@ class Ref:
     entity: str              # id của mục entities trong cùng file
     key: List[str]           # biểu thức SQL, khớp theo vị trí với key của node
     concept: Optional[str] = None   # hoặc: biểu thức -> skos:notation của một khái niệm TBox (vd 'FAN-OUT')
+    product: Optional[str] = None   # hoặc: biểu thức -> skos:notation của LỚP SẢN PHẨM, không tiền tố nguồn
+                                    # (vd 'card_type=gold' -> 'berka:card_type=gold' -> fin:GoldCard)
 
 
 # Lớp của node khái niệm theo concept scheme (khái niệm SKOS trong TBox thành node trên đồ thị)
@@ -165,6 +167,8 @@ def _source(raw: Dict[str, Any], database: str, where_ctx: str) -> Source:
 def _ref(raw: Any, ctx: str) -> Ref:
     if isinstance(raw, dict) and "concept" in raw:
         return Ref(entity="", key=[], concept=str(raw["concept"]))
+    if isinstance(raw, dict) and "product" in raw:
+        return Ref(entity="", key=[], product=str(raw["product"]))
     if not isinstance(raw, dict) or "entity" not in raw or "key" not in raw:
         raise MappingError(f"{ctx}: tham chieu node can {{entity, key}}")
     key = raw["key"] if isinstance(raw["key"], list) else [raw["key"]]
@@ -324,6 +328,10 @@ def validate(mappings: List[Mapping], tbox: Dict[str, Any]) -> None:
     def ref_types(m: Mapping, r: Ref, ctx: str) -> Optional[List[str]]:
         if r.concept is not None:
             return sorted(set(SCHEME_CLASS.values()))
+        if r.product is not None:
+            if not any(n.startswith(m.source_system + ":") for n in notations):
+                errors.append(f"{ctx}: TBox khong co skos:notation nao cho nguon {m.source_system}")
+            return ["fin:Product"]
         e = m.entities.get(r.entity)
         if e is None:
             errors.append(f"{ctx}: khong co node `{r.entity}` trong {m.name}")

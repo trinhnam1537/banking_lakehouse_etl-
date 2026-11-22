@@ -97,7 +97,15 @@ def _null_key(exprs):
     return F.greatest(*[F.expr(x).isNull() for x in exprs]) if len(exprs) > 1 else F.expr(exprs[0]).isNull()
 
 
-def _ref_uid(m: M.Mapping, ref: M.Ref, concepts=None):
+def _ref_uid(m: M.Mapping, ref: M.Ref, concepts=None, notations=None):
+    if ref.product is not None:
+        # mã sản phẩm của nguồn -> lớp sản phẩm (skos:notation) -> uid node sản phẩm; không tra được thì trỏ IRI
+        # không tồn tại để bất biến "cạnh mồ côi" chặn lại
+        from pyspark.sql import functions as F
+
+        lookup = F.create_map(*[x for k, v in (notations or {}).items() for x in (F.lit(k), F.lit(v))])
+        key = F.concat(F.lit(m.source_system + ":"), F.expr(ref.product))
+        return _product_uid_col(F.coalesce(lookup[key], F.lit("fin:UNRESOLVED_PRODUCT")))
     if ref.concept is not None:
         # notation -> IRI khái niệm -> uid node khái niệm. Không tra được thì trỏ vào IRI không tồn tại
         # để bất biến "cạnh mồ côi" chặn lại (NULL sẽ lọt vì cạnh literal có object_uid NULL).
@@ -174,7 +182,7 @@ def _triple(subject, predicate, obj_uid, literal, datatype, weight, vf, vt, data
             F.lit(1.0).alias("confidence"), F.lit(False).alias("is_inferred"), F.lit(mapping_id).alias("mapping_id")]
 
 
-def edge_frame(spark, m: M.Mapping, e: M.Edge, concepts=None):
+def edge_frame(spark, m: M.Mapping, e: M.Edge, concepts=None, notations=None):
     from pyspark.sql import functions as F
 
     df = source_df(spark, e.source)
@@ -182,7 +190,7 @@ def edge_frame(spark, m: M.Mapping, e: M.Edge, concepts=None):
     skey = F.expr(e.source_key) if e.source_key else _nkey(m.entities[e.subject.entity].key.keys(), e.subject.key)
     weight = F.expr(e.weight) if e.weight else F.lit(None)
     if e.obj is not None:
-        cols = _triple(subj, e.predicate, _ref_uid(m, e.obj, concepts), F.lit(None), F.lit(None), weight,
+        cols = _triple(subj, e.predicate, _ref_uid(m, e.obj, concepts, notations), F.lit(None), F.lit(None), weight,
                        _date(e.valid_from), _date(e.valid_to), e.source.dataset, skey, f"{m.source_system}.{e.id}")
     else:
         cols = _triple(subj, e.predicate, F.lit(None), F.expr(e.literal["expr"]), F.lit(e.literal["datatype"]),
@@ -335,7 +343,7 @@ def build(spark, mappings: List[M.Mapping], tb: Dict[str, Any]):
         for e in m.entities.values():
             ents.append(entity_frame(spark, m, e))
         for e in m.edges:
-            tris.append(edge_frame(spark, m, e, concepts))
+            tris.append(edge_frame(spark, m, e, concepts, notations))
             if e.expect_rows:
                 expectations.append({"id": f"{m.source_system}.{e.id}", "sql": e.expect_rows})
         for h in m.holdings:
