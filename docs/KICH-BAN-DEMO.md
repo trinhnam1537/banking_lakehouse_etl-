@@ -34,6 +34,11 @@ cd ..\banking_lakehouse_etl
 
 Mật khẩu Grafana: `sudo cat /data/realtime-secrets/grafana_admin_password` qua SSM. Không chiếu lên màn hình.
 
+Port forward SSM tự đóng khi không dùng khoảng 20 phút (gặp 22-11). Mở lại ngay trước phần 3.
+
+Lần nạp Neptune ngày 22-11 mất khoảng 1 giờ (export 423 MB, 120 file). Bắt đầu `load` sớm, hoặc dùng
+`load -SkipExport` nếu đồ thị không đổi.
+
 **Danh sách kiểm (tick trước khi bắt đầu):**
 
 | Kiểm | Lệnh / nơi xem | Kỳ vọng |
@@ -107,8 +112,8 @@ $A = @("--workgroup", "fingraph-dev-analyst", "--agent-profile", "fg-analyst-mcp
 
 | # | Câu hỏi | Tool kỳ vọng | Nói |
 |---|---|---|---|
-| 4.1 | `python -m agent.loop "Khách 2 (Berka) đang giữ những sản phẩm nào?" @A` | `customer_360` | "Agent không viết SQL tự do trên silver, mà đi qua ontology: tool hẹp, có kiểu" |
-| 4.2 | "Lớp Khoản vay (fin:Loan) được nạp từ những bảng silver nào?" | `describe` | "Catalog ngữ nghĩa sinh tự động từ TBox và mapping" |
+| 4.1 | `python -m agent.loop "Khách 2 (Berka) đang giữ những sản phẩm nào?" @A` | `find_entity` → `customer_360` | Kỳ vọng (22-11): tài khoản thanh toán (1993), thanh toán định kỳ, khoản vay đã tất toán 1994–1996, mỗi dòng có `[triple:…]`. "Agent không viết SQL tự do trên silver, mà đi qua ontology: tool hẹp, có kiểu" |
+| 4.2 | "Lớp Khoản vay (fin:Loan) được nạp từ những bảng silver nào?" | `describe` | Kỳ vọng (22-11): 4 bảng (`silver_berka.loan/disp`, `silver_corebank.loan/disp`). "Catalog ngữ nghĩa sinh tự động từ TBox và mapping" |
 | 4.3 | "Vụ rửa tiền HI-Medium-01062 thuộc kiểu hình nào? Các tài khoản tham gia thuộc sở hữu của những pháp nhân nào?" | `neighborhood` / `explain_link` (Neptune) | "Câu nhiều bước trên đồ thị: Neptune trả đường đi, mỗi cạnh có triple_id" |
 | 4.4 | "Nên chào sản phẩm gì cho Khách 2 (Berka), vì sao?" | `recommend` | Kỳ vọng (22-11): Thẻ classic, 7,3%, lý do số dư bình quân 3 tháng, model `v2-20261119-2256`, có `[metric:…]` |
 | 4.5 | `python -m agent.customer "Tôi có những tài khoản nào, mở từ ngày nào?"` | `my_data` (persona khách) | "Agent khách chạy dưới quyền của chính khách" |
